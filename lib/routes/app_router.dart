@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'package:servus_app/features/dashboard/dashboard_screen.dart';
 import 'package:servus_app/features/login/login_screen.dart';
 import 'package:servus_app/features/splash/welcome_screen.dart';
 
@@ -19,6 +20,10 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: '/dashboard',
+      builder: (context, state) => const DashboardScreen(),
     ),
   ],
 );

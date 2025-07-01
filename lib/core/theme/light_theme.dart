@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:servus_app/core/theme/color_scheme.dart';
 
 final ThemeData lightTheme = ThemeData(
+  
   textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme).copyWith(
     bodyLarge: TextStyle(color: ServusColors.surface),
     bodyMedium: TextStyle(color: ServusColors.surface),

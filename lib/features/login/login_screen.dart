@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/color_scheme.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
@@ -12,11 +13,12 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final statusBarHeight = MediaQuery.of(context).padding.top;
+    final _formKey = GlobalKey<FormState>();
 
     return Scaffold(
       body: Stack(
         children: [
-          // Fundo azul ocupando 40% da tela + área da notch
+          // Fundo azul ocupando 33% da tela + área da notch
           Positioned(
             top: 0,
             left: 0,
@@ -71,147 +73,185 @@ class LoginScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            label: Text(
-                              'Continue com Google',
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              label: Text(
+                                'Continue com Google',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      color: ServusColors.textHigh,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                              ),
+                              onPressed: () {},
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    context.theme.scaffoldBackgroundColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                minimumSize: const Size(double.infinity, 48),
+                              ),
+                              icon: SvgPicture.asset(
+                                'assets/images/google_logo.svg',
+                                width: 24,
+                                height: 24,
+                                semanticsLabel: 'Google Icon',
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text('Ou acesse com',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      color: ServusColors.textMedium,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                textAlign: TextAlign.center),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              keyboardType: TextInputType.emailAddress,
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyLarge
                                   ?.copyWith(
                                     color: ServusColors.textHigh,
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w500,
                                   ),
+                              controller: context
+                                  .read<LoginController>()
+                                  .emailController,
+                              decoration:
+                                  const InputDecoration(labelText: 'Email'),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Informe o e-mail';
+                                }
+                                final emailRegex =
+                                    RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
+                                if (!emailRegex.hasMatch(value)) {
+                                  return 'E-mail inválido';
+                                }
+                                return null;
+                              },
                             ),
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: context.theme.scaffoldBackgroundColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              minimumSize: const Size(double.infinity, 48),
-                            ),
-                            icon: SvgPicture.asset(
-                              'assets/images/google_logo.svg',
-                              width: 24,
-                              height: 24,
-                              semanticsLabel: 'Google Icon',
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text('Ou acesse com',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyLarge
-                                  ?.copyWith(
-                                    color: ServusColors.textMedium,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                              textAlign: TextAlign.center),
-                          const SizedBox(height: 16),
-                          TextField(
-                            style:
-                                Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            const SizedBox(height: 16),
+                            Consumer<LoginController>(
+                              builder: (context, controller, _) =>
+                                  TextFormField(
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
                                       color: ServusColors.textHigh,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w500,
                                     ),
-                            controller:
-                                context.read<LoginController>().emailController,
-                            decoration:
-                                const InputDecoration(labelText: 'Email'),
-                          ),
-                          const SizedBox(height: 16),
-                          Consumer<LoginController>(
-                            builder: (context, controller, _) => TextField(
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyLarge
-                                  ?.copyWith(
-                                    color: ServusColors.textHigh,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
+                                maxLength: 8,
+                                buildCounter: (_, {required int currentLength, required bool isFocused, required int? maxLength}) => null,
+                                controller: controller.passwordController,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Informe a senha';
+                                  }
+                                  if (value.length < 8) {
+                                    return 'A senha deve ter pelo menos 8 caracteres';
+                                  }
+                                  return null;
+                                },
+                                obscureText: !controller.isPasswordVisible,
+                                decoration: InputDecoration(
+                                  labelText: 'Senha',
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      controller.isPasswordVisible
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                    ),
+                                    onPressed:
+                                        controller.togglePasswordVisibility,
                                   ),
-                              maxLength: 10,
-                              controller: controller.passwordController,
-                              obscureText: !controller.isPasswordVisible,
-                              decoration: InputDecoration(
-                                labelText: 'Senha',
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    controller.isPasswordVisible
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                  ),
-                                  onPressed:
-                                      controller.togglePasswordVisibility,
                                 ),
                               ),
                             ),
-                          ),
-                          Consumer<LoginController>(
-                            builder: (context, controller, _) => Row(
-                              children: [
-                                Checkbox(
-                                  value: controller.rememberMe,
-                                  onChanged: controller.toggleRememberMe,
-                                ),
-                                Text('Lembrar senha',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          color: ServusColors.textHigh,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                        )),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: () {},
-                                  child: Text(
-                                    'Esqueceu a senha?',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          color: context.theme.colorScheme.primary,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                            Consumer<LoginController>(
+                              builder: (context, controller, _) => Row(
+                                children: [
+                                  Checkbox(
+                                    value: controller.rememberMe,
+                                    onChanged: controller.toggleRememberMe,
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: context.theme.colorScheme.primary,
-                              foregroundColor: context.theme.scaffoldBackgroundColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                  Text('Lembrar senha',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            color: ServusColors.textHigh,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          )),
+                                  const Spacer(),
+                                  TextButton(
+                                    onPressed: () {},
+                                    child: Text(
+                                      'Esqueceu a senha?',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            color: context
+                                                .theme.colorScheme.primary,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              minimumSize: const Size(double.infinity, 48),
                             ),
-                            child: Text(
-                              'Entrar',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyLarge
-                                  ?.copyWith(
-                                    color: context.theme.scaffoldBackgroundColor,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                if (_formKey.currentState!.validate()) {
+                                  context.go('/dashboard');
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    context.theme.colorScheme.primary,
+                                foregroundColor:
+                                    context.theme.scaffoldBackgroundColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                minimumSize: const Size(double.infinity, 48),
+                              ),
+                              child: Text(
+                                'Entrar',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      color:
+                                          context.theme.scaffoldBackgroundColor,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
