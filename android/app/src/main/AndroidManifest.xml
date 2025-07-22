@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="servus_app"
+        android:label="Servus"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

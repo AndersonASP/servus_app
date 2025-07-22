@@ -1,0 +1,258 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import 'login_controller.dart';
+import 'package:servus_app/core/theme/color_scheme.dart';
+import 'package:servus_app/core/theme/context_extension.dart';
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController emailController;
+  late TextEditingController passwordController;
+
+  @override
+  void initState() {
+    super.initState();
+    final controller = context.read<LoginController>();
+    emailController = controller.emailController;
+    passwordController = controller.passwordController;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          // Fundo azul
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: screenHeight * 0.33 + statusBarHeight,
+            child: Container(
+              color: context.theme.colorScheme.primary,
+            ),
+          ),
+
+          // Conteúdo
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 15),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 30),
+
+                          SvgPicture.asset(
+                            'assets/images/logo.svg',
+                            width: 50,
+                            semanticsLabel: 'Servus Logo',
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'SERVUS',
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 33),
+                          Text(
+                            'Acesse sua conta',
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const SizedBox(height: 24),
+
+                                  ElevatedButton.icon(
+                                    label: Text(
+                                      'Continue com Google',
+                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                            color: ServusColors.textHigh,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
+                                    onPressed: () {},
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: context.theme.scaffoldBackgroundColor,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      minimumSize: const Size(double.infinity, 48),
+                                    ),
+                                    icon: SvgPicture.asset(
+                                      'assets/images/google_logo.svg',
+                                      width: 24,
+                                      height: 24,
+                                      semanticsLabel: 'Google Icon',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Ou acesse com',
+                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                          color: ServusColors.textMedium,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Email
+                                  TextFormField(
+                                    keyboardType: TextInputType.emailAddress,
+                                    controller: emailController,
+                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                          color: ServusColors.textHigh,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                    decoration: const InputDecoration(labelText: 'Email'),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Senha
+                                  Consumer<LoginController>(
+                                    builder: (context, controller, _) => TextFormField(
+                                      controller: passwordController,
+                                      obscureText: !controller.isPasswordVisible,
+                                      maxLength: 8,
+                                      buildCounter: (_, {required int currentLength, required bool isFocused, required int? maxLength}) => null,
+                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                            color: ServusColors.textHigh,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Senha',
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            controller.isPasswordVisible
+                                                ? Icons.visibility_off
+                                                : Icons.visibility,
+                                          ),
+                                          onPressed: controller.togglePasswordVisibility,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Lembrar senha / Esqueceu
+                                  Consumer<LoginController>(
+                                    builder: (context, controller, _) => Row(
+                                      children: [
+                                        Checkbox(
+                                          value: controller.rememberMe,
+                                          onChanged: controller.toggleRememberMe,
+                                        ),
+                                        Text(
+                                          'Lembrar senha',
+                                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                                color: ServusColors.textHigh,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                        ),
+                                        const Spacer(),
+                                        TextButton(
+                                          onPressed: () {
+                                            context.go('/indisponibilidade');
+                                          },
+                                          child: Text(
+                                            'Esqueceu a senha?',
+                                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                                  color: context.theme.colorScheme.primary,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      if (_formKey.currentState!.validate()) {
+                                        context.go('/choose-role');
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: context.theme.colorScheme.primary,
+                                      foregroundColor: context.theme.scaffoldBackgroundColor,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      minimumSize: const Size(double.infinity, 48),
+                                    ),
+                                    child: Text(
+                                      'Entrar',
+                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                            color: context.theme.scaffoldBackgroundColor,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}

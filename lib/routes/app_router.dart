@@ -1,29 +1,20 @@
 import 'package:go_router/go_router.dart';
-import 'package:servus_app/features/dashboard/dashboard_screen.dart';
-import 'package:servus_app/features/login/login_screen.dart';
-import 'package:servus_app/features/splash/welcome_screen.dart';
-
-import '../features/splash/splash_screen.dart';
-// import outros arquivos de tela aqui
+import 'package:servus_app/features/volunteers/dashboard/escala/escala_detalhes/escala_detalhes.dart';
+import 'package:servus_app/routes/auth_routes.dart';
+import 'package:servus_app/routes/qr_routes.dart';
+import 'package:servus_app/routes/shells/leader_shell.dart';
+import 'package:servus_app/routes/shells/volunteer_shell.dart';
 
 final GoRouter router = GoRouter(
   initialLocation: '/',
   routes: [
+    ...authRoutes,
+    ...qrRoutes,
+    volunteerShellRoute,
+    leaderShellRoute,
     GoRoute(
-      path: '/',
-      builder: (context, state) => const SplashScreen(),
-    ),
-    GoRoute(
-      path: '/welcome',
-      builder: (context, state) => const WelcomeScreen(),
-    ),
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
-    GoRoute(
-      path: '/dashboard',
-      builder: (context, state) => const DashboardScreen(),
+      path: '/escala_detalhe',
+      builder: (context, state) => const EscalaDetalheScreen(),
     ),
   ],
 );

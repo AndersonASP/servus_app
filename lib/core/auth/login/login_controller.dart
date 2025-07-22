@@ -16,14 +16,7 @@ class LoginController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void disposeFields() {
-    emailController.dispose();
-    passwordController.dispose();
-  }
-
   void login() {
-    // Implement login logic here
-    // For example, you can validate the input and call an authentication service
     final email = emailController.text;
     final password = passwordController.text;
 
@@ -32,7 +25,13 @@ class LoginController extends ChangeNotifier {
       return;
     }
 
-    // Proceed with login
     print('Logging in with email: $email and password: $password');
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 }

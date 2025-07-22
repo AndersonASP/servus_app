@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/core/theme/design_tokens.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -42,7 +43,7 @@ class WelcomeScreen extends StatelessWidget {
                         text: 'VOCÊ ',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: context.theme.colorScheme.secondary,
-                            fontWeight: FontWeight.bold),
+                            fontWeight: FontWeight.w800),
                       ),
                       TextSpan(
                         text: 'É MAIS DO QUE UM VOLUNTÁRIO\n',
@@ -87,14 +88,18 @@ class WelcomeScreen extends StatelessWidget {
                           BorderRadius.circular(DesignTokens.radiusMd),
                     ),
                   ),
-                  onPressed: () {
+                  onPressed: () async{
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('viu_welcome', true);
+                    if (!context.mounted) return;
+                    // Redireciona para a tela de login
                     context.go('/login');
                   },
                   child: Text(
                     'Entrar',
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w600,
-                      fontSize: 16,
+                      fontSize: 18,
                       color: context.theme.colorScheme.onPrimary,
                     ),
                   ),
