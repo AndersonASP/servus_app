@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/volunteers/dashboard/escala/escala_card/escala_card_screen.dart';
+import 'package:servus_app/features/volunteers/dashboard/widgets/drawer_menu_voluntario.dart';
+import 'package:servus_app/state/auth_state.dart';
 import 'dashboard_controller.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -13,276 +17,295 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
-  final DashboardController controller = DashboardController();
+  late final DashboardController controller;
 
-  late Future<List<Map<String, dynamic>>> _futureEscalas;
-  bool isLoading = false;
+  late final AnimationController _animationController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
-    _futureEscalas = controller.fetchEscalas();
+    final auth = Provider.of<AuthState>(context, listen: false);
+    controller = DashboardController(auth: auth);
+    controller.init();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.05),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+
+    controller.init().then((_) {
+      _animationController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _handleRefresh() async {
-    await Future.delayed(const Duration(seconds: 1));
-    _futureEscalas = controller.fetchEscalas();
-    setState(() {});
+    await controller.refresh();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: const Color(0xFFFDFDFD),
-          drawer: Drawer(
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.person),
-                    title: const Text('Meu perfil'),
-                    onTap: () => Navigator.pop(context),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.settings),
-                    title: const Text('Preferências'),
-                    onTap: () {},
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.notifications),
-                    title: const Text('Notificações'),
-                    onTap: () {},
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.logout),
-                    title: const Text('Sair'),
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ),
-          ),
-          body: SafeArea(
-            child: RefreshIndicator(
-              onRefresh: _handleRefresh,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return ChangeNotifierProvider.value(
+      value: controller,
+      child: Consumer<DashboardController>(
+        builder: (context, controller, _) {
+          return controller.isLoading && !controller.isInitialized
+              ? const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                )
+              : Stack(
                   children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.menu, size: 30),
-                          onPressed: () => Scaffold.of(context).openDrawer(),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Olá, Anderson Alves!',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
-                                      ?.copyWith(
-                                          fontSize: 25,
-                                          fontWeight: FontWeight.w800,
-                                          color: context.colors.primary)),
-                              RichText(
-                                text: TextSpan(
-                                  style: context.textStyles.bodyLarge?.copyWith(
-                                    fontSize: 14,
-                                    color: context.colors.onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  children: const [
-                                    TextSpan(text: 'Você tem '),
-                                    TextSpan(
-                                      text: '4',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w700),
+                    Scaffold(
+                      backgroundColor: context.theme.scaffoldBackgroundColor,
+                      drawer: DrawerMenuVoluntario(
+                        nome: controller.usuario.nome,
+                        email: controller.usuario.email,
+                        onTapPerfil: () => {context.push('/perfil')},
+                        onTrocarModo: () {
+                          context.go('/leader/dashboard');
+                        },
+                        exibirTrocaModo: true,
+                      ),
+                      body: SafeArea(
+                        child: RefreshIndicator(
+                          onRefresh: _handleRefresh,
+                          child: FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: SlideTransition(
+                              position: _slideAnimation,
+                              child: SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.all(10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const DrawerButton(),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                  'Olá, ${controller.usuario.nome.split(' ').first}!',
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodyLarge
+                                                      ?.copyWith(
+                                                          fontSize: 25,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          color: context.colors
+                                                              .onSurface)),
+                                              RichText(
+                                                text: TextSpan(
+                                                  style: context
+                                                      .textStyles.bodyLarge
+                                                      ?.copyWith(
+                                                    fontSize: 14,
+                                                    color: context
+                                                        .colors.onSurface,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                  children: [
+                                                    const TextSpan(
+                                                        text: 'Você tem '),
+                                                    TextSpan(
+                                                      text: controller
+                                                          .qtdEscalas
+                                                          .toString(),
+                                                      style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w800),
+                                                    ),
+                                                    const TextSpan(
+                                                        text:
+                                                            ' escalas este mês'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Stack(
+                                          alignment: Alignment.topRight,
+                                          children: [
+                                            const Icon(Icons.notifications_none,
+                                                size: 30),
+                                            Positioned(
+                                              right: 0,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.all(4),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.red,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Text('15',
+                                                    style: TextStyle(
+                                                        fontSize: 8,
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.w700)),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
-                                    TextSpan(text: ' escalas este mês'),
+                                    const SizedBox(height: 24),
+                                    if (controller.escalas.isEmpty) ...[
+                                      SizedBox(
+                                        height:
+                                            MediaQuery.of(context).size.height *
+                                                0.6,
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              SvgPicture.asset(
+                                                  'assets/images/sem_escalas.svg',
+                                                  width: 150,
+                                                  height: 150),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                'Descanse um pouco!',
+                                                style: context
+                                                    .textStyles.bodyLarge
+                                                    ?.copyWith(
+                                                  fontSize: 26,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: context.colors.primary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Você ainda não foi escalado para nenhum evento.',
+                                                style: context
+                                                    .textStyles.bodyLarge
+                                                    ?.copyWith(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: context.colors.primary
+                                                      .withValues(alpha: 0.6),
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      Text('sua próxima escala',
+                                          style: context.textStyles.bodyLarge
+                                              ?.copyWith(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                            color: context.colors.onSurface,
+                                          )),
+                                      const SizedBox(height: 12),
+                                      EscalaCardWidget(
+                                        index:
+                                            controller.escalas.first['index'] ??
+                                                0,
+                                        diasRestantes: controller
+                                            .escalas.first['diasRestantes'],
+                                        dia: controller.escalas.first['dia'],
+                                        mes: controller.escalas.first['mes'],
+                                        horario:
+                                            controller.escalas.first['horario'],
+                                        diaSemana: controller
+                                            .escalas.first['diaSemana'],
+                                        nomeEvento: controller
+                                            .escalas.first['nomeEvento'],
+                                        funcoes: List<String>.from(controller
+                                            .escalas.first['funcoes']),
+                                        statusLabel:
+                                            controller.escalas.first['status'],
+                                        statusColor:
+                                            controller.escalas.first['cor'],
+                                        controller: controller,
+                                      ),
+                                      const SizedBox(height: 24),
+                                      if (controller.escalas.length > 1) ...[
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('o que vem por aí',
+                                                style: context
+                                                    .textStyles.bodyLarge
+                                                    ?.copyWith(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w700,
+                                                  color:
+                                                      context.colors.onSurface,
+                                                )),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Column(
+                                          children: List.generate(
+                                            controller.escalas.length - 1,
+                                            (index) {
+                                              final escala =
+                                                  controller.escalas[index + 1];
+                                              return EscalaCardWidget(
+                                                index: escala['index'] ??
+                                                    index + 1,
+                                                diasRestantes:
+                                                    escala['diasRestantes'],
+                                                dia: escala['dia'],
+                                                mes: escala['mes'],
+                                                nomeEvento:
+                                                    escala['nomeEvento'],
+                                                horario: escala['horario'],
+                                                diaSemana: escala['diaSemana'],
+                                                funcoes: List<String>.from(
+                                                    escala['funcoes']),
+                                                statusLabel: escala['status'],
+                                                statusColor: escala['cor'],
+                                                controller: controller,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                    const SizedBox(height: 24),
                                   ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                        Stack(
-                          alignment: Alignment.topRight,
-                          children: [
-                            const Icon(Icons.notifications_none, size: 30),
-                            Positioned(
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Text('15',
-                                    style: TextStyle(
-                                        fontSize: 8,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    FutureBuilder<List<Map<String, dynamic>>>(
-                      future: _futureEscalas,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
-                          return SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.6,
-                            child: const Center(child: CircularProgressIndicator()),
-                          );
-                        } else if (snapshot.hasError) {
-                          return const Text('Erro ao carregar escalas');
-                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.6,
-                            child: Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SvgPicture.asset('assets/images/sem_escalas.svg', width: 150, height: 150),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Descanse um pouco!',
-                                    style: context.textStyles.bodyLarge?.copyWith(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.w800,
-                                      color: context.colors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Você ainda não foi escalado para nenhum evento.',
-                                    style: context.textStyles.bodyLarge?.copyWith(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                      color: context.colors.primary.withOpacity(0.6),
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-
-                        final escalas = snapshot.data!;
-                        final proximaEscala = escalas.first;
-                        final outrasEscalas = escalas.sublist(1);
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('sua próxima escala',
-                                style: context.textStyles.bodyLarge?.copyWith(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: context.colors.onSurface,
-                                )),
-                            const SizedBox(height: 12),
-                            EscalaCardWidget(
-                              index: proximaEscala['index'] ?? 0,
-                              diasRestantes: proximaEscala['diasRestantes'],
-                              dia: proximaEscala['dia'],
-                              mes: proximaEscala['mes'],
-                              horario: proximaEscala['horario'],
-                              diaSemana: proximaEscala['diaSemana'],
-                              nomeEvento: proximaEscala['nomeEvento'],
-                              funcoes: List<String>.from(proximaEscala['funcoes']),
-                              statusLabel: proximaEscala['status'],
-                              statusColor: proximaEscala['cor'],
-                              controller: controller,
-                            ),
-                            const SizedBox(height: 24),
-                            if (outrasEscalas.isNotEmpty) ...[
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('o que vem por aí',
-                                      style: context.textStyles.bodyLarge?.copyWith(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: context.colors.onSurface,
-                                      )),
-                                  Icon(Icons.filter_alt_outlined, color: context.colors.primary),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Column(
-                                children: List.generate(
-                                  outrasEscalas.length,
-                                  (index) {
-                                    final escala = outrasEscalas[index];
-                                    return EscalaCardWidget(
-                                      index: escala['index'] ?? index + 1,
-                                      diasRestantes: escala['diasRestantes'],
-                                      dia: escala['dia'],
-                                      mes: escala['mes'],
-                                      nomeEvento: escala['nomeEvento'],
-                                      horario: escala['horario'],
-                                      diaSemana: escala['diaSemana'],
-                                      funcoes: List<String>.from(escala['funcoes']),
-                                      statusLabel: escala['status'],
-                                      statusColor: escala['cor'],
-                                      controller: controller,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ] else ...[
-                              const Center(child: Text('Não há outras escalas')),
-                              const SizedBox(height: 12),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
                   ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        if (isLoading)
-          Container(
-            color: Colors.black.withOpacity(0.5),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset('assets/logo_servus.png', width: 100),
-                  const SizedBox(height: 20),
-                  const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
+                );
+        },
+      ),
     );
   }
 }

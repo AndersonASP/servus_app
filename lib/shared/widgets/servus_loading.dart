@@ -30,7 +30,7 @@ class _ServusLoadingWidgetState extends State<ServusLoadingWidget>
     return Stack(
       children: [
         Container(
-          color: Colors.black.withOpacity(0.5),
+          color: Colors.black.withValues(alpha: 0.5),
           width: double.infinity,
           height: double.infinity,
         ),

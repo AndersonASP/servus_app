@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:servus_app/core/theme/color_scheme.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/core/theme/design_tokens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,7 +12,7 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.theme.scaffoldBackgroundColor,
+      backgroundColor: ServusColors.background,
       body: SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -48,13 +49,13 @@ class WelcomeScreen extends StatelessWidget {
                       TextSpan(
                         text: 'É MAIS DO QUE UM VOLUNTÁRIO\n',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: context.theme.colorScheme.onSurface,
+                            color: ServusColors.primaryDark,
                             fontWeight: FontWeight.bold),
                       ),
                       TextSpan(
                         text: 'VOCÊ É PARTE DA ',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: context.theme.colorScheme.onSurface,
+                            color: ServusColors.primaryDark,
                             fontSize: 24,
                             letterSpacing: 0,
                             fontWeight: FontWeight.w800),

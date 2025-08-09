@@ -3,8 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import 'login_controller.dart';
-import 'package:servus_app/core/theme/color_scheme.dart';
+import '../../controllers/login_controller.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -31,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final statusBarHeight = MediaQuery.of(context).padding.top;
+    final controller = context.read<LoginController>();
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -43,11 +43,10 @@ class _LoginScreenState extends State<LoginScreen> {
             right: 0,
             height: screenHeight * 0.33 + statusBarHeight,
             child: Container(
-              color: context.theme.colorScheme.primary,
+              color: context.theme.primaryColor,
             ),
           ),
 
-          // Conteúdo
           LayoutBuilder(
             builder: (context, constraints) {
               return SingleChildScrollView(
@@ -60,7 +59,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         children: [
                           const SizedBox(height: 30),
-
                           SvgPicture.asset(
                             'assets/images/logo.svg',
                             width: 50,
@@ -72,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
+                                  color: context.colors.onPrimary,
                                 ),
                           ),
                           const SizedBox(height: 33),
@@ -80,6 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                   fontSize: 32,
                                   fontWeight: FontWeight.w800,
+                                  color: context.colors.onPrimary,
                                 ),
                             textAlign: TextAlign.center,
                           ),
@@ -88,11 +88,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: context.theme.scaffoldBackgroundColor,
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withOpacity(0.05),
                                   blurRadius: 10,
                                   offset: const Offset(0, 5),
                                 ),
@@ -100,23 +100,27 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: Form(
                               key: _formKey,
+                              autovalidateMode: AutovalidateMode.onUserInteraction,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   const SizedBox(height: 24),
 
+                                  // Botão Google
                                   ElevatedButton.icon(
                                     label: Text(
                                       'Continue com Google',
                                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                            color: ServusColors.textHigh,
+                                            color: context.colors.onSurface,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w500,
                                           ),
                                     ),
-                                    onPressed: () {},
+                                    onPressed: () async {
+                                       await controller.fazerLoginComGoogle(context);
+                                    },
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: context.theme.scaffoldBackgroundColor,
+                                      backgroundColor: context.colors.surface,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8),
                                       ),
@@ -129,11 +133,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                       semanticsLabel: 'Google Icon',
                                     ),
                                   ),
+
                                   const SizedBox(height: 16),
                                   Text(
                                     'Ou acesse com',
                                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                          color: ServusColors.textMedium,
+                                          color: context.colors.onSurface,
                                           fontSize: 13,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -141,38 +146,46 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   const SizedBox(height: 20),
 
-                                  // Email
+                                  // Campo email
                                   TextFormField(
                                     keyboardType: TextInputType.emailAddress,
                                     controller: emailController,
-                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                          color: ServusColors.textHigh,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Por favor, insira seu e-mail';
+                                      }
+                                      final emailRegex = RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$');
+                                      if (!emailRegex.hasMatch(value)) {
+                                        return 'E-mail inválido';
+                                      }
+                                      return null;
+                                    },
                                     decoration: const InputDecoration(labelText: 'Email'),
                                   ),
+
                                   const SizedBox(height: 16),
 
-                                  // Senha
+                                  // Campo senha
                                   Consumer<LoginController>(
                                     builder: (context, controller, _) => TextFormField(
                                       controller: passwordController,
                                       obscureText: !controller.isPasswordVisible,
-                                      maxLength: 8,
-                                      buildCounter: (_, {required int currentLength, required bool isFocused, required int? maxLength}) => null,
-                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                            color: ServusColors.textHigh,
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                      maxLength: 20,
+                                      buildCounter: (_, {required currentLength, required isFocused, required maxLength}) => null,
+                                      validator: (value) {
+                                        if (value == null || value.isEmpty) {
+                                          return 'Por favor, insira sua senha';
+                                        }
+                                        if (value.length < 6) {
+                                          return 'A senha deve ter no mínimo 6 caracteres';
+                                        }
+                                        return null;
+                                      },
                                       decoration: InputDecoration(
                                         labelText: 'Senha',
                                         suffixIcon: IconButton(
                                           icon: Icon(
-                                            controller.isPasswordVisible
-                                                ? Icons.visibility_off
-                                                : Icons.visibility,
+                                            controller.isPasswordVisible ? Icons.visibility_off : Icons.visibility,
                                           ),
                                           onPressed: controller.togglePasswordVisibility,
                                         ),
@@ -180,49 +193,38 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   ),
 
-                                  // Lembrar senha / Esqueceu
-                                  Consumer<LoginController>(
-                                    builder: (context, controller, _) => Row(
-                                      children: [
-                                        Checkbox(
-                                          value: controller.rememberMe,
-                                          onChanged: controller.toggleRememberMe,
-                                        ),
-                                        Text(
-                                          'Lembrar senha',
-                                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                                color: ServusColors.textHigh,
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                        ),
-                                        const Spacer(),
-                                        TextButton(
-                                          onPressed: () {
-                                            context.go('/indisponibilidade');
-                                          },
-                                          child: Text(
-                                            'Esqueceu a senha?',
-                                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                                  color: context.theme.colorScheme.primary,
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                          ),
-                                        ),
-                                      ],
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: TextButton(
+                                      onPressed: () {
+                                        context.go('/recover-password');
+                                      },
+                                      child: Text(
+                                        'Esqueceu a senha?',
+                                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                              color: context.colors.onSurface,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                      ),
                                     ),
                                   ),
+
                                   const SizedBox(height: 16),
 
+                                  // Botão login
                                   ElevatedButton(
-                                    onPressed: () {
-                                      if (_formKey.currentState!.validate()) {
-                                        context.go('/choose-role');
+                                    onPressed: () async {
+                                      if (_formKey.currentState?.validate() ?? false) {
+                                        await controller.fazerLogin(
+                                          emailController.text,
+                                          passwordController.text,
+                                          context,
+                                        );
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: context.theme.colorScheme.primary,
+                                      backgroundColor: context.theme.primaryColor,
                                       foregroundColor: context.theme.scaffoldBackgroundColor,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8),
@@ -232,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     child: Text(
                                       'Entrar',
                                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                            color: context.theme.scaffoldBackgroundColor,
+                                            color: context.colors.onPrimary,
                                             fontSize: 15,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -242,6 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
+
                           const SizedBox(height: 24),
                         ],
                       ),

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1489810637",
+    "project_id": "appservus-b02bd",
+    "storage_bucket": "appservus-b02bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1489810637:android:95c199d8b6d102aa582584",
+        "android_client_info": {
+          "package_name": "com.servus.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3A7l4UwKr18xmTyzeeFbeuam86MpwsLE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

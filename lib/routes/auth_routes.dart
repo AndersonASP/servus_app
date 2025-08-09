@@ -1,8 +1,8 @@
 import 'package:go_router/go_router.dart';
-import 'package:servus_app/core/auth/choose_mode_screen.dart';
-import '../core/auth/splash/splash_screen.dart';
-import '../core/auth/splash/welcome_screen.dart';
-import '../core/auth/login/login_screen.dart';
+import 'package:servus_app/core/auth/screens/choose_mode/choose_mode_screen.dart';
+import 'package:servus_app/core/auth/screens/splash_screen.dart';
+import '../core/auth/screens/welcome_screen.dart';
+import '../core/auth/screens/login/login_screen.dart';
 
 final List<GoRoute> authRoutes = [
   GoRoute(

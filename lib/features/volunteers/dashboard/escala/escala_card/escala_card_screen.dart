@@ -15,7 +15,7 @@ class EscalaCardWidget extends StatelessWidget {
   final List<String> funcoes;
   final String statusLabel;
   final Color statusColor;
-  final dynamic controller; // Substitua por seu tipo real
+  final dynamic controller;
 
   const EscalaCardWidget({
     super.key,
@@ -36,13 +36,13 @@ class EscalaCardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isProximaEscala = index == 0;
     final Color backgroundColor = isProximaEscala
-        ? context.colors.primary
+        ? context.theme.primaryColor
         : context.colors.surface;
     final Color textColor =
-        isProximaEscala ? context.colors.surface : context.colors.onSurface;
+        isProximaEscala ? context.colors.onPrimary : context.colors.onSurface;
     final Color secondaryTextColor =
-        isProximaEscala ? context.colors.surface : context.colors.onSurface;
-    final statusButton = controller.getBotaoStatusData(statusLabel);
+        isProximaEscala ? context.colors.onPrimary : context.colors.onSurface;
+    final statusButton = controller.getBotaoStatusData(statusLabel, context);
 
     return Slidable(
       key: ValueKey(index),
@@ -59,65 +59,81 @@ class EscalaCardWidget extends StatelessWidget {
         ],
       ),
       child: GestureDetector(
+        onTap: () {
+          context.push('/volunteer/detalhes-escalas'); // TODO vai ser preciso usar o ID da escala aqui para buscar as infos
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(15),
-          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 22),
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
+                color: ServusColors.darkSurface.withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Coluna da data e hora
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    dia, // Ex: '28 Jul'
-                    style: context.textStyles.bodyLarge?.copyWith(
-                      fontSize: 18,
-                      color: secondaryTextColor,
-                      fontWeight: FontWeight.w800,
+              // 👉 Destaque da data com fundo
+              Container(
+                width: 70,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  color: isProximaEscala
+                      ? context.theme.canvasColor
+                      : context.theme.canvasColor.withValues(
+                          alpha: 0.3,
+                        ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      dia,
+                      style: context.textStyles.bodyLarge?.copyWith(
+                        fontSize: 20,
+                        color: secondaryTextColor,
+                        fontWeight: FontWeight.w900,
+                        height: 0.6
+                      ),
                     ),
-                  ),
-                  Text(
-                    mes, // Ex: 'Jul'
-                    style: context.textStyles.bodyLarge?.copyWith(
-                      fontSize: 18,
-                      color: secondaryTextColor,
-                      fontWeight: FontWeight.w800,
+                    Text(
+                      mes,
+                      style: context.textStyles.bodyLarge?.copyWith(
+                        fontSize: 15,
+                        color: secondaryTextColor,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    diaSemana,
-                    style: context.textStyles.bodyLarge?.copyWith(
-                      fontSize: 14,
-                      color: secondaryTextColor,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(height: 10),
+                    Text(
+                      diaSemana,
+                      style: context.textStyles.bodyLarge?.copyWith(
+                        fontSize: 15,
+                        color: secondaryTextColor,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),              
-                  Text(
-                    '${horario}h',
-                    style: context.textStyles.bodyLarge?.copyWith(
-                      fontSize: 14,
-                      color: secondaryTextColor,
-                      fontWeight: FontWeight.w700,
+                    Text(
+                      '${horario}h',
+                      style: context.textStyles.bodyLarge?.copyWith(
+                        fontSize: 15,
+                        color: secondaryTextColor,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(width: 12),
-              // Coluna principal
+              // 👉 Conteúdo principal
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,20 +141,20 @@ class EscalaCardWidget extends StatelessWidget {
                     Text(
                       nomeEvento,
                       style: context.textStyles.bodyLarge?.copyWith(
-                        fontSize: 19,
+                        fontSize: 20,
                         color: textColor,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     Text(
-                    diasRestantes,
-                    style: context.textStyles.bodyLarge?.copyWith(
-                      fontSize: 12,
-                      color: secondaryTextColor,
-                      fontWeight: FontWeight.w800,
+                      diasRestantes,
+                      style: context.textStyles.bodyLarge?.copyWith(
+                        fontSize: 12,
+                        color: secondaryTextColor,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -147,21 +163,21 @@ class EscalaCardWidget extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: ServusColors.funcoesBackground,
+                                  color: context.theme.canvasColor,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
                                   funcao,
                                   style: context.textStyles.bodyLarge?.copyWith(
                                     fontSize: 12,
-                                    color: context.colors.surface,
+                                    color: context.colors.onPrimary,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ))
                           .toList(),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -190,17 +206,17 @@ class EscalaCardWidget extends StatelessWidget {
                           style: context.textStyles.bodyLarge?.copyWith(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
+                            color: context.colors.onPrimary,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: statusButton.color,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 5),
+                              horizontal: 24, vertical: 6),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          elevation: 2,
                         ),
                       ),
                     ),
