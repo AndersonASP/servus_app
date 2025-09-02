@@ -36,7 +36,7 @@ class LocalStorageService {
     final branchName = prefs.getString(_keyBranchName);
     final picture = prefs.getString(_keyPicture);
 
-    if (nome != null && email != null && (branchName != null || tenantName != null)) {
+    if (nome != null && email != null && role != null) {
       return UsuarioLogado(
         nome: nome,
         email: email,
@@ -45,7 +45,8 @@ class LocalStorageService {
         role: mapRoleToEnum(role),
         tenantId: tenantId,
         branchId: branchId,
-        picture: picture
+        picture: picture,
+        ministerios: [], // TODO: Implementar quando disponível
       );
     }
 
@@ -54,9 +55,28 @@ class LocalStorageService {
 
   static Future<void> limparDados() async {
     final prefs = await SharedPreferences.getInstance();
-    final secureStorage = FlutterSecureStorage();
-
     await prefs.clear();
-    await secureStorage.deleteAll();
+  }
+
+  /// Verifica se há dados de usuário salvos
+  static Future<bool> temUsuarioSalvo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final nome = prefs.getString(_keyNome);
+    final email = prefs.getString(_keyEmail);
+    final role = prefs.getString(_keyRole);
+    
+    return nome != null && email != null && role != null;
+  }
+
+  /// Obtém apenas informações básicas do usuário
+  static Future<Map<String, String?>> getInfoBasica() async {
+    final prefs = await SharedPreferences.getInstance();
+    return {
+      'nome': prefs.getString(_keyNome),
+      'email': prefs.getString(_keyEmail),
+      'role': prefs.getString(_keyRole),
+      'tenantId': prefs.getString(_keyTenantId),
+      'branchId': prefs.getString(_keyBranchId),
+    };
   }
 }

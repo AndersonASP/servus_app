@@ -20,6 +20,10 @@ class DrawerMenuLider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final usuario = context.read<AuthState>().usuario!;
+    
+    // Debug temporário para identificar o problema
+    print('DEBUG: usuario.role no build = ${usuario.role}');
+    print('DEBUG: usuario completo = $usuario');
 
     return Drawer(
       shape: const RoundedRectangleBorder(
@@ -38,7 +42,7 @@ class DrawerMenuLider extends StatelessWidget {
               picture: usuario.picture ?? '',
               onTapPerfil: () => context.push('/perfil'),
               exibirTrocaModo: true,
-              modoAtual: 'Líder',
+              modoAtual: _labelDoPapel(usuario.role),
             ),
             Divider(
               height: 10,
@@ -46,6 +50,7 @@ class DrawerMenuLider extends StatelessWidget {
               color: context.colors.onSurface.withValues(alpha: 0.2),
             ),
 
+            // Ministério atual
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Text(
@@ -64,6 +69,98 @@ class DrawerMenuLider extends StatelessWidget {
               ),
             ),
 
+            const SizedBox(height: 16),
+
+            // Menu de navegação
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Column(
+                children: [
+                  // Dashboard
+                  ListTile(
+                    leading: const Icon(Icons.dashboard),
+                    title: const Text('Dashboard'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/leader/dashboard');
+                    },
+                  ),
+                  
+                  // Ministérios (não visível para servus_admin)
+                  if (usuario.role != UserRole.servus_admin)
+                    ListTile(
+                      leading: const Icon(Icons.groups),
+                      title: const Text('Ministérios'),
+                      subtitle: const Text('Gerenciar ministérios'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/leader/ministerio/lista');
+                      },
+                    ),
+                  
+                  // Criar Tenants (apenas para ServusAdmin)
+                  if (usuario.role == UserRole.servus_admin)
+                    ListTile(
+                      leading: const Icon(Icons.business),
+                      title: const Text('Criar Tenant'),
+                      subtitle: const Text('Nova organização'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/leader/tenants/create');
+                      },
+                    ),
+                  
+                  // Escalas (não visível para servus_admin)
+                  if (usuario.role != UserRole.servus_admin)
+                    ListTile(
+                      leading: const Icon(Icons.schedule),
+                      title: const Text('Escalas'),
+                      subtitle: const Text('Gerenciar escalas'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/leader/escalas');
+                      },
+                    ),
+                  
+                  // Eventos (não visível para servus_admin)
+                  if (usuario.role != UserRole.servus_admin)
+                    ListTile(
+                      leading: const Icon(Icons.event),
+                      title: const Text('Eventos'),
+                      subtitle: const Text('Gerenciar eventos'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/leader/eventos');
+                      },
+                    ),
+                  
+                  // Templates (não visível para servus_admin)
+                  if (usuario.role != UserRole.servus_admin)
+                    ListTile(
+                      leading: const Icon(Icons.copy),
+                      title: const Text('Templates'),
+                      subtitle: const Text('Modelos de escala'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/leader/templates');
+                      },
+                    ),
+                  
+                  // Voluntários (não visível para servus_admin)
+                  if (usuario.role != UserRole.servus_admin)
+                    ListTile(
+                      leading: const Icon(Icons.people),
+                      title: const Text('Voluntários'),
+                      subtitle: const Text('Gerenciar voluntários'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/leader/dashboard/voluntarios');
+                      },
+                    ),
+                ],
+              ),
+            ),
+
             const Spacer(),
 
             Divider(
@@ -71,7 +168,7 @@ class DrawerMenuLider extends StatelessWidget {
               thickness: 0.6,
               color: context.colors.onSurface.withValues(alpha: 0.2),
             ),
-            if (usuario.role == UserRole.admin || usuario.role == UserRole.leader)
+            if (usuario.role == UserRole.tenant_admin || usuario.role == UserRole.branch_admin || usuario.role == UserRole.leader)
               ListTile(
                 leading: const Icon(Icons.swap_horiz),
                 title: const Text('Trocar para voluntário'),
@@ -82,5 +179,23 @@ class DrawerMenuLider extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _labelDoPapel(UserRole role) {
+    print('DEBUG: _labelDoPapel recebeu role: $role');
+    switch (role) {
+      case UserRole.servus_admin:
+        return 'Servus Admin';
+      case UserRole.tenant_admin:
+        return 'Admin da Igreja';
+      case UserRole.branch_admin:
+        return 'Admin da Filial';
+      case UserRole.leader:
+        return 'Líder';
+      case UserRole.volunteer:
+        return 'Voluntário';
+      default:
+        return 'Papel não definido';
+    }
   }
 }

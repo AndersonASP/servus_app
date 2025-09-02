@@ -62,7 +62,7 @@ class DrawerMenuVoluntario extends StatelessWidget {
               thickness: 0.6,
               color: context.colors.onSurface.withValues(alpha: 0.2),
             ),
-            if (usuario!.role == UserRole.admin || usuario.role == UserRole.leader)
+            if (usuario!.role == UserRole.tenant_admin || usuario.role == UserRole.leader || usuario.role == UserRole.servus_admin)
               ListTile(
                 leading: const Icon(Icons.swap_horiz),
                 title: const Text('Trocar para admin'),

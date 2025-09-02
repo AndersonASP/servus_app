@@ -17,8 +17,9 @@ class ChooseModeController {
     auth.selecionarPapel(papel);
 
     switch (papel) {
-      case UserRole.superadmin:
-      case UserRole.admin:
+      case UserRole.servus_admin:
+      case UserRole.tenant_admin:  // ✅ Corrigido: era tentant_admin
+      case UserRole.branch_admin:
       case UserRole.leader:
         context.go('/leader/dashboard');
         break;

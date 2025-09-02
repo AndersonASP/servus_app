@@ -24,7 +24,7 @@ class UsuarioLogado {
     this.ministerios = const [],
   });
 
-  bool get isAdmin => role == UserRole.admin ;
+  bool get isAdmin => role == UserRole.servus_admin || role == UserRole.tenant_admin || role == UserRole.branch_admin;
   bool get isLider => role == UserRole.leader;
   bool get isVoluntario => role == UserRole.volunteer ;
 

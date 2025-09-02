@@ -5,6 +5,7 @@ import 'package:servus_app/features/leader/escalas/controllers/escala/escala_con
 import 'package:servus_app/features/leader/escalas/controllers/evento/evento_controller.dart';
 import 'package:servus_app/features/leader/escalas/models/escala_model.dart';
 import 'escala_form_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class EscalaListScreen extends StatelessWidget {
   const EscalaListScreen({super.key});
@@ -18,6 +19,10 @@ class EscalaListScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/leader/dashboard'),
+        ),
         title: Text(
           'Escalas',
           style: context.textStyles.titleLarge?.copyWith(

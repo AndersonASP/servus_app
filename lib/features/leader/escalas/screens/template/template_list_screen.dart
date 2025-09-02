@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/escalas/controllers/template/template_controller.dart';
 import 'template_form_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class TemplateListScreen extends StatelessWidget {
   const TemplateListScreen({super.key});
@@ -15,6 +16,10 @@ class TemplateListScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.go('/leader/dashboard'),
+            ),
             title: Text('Templates de Escala', style: context.textStyles.titleLarge?.copyWith(
               color: context.colors.onSurface,
               fontWeight: FontWeight.bold,

@@ -152,7 +152,7 @@ class _ChooseModeScreenState extends State<ChooseModeScreen> with TickerProvider
                 icon: Icons.admin_panel_settings,
                 onTap: () => controller.selecionarPapel(
                   context,
-                  controller.isAdmin ? UserRole.admin : UserRole.leader,
+                  controller.isAdmin ? UserRole.tenant_admin : UserRole.leader,
                 ),
               ),
             if (controller.isVoluntario)

@@ -213,31 +213,44 @@ class _LoginScreenState extends State<LoginScreen> {
                                   const SizedBox(height: 16),
 
                                   // Botão login
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      if (_formKey.currentState?.validate() ?? false) {
-                                        await controller.fazerLogin(
-                                          emailController.text,
-                                          passwordController.text,
-                                          context,
-                                        );
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: context.theme.primaryColor,
-                                      foregroundColor: context.theme.scaffoldBackgroundColor,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                  Consumer<LoginController>(
+                                    builder: (context, controller, _) => ElevatedButton(
+                                      onPressed: controller.isLoading ? null : () async {
+                                        if (_formKey.currentState?.validate() ?? false) {
+                                          await controller.fazerLogin(
+                                            emailController.text,
+                                            passwordController.text,
+                                            context,
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: context.theme.primaryColor,
+                                        foregroundColor: context.theme.scaffoldBackgroundColor,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        minimumSize: const Size(double.infinity, 48),
                                       ),
-                                      minimumSize: const Size(double.infinity, 48),
-                                    ),
-                                    child: Text(
-                                      'Entrar',
-                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                            color: context.colors.onPrimary,
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                      child: controller.isLoading
+                                          ? SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(
+                                                  context.theme.scaffoldBackgroundColor,
+                                                ),
+                                              ),
+                                            )
+                                          : Text(
+                                              'Entrar',
+                                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                                    color: context.colors.onPrimary,
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                            ),
                                     ),
                                   ),
                                 ],

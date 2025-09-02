@@ -1,13 +1,21 @@
 import 'package:servus_app/core/enums/user_role.dart';
 
 UserRole mapRoleToEnum(String? role) {
+  print('DEBUG: mapRoleToEnum recebeu: "$role"');
+  
   switch (role) {
-    case 'superadmin':
-    case 'admin':
-      return UserRole.admin;
+    case 'servus_admin':
+      return UserRole.servus_admin;
+    case 'tenant_admin':
+      return UserRole.tenant_admin;
+    case 'branch_admin':
+      return UserRole.branch_admin;
     case 'leader':
-      return UserRole.leader; // (verifique se "leaeder" está correto ou é um typo de "leader")
+      return UserRole.leader;
+    case 'volunteer':
+      return UserRole.volunteer;
     default:
+      print('❌ ERRO: Role desconhecido recebido: "$role" - retornando volunteer como fallback');
       return UserRole.volunteer;
   }
 }
@@ -15,13 +23,15 @@ UserRole mapRoleToEnum(String? role) {
 /// Converte de enum UserRole para string
 String mapRoleToString(UserRole role) {
   switch (role) {
-    case UserRole.admin:
-      return 'admin';
+    case UserRole.servus_admin:
+      return 'servus_admin';
+    case UserRole.tenant_admin:
+      return 'tenant_admin';
+    case UserRole.branch_admin:
+      return 'branch_admin';
     case UserRole.leader:
       return 'leader';
     case UserRole.volunteer:
       return 'volunteer';
-    case UserRole.superadmin:
-      return 'superadmin';
   }
 }

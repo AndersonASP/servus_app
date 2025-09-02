@@ -1,3 +1,3 @@
 class Env {
-  static const baseUrl = 'https://742493162c15.ngrok-free.app';
+  static const baseUrl = 'http://localhost:3000';
 }

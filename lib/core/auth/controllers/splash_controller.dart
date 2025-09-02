@@ -1,13 +1,9 @@
-import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:servus_app/core/auth/services/auth_service.dart';
-import 'package:servus_app/core/constants/env.dart';
-import 'package:servus_app/core/network/dio_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
+import 'package:servus_app/core/auth/services/auth_service.dart';
+import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/core/enums/user_role.dart';
+import 'package:servus_app/services/local_storage_service.dart';
 
 class SplashController {
   final AnimationController animationController;
@@ -26,24 +22,7 @@ class SplashController {
           duration: const Duration(milliseconds: 3000),
         );
 
-  void _debugSharedPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys();
-
-    if (keys.isEmpty) {
-      print('🔍 SharedPreferences está vazio');
-      return;
-    }
-
-    print('🔍 Conteúdo do SharedPreferences:');
-    for (final key in keys) {
-      final value = prefs.get(key);
-      print('  → $key = $value');
-    }
-  }
-
   void start(BuildContext context) {
-    _debugSharedPrefs();
     final curved = CurvedAnimation(
       parent: animationController,
       curve: Curves.easeOut,
@@ -88,61 +67,211 @@ class SplashController {
   }
 
   Future<void> _decidirRota(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    final storage = FlutterSecureStorage();
-
-    final jaViuWelcome = prefs.getBool('viu_welcome') ?? false;
-    final accessToken = await storage.read(key: 'access_token');
-    final refreshToken = await storage.read(key: 'refresh_token');
-    final nome = prefs.getString('nome');
-    final email = prefs.getString('email');
-    final role = prefs.getString('role');
-
+    print('🚀 Iniciando decisão de rota...');
+    
+    // Verifica se já viu a tela de welcome
+    final jaViuWelcome = await _verificarSeViuWelcome();
+    print('📋 Já viu welcome: $jaViuWelcome');
     if (!jaViuWelcome) {
+      print('🔄 Redirecionando para welcome');
       onNavigate('/welcome');
       return;
     }
 
-    if (accessToken == null || refreshToken == null || nome == null || email == null) {
+    // Verifica se há tokens válidos
+    final temTokens = await _verificarTokens();
+    print('🔑 Tem tokens: $temTokens');
+    if (!temTokens) {
+      print('🔄 Redirecionando para login (sem tokens)');
       onNavigate('/login');
       return;
     }
 
-    final sucesso = await AuthService().renovarToken(refreshToken, context);
-    if (!sucesso) {
-      await _limparDadosLogin();
+    // Tenta renovar o token se necessário
+    final tokenValido = await _verificarErenovarToken(context);
+    print('✅ Token válido: $tokenValido');
+    if (!tokenValido) {
+      print('🔄 Token inválido, limpando dados e redirecionando para login');
+      await _limparDados();
       onNavigate('/login');
       return;
     }
 
-    if (role != null) {
-      final papel = UserRole.values.firstWhere(
-        (e) => e.name == role,
-        orElse: () => UserRole.volunteer,
-      );
+    // Verifica se há dados do usuário
+    final temUsuario = await LocalStorageService.temUsuarioSalvo();
+    print('👤 Tem usuário salvo: $temUsuario');
+    if (!temUsuario) {
+      print('🔄 Redirecionando para login (sem usuário salvo)');
+      onNavigate('/login');
+      return;
+    }
 
-      switch (papel) {
-        case UserRole.superadmin:
-        case UserRole.admin:
-        case UserRole.leader:
-          onNavigate('/leader/dashboard');
-          break;
-        case UserRole.volunteer:
-          onNavigate('/volunteer/dashboard');
-          break;
+    // Redireciona baseado no role
+    print('🎯 Redirecionando por role...');
+    await _redirecionarPorRole();
+  }
+
+  Future<bool> _verificarSeViuWelcome() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('viu_welcome') ?? false;
+  }
+
+  Future<bool> _verificarTokens() async {
+    final accessToken = await TokenService.getAccessToken();
+    final refreshToken = await TokenService.getRefreshToken();
+    
+    return accessToken != null && refreshToken != null;
+  }
+
+  Future<bool> _verificarErenovarToken(BuildContext context) async {
+    try {
+      // Se o token está expirado, tenta renovar
+      if (await TokenService.isTokenExpired()) {
+        final authService = AuthService();
+        return await authService.renovarToken(context);
       }
-    } else {
+      
+      // Se o token expira em breve, renova preventivamente
+      if (await TokenService.isTokenExpiringSoon()) {
+        final authService = AuthService();
+        return await authService.renovarToken(context);
+      }
+      
+      return true;
+    } catch (e) {
+      print('❌ Erro ao verificar/renovar token: $e');
+      return false;
+    }
+  }
+
+  Future<void> _redirecionarPorRole() async {
+    try {
+      print('🔍 Decidindo rota baseada no role...');
+      
+      // 🆕 PRIMEIRO: Tenta extrair claims diretamente do JWT atual
+      final accessToken = await TokenService.getAccessToken();
+      print('🔐 Access token encontrado: ${accessToken != null ? "SIM" : "NÃO"}');
+      if (accessToken != null) {
+        print('🔐 JWT encontrado, extraindo claims diretamente...');
+        await TokenService.extractSecurityClaims(accessToken);
+      }
+      
+      // 🆕 SEGUNDO: Carrega claims de segurança (do JWT ou cache)
+      print('📥 Carregando claims de segurança...');
+      await TokenService.loadSecurityClaims();
+      
+      // 🆕 TERCEIRO: Usa role do JWT (mais seguro e atualizado)
+      final userRole = TokenService.userRole;
+      final membershipRole = TokenService.membershipRole;
+      
+      print('📋 Claims de segurança carregados:');
+      print('   - User Role: $userRole');
+      print('   - Membership Role: $membershipRole');
+      
+      // 🆕 CORREÇÃO: Para ServusAdmin, sempre usa userRole
+      String? roleFinal;
+      if (userRole == 'servus_admin') {
+        roleFinal = userRole; // ServusAdmin sempre usa seu role global
+        print('🎯 ServusAdmin detectado - usando role global: $roleFinal');
+      } else {
+        // Para outros usuários, membership role tem prioridade sobre user role
+        roleFinal = membershipRole ?? userRole;
+        print('🎯 Role final para roteamento: $roleFinal');
+      }
+      
+      if (roleFinal != null) {
+        print('🎯 Role final para roteamento: $roleFinal');
+        
+        // Mapeia o role para enum
+        final papel = _mapearRoleParaEnum(roleFinal);
+        print('🎭 Role mapeado para enum: $papel');
+        
+        switch (papel) {
+          case UserRole.servus_admin:
+          case UserRole.tenant_admin:
+          case UserRole.branch_admin:
+          case UserRole.leader:
+            print('👑 Redirecionando para dashboard de líder: /leader/dashboard');
+            onNavigate('/leader/dashboard');
+            break;
+          case UserRole.volunteer:
+            print('👤 Redirecionando para dashboard de voluntário: /volunteer/dashboard');
+            onNavigate('/volunteer/dashboard');
+            break;
+        }
+      } else {
+        print('⚠️ Nenhum role encontrado, redirecionando para escolha de role');
+        onNavigate('/choose-role');
+      }
+      
+    } catch (e) {
+      print('❌ Erro ao decidir rota por role: $e');
+      print('🔄 Fallback: usando storage local...');
+      
+      // 🆕 FALLBACK: Se falhar, usa storage local
+      await _redirecionarPorRoleFallback();
+    }
+  }
+
+  /// 🆕 Fallback para roteamento usando storage local
+  Future<void> _redirecionarPorRoleFallback() async {
+    try {
+      final infoBasica = await LocalStorageService.getInfoBasica();
+      final role = infoBasica['role'];
+      
+      print('🔄 Fallback - Role do storage local: $role');
+      
+      if (role != null) {
+        final papel = UserRole.values.firstWhere(
+          (e) => e.name == role,
+          orElse: () => UserRole.volunteer,
+        );
+
+        switch (papel) {
+          case UserRole.servus_admin:
+          case UserRole.tenant_admin:
+          case UserRole.branch_admin:
+          case UserRole.leader:
+            print('👑 Fallback - Redirecionando para dashboard de líder');
+            onNavigate('/leader/dashboard');
+            break;
+          case UserRole.volunteer:
+            print('👤 Fallback - Redirecionando para dashboard de voluntário');
+            onNavigate('/volunteer/dashboard');
+            break;
+        }
+      } else {
+        print('⚠️ Fallback - Nenhum role encontrado, redirecionando para escolha');
+        onNavigate('/choose-role');
+      }
+    } catch (e) {
+      print('❌ Erro no fallback de roteamento: $e');
       onNavigate('/choose-role');
     }
   }
 
-  Future<void> _limparDadosLogin() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('access_token');
-    await prefs.remove('refresh_token');
-    await prefs.remove('nome');
-    await prefs.remove('email');
-    await prefs.remove('papelSelecionado');
+  /// 🆕 Mapeia role string para enum UserRole
+  UserRole _mapearRoleParaEnum(String role) {
+    switch (role.toLowerCase()) {
+      case 'servus_admin':
+        return UserRole.servus_admin;
+      case 'tenant_admin':
+        return UserRole.tenant_admin;
+      case 'branch_admin':
+        return UserRole.branch_admin;
+      case 'leader':
+        return UserRole.leader;
+      case 'volunteer':
+        return UserRole.volunteer;
+      default:
+        print('⚠️ Role desconhecido: $role, usando volunteer como padrão');
+        return UserRole.volunteer;
+    }
+  }
+
+  Future<void> _limparDados() async {
+    await TokenService.clearAll();
+    await LocalStorageService.limparDados();
   }
 
   void dispose() {

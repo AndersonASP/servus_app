@@ -11,6 +11,7 @@ import 'package:servus_app/features/leader/ministerios/controllers/ministerios_l
 import 'package:servus_app/features/leader/ministerios/screens/ministerio_form_screen.dart';
 import 'package:servus_app/features/leader/ministerios/screens/ministerios_detalhes_screen.dart';
 import 'package:servus_app/features/leader/ministerios/screens/ministerios_lista_screen.dart';
+import 'package:servus_app/features/leader/tenants/create_tenant_screen.dart';
 // import 'package:servus_app/features/leader/perfil/perfil_screen.dart'; // futuro
 
 final List<GoRoute> leaderRoutes = [
@@ -56,5 +57,9 @@ final List<GoRoute> leaderRoutes = [
       final ministerioId = state.pathParameters['id']!;
       return MinisterioDetalhesScreen(ministerioId: ministerioId);
     },
+  ),
+  GoRoute(
+    path: '/leader/tenants/create',
+    builder: (context, state) => const CreateTenantScreen(),
   ),
 ];

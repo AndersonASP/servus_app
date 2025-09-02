@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/color_scheme.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
@@ -16,6 +17,10 @@ class CardDetailsVoluntariosScreen extends StatelessWidget {
           return Scaffold(
             appBar: AppBar(
               backgroundColor: context.theme.scaffoldBackgroundColor,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/leader/dashboard'),
+              ),
               title: const Text('Voluntários'),
               centerTitle: false,
               actions: [

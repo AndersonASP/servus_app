@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 class DrawerProfileHeader extends StatelessWidget {
   final String nome;
   final String email;
-  final String picture;
+  final String picture;          // URL (pode ser vazio)
   final VoidCallback onTapPerfil;
-  final bool exibirTrocaModo;
+  final bool exibirTrocaModo;    // exibe chip com modo atual, se true
   final String modoAtual;
 
   const DrawerProfileHeader({
@@ -15,7 +15,7 @@ class DrawerProfileHeader extends StatelessWidget {
     required this.picture,
     required this.onTapPerfil,
     this.exibirTrocaModo = false,
-    this.modoAtual = 'Voluntário',
+    required this.modoAtual,
   });
 
   @override
@@ -26,37 +26,43 @@ class DrawerProfileHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: onTapPerfil,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _Avatar(profileImgUrl: picture, nome: nome),
+            _Avatar(profileImgUrl: picture, nome: nome, size: 56),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              nome,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              email,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          nome,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const Icon(Icons.chevron_right, size: 20),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          email,
+                          style: const TextStyle(fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (exibirTrocaModo) ...[
+                          const SizedBox(height: 6),
+                          _ModoChip(texto: modoAtual),
+                        ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right, size: 20),
                 ],
               ),
             ),
@@ -66,40 +72,116 @@ class DrawerProfileHeader extends StatelessWidget {
     );
   }
 }
+
 class _Avatar extends StatelessWidget {
   final String? profileImgUrl;
   final String nome;
+  final double size; // diâmetro do avatar
 
-  const _Avatar({required this.profileImgUrl, required this.nome});
+  const _Avatar({
+    required this.profileImgUrl,
+    required this.nome,
+    this.size = 56,
+  });
 
   @override
   Widget build(BuildContext context) {
     final initials = _iniciais(nome);
+    final radius = size / 2;
+    final scheme = Theme.of(context).colorScheme;
 
-    // Se não tem URL, mostra as iniciais
-    if (profileImgUrl == null || profileImgUrl!.isEmpty) {
-      return CircleAvatar(
-        radius: 28,
-        child: Text(initials, style: const TextStyle(fontWeight: FontWeight.w700)),
-      );
-    }
+    final hasUrl = profileImgUrl != null && profileImgUrl!.isNotEmpty;
 
-    // Com URL: usa NetworkImage e trata erro de carregamento
-    return CircleAvatar(
-      radius: 28,
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      foregroundImage: NetworkImage(profileImgUrl!),
-      onForegroundImageError: (_, __) {
-        // Se falhar o carregamento, o CircleAvatar cai pro child
-      },
-      child: Text(initials, style: const TextStyle(fontWeight: FontWeight.w700)),
+    return ClipOval(
+      child: Container(
+        width: size,
+        height: size,
+        color: scheme.primary, // ✅ fundo quando mostrar iniciais/erro
+        child: hasUrl
+            ? Image.network(
+                profileImgUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _FallbackInitials(
+                  initials: initials,
+                  fontSize: radius * 0.7,
+                ),
+              )
+            : _FallbackInitials(
+                initials: initials,
+                fontSize: radius * 0.7,
+              ),
+      ),
     );
   }
 
   String _iniciais(String nome) {
-    final partes = nome.trim().split(RegExp(r'\s+'));
-    if (partes.isEmpty) return '';
-    if (partes.length == 1) return partes.first.substring(0, 1).toUpperCase();
-    return (partes.first.substring(0, 1) + partes.last.substring(0, 1)).toUpperCase();
+    if (nome.trim().isEmpty) return '';
+    final ignora = {'de','da','do','das','dos','e','di','du'};
+    final partes = nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+
+    final uteis = <String>[];
+    for (final p in partes) {
+      final lower = p.toLowerCase();
+      if (uteis.isEmpty || !ignora.contains(lower)) {
+        uteis.add(p);
+      }
+      if (uteis.length == 2) break;
+    }
+
+    if (uteis.length == 1) return uteis.first[0].toUpperCase();
+    return (uteis[0][0] + uteis[1][0]).toUpperCase();
+  }
+}
+
+class _FallbackInitials extends StatelessWidget {
+  final String initials;
+  final double fontSize;
+
+  const _FallbackInitials({
+    required this.initials,
+    required this.fontSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Text(
+        initials,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: fontSize,
+          color: scheme.onPrimary, // ✅ contraste correto com fundo primary
+        ),
+      ),
+    );
+  }
+}
+
+class _ModoChip extends StatelessWidget {
+  final String texto;
+  const _ModoChip({required this.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(
+          color: scheme.onPrimaryContainer,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
   }
 }

@@ -1,6 +1,7 @@
 enum UserRole {
-  superadmin,
-  admin,
+  servus_admin,
+  tenant_admin,
+  branch_admin,
   leader,
   volunteer,
 }

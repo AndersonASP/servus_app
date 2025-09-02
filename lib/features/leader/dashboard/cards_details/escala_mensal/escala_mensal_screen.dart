@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/dashboard/cards_details/escala_mensal/escala_mensal_controller.dart';
@@ -61,6 +62,10 @@ class _EscalaMensalScreenState extends State<EscalaMensalScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: context.theme.scaffoldBackgroundColor,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/leader/dashboard'),
+        ),
         title: Text(
           'Escalas do mês',
           style: context.textStyles.titleLarge?.copyWith(

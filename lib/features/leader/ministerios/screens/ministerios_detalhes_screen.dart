@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerios_detalhes_controller.dart';
+import 'package:go_router/go_router.dart';
 
 class MinisterioDetalhesScreen extends StatelessWidget {
   final String ministerioId;
@@ -22,6 +23,10 @@ class MinisterioDetalhesScreen extends StatelessWidget {
           return Scaffold(
             appBar: AppBar(
               centerTitle: false,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/leader/ministerio/lista'),
+              ),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

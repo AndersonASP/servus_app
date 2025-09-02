@@ -1,3 +1,4 @@
+// perfil_controller.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,21 +26,19 @@ class PerfilController extends ChangeNotifier {
   // Arquivo local (quando o usuário escolhe da galeria sem upload)
   File? imagemPerfilLocal;
 
-  // Provider atual (URL > arquivo local > placeholder)
-  ImageProvider<Object> _imagemProvider =
-      const NetworkImage('https://doodleipsum.com/700x700/avatar-2?i=3a7ca2d4b169ed44c01b1216ee20822f');
+  // Pode ser null -> tela mostra iniciais
+  ImageProvider<Object>? _imagemProvider;
+  ImageProvider<Object>? get imagemPerfilProvider => _imagemProvider;
 
-  ImageProvider<Object> get imagemPerfilProvider => _imagemProvider;
-
-  /// Carrega nome, email, igreja e imagem do SharedPreferences.
-  /// Prioridade: URL `picture` > arquivo local `caminhoImagemPerfil`.
+  /// Prioridade: URL `picture` > arquivo local `caminhoImagemPerfil`
   Future<void> carregarDadosSalvos() async {
     final prefs = await SharedPreferences.getInstance();
 
-    nome   = prefs.getString('nome')    ?? nome;
-    email  = prefs.getString('email')   ?? email;
+    nome  = prefs.getString('nome')  ?? nome;
+    email = prefs.getString('email') ?? email;
+    igreja = prefs.getString('igreja') ?? igreja;
 
-    // 1) Tenta URL (padronizada)
+    // 1) URL
     final url = prefs.getString('picture');
     if (url != null && url.isNotEmpty) {
       pictureUrl = url;
@@ -49,28 +48,27 @@ class PerfilController extends ChangeNotifier {
       return;
     }
 
-    // 2) Fallback para caminho local salvo
+    // 2) Caminho local (⚠️ chave correta)
     final caminho = prefs.getString('caminhoImagemPerfil');
     if (caminho != null && caminho.isNotEmpty) {
       final arquivo = File(caminho);
       if (await arquivo.exists()) {
         imagemPerfilLocal = arquivo;
-        pictureUrl = null; // sem URL válida
+        pictureUrl = null;
         _imagemProvider = FileImage(arquivo);
         notifyListeners();
         return;
       }
     }
 
-    // 3) Placeholder
+    // 3) Nenhuma imagem -> usa iniciais
     pictureUrl = null;
     imagemPerfilLocal = null;
-    _imagemProvider = const NetworkImage('https://doodleipsum.com/700x700/avatar-2?i=3a7ca2d4b169ed44c01b1216ee20822f');
+    _imagemProvider = null;
     notifyListeners();
   }
 
-  /// Seleciona imagem da galeria e salva localmente.
-  /// (Fluxo pronto para, depois, você fazer upload -> obter URL -> chamar `atualizarPictureComNovaUrl`)
+  /// Seleciona imagem da galeria e salva localmente
   Future<void> selecionarImagemDaGaleria() async {
     final picker = ImagePicker();
     final selecionada = await picker.pickImage(source: ImageSource.gallery);
@@ -80,13 +78,12 @@ class PerfilController extends ChangeNotifier {
     final caminho = '${appDir.path}/foto_perfil.png';
     final salvo = await File(selecionada.path).copy(caminho);
 
-    // Atualiza estado local
     imagemPerfilLocal = salvo;
-    pictureUrl = null; // enquanto não subir e obter URL
+    pictureUrl = null;
     _imagemProvider = FileImage(salvo);
 
-    // Persiste como arquivo local e limpa URL antiga se houver
     final prefs = await SharedPreferences.getInstance();
+    // ⚠️ salva caminho local na chave certa e limpa a URL
     await prefs.setString('caminhoImagemPerfil', salvo.path);
     await prefs.remove('picture');
 
@@ -105,13 +102,11 @@ class PerfilController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Logout completo via AuthState
   Future<void> logout(BuildContext context) async {
     final auth = context.read<AuthState>();
     await auth.logoutCompleto();
   }
 
-  /// Menu dinâmico do perfil
   List<PerfilItem> get menuItems => [
         PerfilItem(title: 'Informações pessoais', onTap: () {}),
         PerfilItem(title: 'Suas funções', onTap: () {}),

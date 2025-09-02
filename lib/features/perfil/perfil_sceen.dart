@@ -54,21 +54,30 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
               // Foto de perfil (URL > arquivo local > placeholder)
               GestureDetector(
-                onTap: () => controller.selecionarImagemDaGaleria(),
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundImage: controller.imagemPerfilProvider,
-                  child: Text(
-                    _iniciais(controller.nome),
-                    style: context.textStyles.bodyLarge?.copyWith(
-                      color: context.colors.onSurface,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                  onTap: () => controller.selecionarImagemDaGaleria(),
+                  child: CircleAvatar(
+                    radius: 40,
+                    backgroundColor: context.colors.primary, // evita “anel”
+                    child: ClipOval(
+                      child: controller.imagemPerfilProvider != null
+                          ? Image(
+                              image: controller.imagemPerfilProvider!,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                            )
+                          : Center(
+                              child: Text(
+                                _iniciais(controller.nome),
+                                style: context.textStyles.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 22,
+                                  color: context.colors.onPrimary,
+                                ),
+                              ),
+                            ),
                     ),
-                  ),
-                ),
-              ),
+                  )),
 
               const SizedBox(height: 16),
 
@@ -266,7 +275,9 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         ),
                       ),
                       actionsPadding: const EdgeInsets.only(
-                        left: 16, right: 16, bottom: 12,
+                        left: 16,
+                        right: 16,
+                        bottom: 12,
                       ),
                       actions: [
                         Row(
@@ -331,10 +342,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 }
 
-// helper simples para iniciais
 String _iniciais(String nome) {
-  final partes = nome.trim().split(RegExp(r'\s+'));
-  if (partes.isEmpty) return '';
-  if (partes.length == 1) return partes.first.substring(0, 1).toUpperCase();
-  return (partes.first[0] + partes.last[0]).toUpperCase();
+  if (nome.trim().isEmpty) return '';
+  final ignora = {'de','da','do','das','dos','e','di','du'};
+  final partes = nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+
+  final uteis = <String>[];
+  for (final p in partes) {
+    final lower = p.toLowerCase();
+    if (uteis.isEmpty || !ignora.contains(lower)) {
+      uteis.add(p);
+    }
+    if (uteis.length == 2) break;
+  }
+
+  if (uteis.length == 1) return uteis.first[0].toUpperCase();
+  return (uteis[0][0] + uteis[1][0]).toUpperCase();
 }
