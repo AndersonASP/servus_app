@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:servus_app/core/models/ministry_dto.dart';
+import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 
 class MinistryDetailsDialog extends StatelessWidget {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:servus_app/core/auth/controllers/ministry_controller.dart';
-import 'package:servus_app/core/models/ministry_dto.dart';
+import 'package:servus_app/features/ministries/controllers/ministry_controller.dart';
+import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
@@ -34,6 +34,10 @@ class _MinistryFormDialogState extends State<MinistryFormDialog> {
       _nameController.text = widget.ministry!.name;
       _descriptionController.text = widget.ministry!.description ?? '';
       _ministryFunctions = List.from(widget.ministry!.ministryFunctions);
+      // Carregar funções no campo de texto
+      if (_ministryFunctions.isNotEmpty) {
+        _functionController.text = _ministryFunctions.join(', ');
+      }
       _isActive = widget.ministry!.isActive;
     }
   }
@@ -104,43 +108,45 @@ class _MinistryFormDialogState extends State<MinistryFormDialog> {
                   const SizedBox(height: 8),
                   
                   // Lista de funções
-                  if (_ministryFunctions.isNotEmpty)
-                    ...(_ministryFunctions.map((function) => Chip(
-                      label: Text(function),
-                      deleteIcon: const Icon(Icons.close, size: 18),
-                      onDeleted: () {
-                        setState(() {
-                          _ministryFunctions.remove(function);
-                        });
-                      },
-                    ))),
+                  if (_ministryFunctions.isNotEmpty) ...[
+                    Text(
+                      'Funções que serão adicionadas:',
+                      style: context.textStyles.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: _ministryFunctions.map((function) => Chip(
+                        label: Text(function),
+                        deleteIcon: const Icon(Icons.close, size: 18),
+                        onDeleted: () {
+                          setState(() {
+                            _ministryFunctions.remove(function);
+                            // Atualizar o texto do campo
+                            _functionController.text = _ministryFunctions.join(', ');
+                          });
+                        },
+                      )).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   
                   const SizedBox(height: 8),
                   
-                  // Adicionar nova função
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _functionController,
-                          decoration: const InputDecoration(
-                            hintText: 'Adicionar função',
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          onSubmitted: _addFunction,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () => _addFunction(_functionController.text),
-                        icon: const Icon(Icons.add),
-                        style: IconButton.styleFrom(
-                          backgroundColor: context.theme.primaryColor,
-                          foregroundColor: context.colors.onPrimary,
-                        ),
-                      ),
-                    ],
+                  // Campo para múltiplas funções
+                  TextFormField(
+                    controller: _functionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Funções do Ministério',
+                      hintText: 'Digite as funções separadas por vírgula (Ex: Baixista, Tecladista, Sonoplasta)',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    maxLines: 3,
+                    onChanged: _processFunctionsInput,
                   ),
                 ],
               ),
@@ -179,6 +185,27 @@ class _MinistryFormDialogState extends State<MinistryFormDialog> {
         ),
       ],
     );
+  }
+
+  void _processFunctionsInput(String input) {
+    if (input.trim().isEmpty) {
+      setState(() {
+        _ministryFunctions.clear();
+      });
+      return;
+    }
+
+    // Processar funções separadas por vírgula, ponto e vírgula ou quebra de linha
+    final functions = input
+        .split(RegExp(r'[,;\n]'))
+        .map((f) => f.trim())
+        .where((f) => f.isNotEmpty)
+        .toSet() // Remove duplicatas
+        .toList();
+
+    setState(() {
+      _ministryFunctions = functions;
+    });
   }
 
   void _addFunction(String function) {

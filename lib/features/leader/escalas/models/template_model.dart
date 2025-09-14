@@ -2,12 +2,14 @@ import 'package:uuid/uuid.dart';
 
 class FuncaoEscala {
   final String id;
-  final String nome;
+
+  final String nome; // Nome da função (para exibição)
   final String ministerioId;
   final int quantidade;
 
   FuncaoEscala({
     String? id,
+
     required this.nome,
     required this.ministerioId,
     required this.quantidade,

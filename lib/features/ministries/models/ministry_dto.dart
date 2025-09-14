@@ -119,10 +119,17 @@ class MinistryListResponse {
       items: (json['items'] as List?)
           ?.map((item) => MinistryResponse.fromJson(item))
           .toList() ?? [],
-      total: json['total'] ?? 0,
-      page: json['page'] ?? 1,
-      limit: json['limit'] ?? 20,
-      pages: json['pages'] ?? 1,
+      total: _parseInt(json['total']) ?? 0,
+      page: _parseInt(json['page']) ?? 1,
+      limit: _parseInt(json['limit']) ?? 20,
+      pages: _parseInt(json['pages']) ?? 1,
     );
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 } 

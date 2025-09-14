@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerio_controller.dart';
-import 'package:servus_app/core/models/ministry_dto.dart';
+import 'package:servus_app/features/ministries/models/ministry_dto.dart';
+import 'package:servus_app/shared/widgets/fab_safe_scroll_view.dart';
 
 class MinisterioFormScreen extends StatefulWidget {
   final MinistryResponse? ministerio; // Para edição
@@ -16,30 +17,26 @@ class MinisterioFormScreen extends StatefulWidget {
 
 class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
   @override
-  void initState() {
-    super.initState();
-    
-    // Se recebeu um ministério, inicializa para edição
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.ministerio != null) {
-        context.read<MinisterioController>().initializeForEdit(widget.ministerio!);
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => MinisterioController(),
+      create: (_) {
+        final controller = MinisterioController();
+        // Se recebeu um ministério, inicializa para edição
+        if (widget.ministerio != null) {
+          controller.initializeForEdit(widget.ministerio!);
+        }
+        return controller;
+      },
       child: Consumer<MinisterioController>(
         builder: (context, controller, _) {
           return Scaffold(
             appBar: AppBar(
+              surfaceTintColor: Colors.transparent,
+              centerTitle: false,
               leading: IconButton(
                 icon: Icon(Icons.arrow_back, color: context.colors.onSurface),
-                onPressed: () => context.go('/leader/ministerio/lista'),
+                onPressed: () => context.pop(),
               ),
-              centerTitle: false,
               title: Text(
                 widget.ministerio != null ? 'Editar Ministério' : 'Novo Ministério',
                 style: context.textStyles.titleLarge?.copyWith(
@@ -55,7 +52,7 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
                 ),
               ],
             ),
-            body: SingleChildScrollView(
+            body: FabSafeScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,9 +88,9 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
                   const SizedBox(height: 24),
                   
                   // Status ativo/inativo
-                  _buildStatusSection(context, controller),
+                  // _buildStatusSection(context, controller),
                   
-                  const SizedBox(height: 32),
+                  // const SizedBox(height: 32),
                   
                   // Informações adicionais
                   _buildInfoSection(context),
@@ -205,6 +202,14 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Digite uma função por vez ou várias separadas por vírgula',
+          style: context.textStyles.bodySmall?.copyWith(
+            color: context.colors.onSurface.withOpacity(0.7),
+            fontStyle: FontStyle.italic,
+          ),
+        ),
         const SizedBox(height: 8),
         
         // Campo para adicionar função
@@ -214,7 +219,7 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
               child: TextField(
                 controller: controller.funcaoController,
                 decoration: InputDecoration(
-                  hintText: 'Ex: Vocal, Instrumentos, Técnico...',
+                  hintText: 'Digite funções separadas por vírgula: Vocal, Instrumentos, Técnico...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -226,20 +231,34 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
                   filled: true,
                   fillColor: context.colors.surface,
                 ),
-                onSubmitted: (_) => controller.adicionarFuncao(),
+                onSubmitted: (_) => controller.adicionarFuncoes(),
               ),
             ),
             const SizedBox(width: 8),
             ElevatedButton(
-              onPressed: controller.funcaoController.text.trim().isNotEmpty ? controller.adicionarFuncao : null,
+              onPressed: controller.funcaoController.text.trim().isNotEmpty ? controller.adicionarFuncoes : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: context.colors.primary,
                 foregroundColor: context.colors.onPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-              child: const Icon(Icons.add),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add, size: 18, color: context.colors.onPrimary),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Adicionar',
+                    style: context.textStyles.bodySmall?.copyWith(
+                      color: context.colors.onPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -251,7 +270,7 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
           Text(
             'Funções adicionadas:',
             style: context.textStyles.bodyMedium?.copyWith(
-              color: context.colors.onSurface.withOpacity(0.7),
+              color: context.colors.onSurface.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 8),
@@ -259,16 +278,46 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
             spacing: 8,
             runSpacing: 8,
             children: controller.funcoes.map((funcao) {
-              return Chip(
-                label: Text(funcao),
-                backgroundColor: context.colors.primary.withOpacity(0.1),
-                labelStyle: TextStyle(color: context.colors.primary),
-                deleteIcon: Icon(
-                  Icons.close,
-                  size: 18,
+              return Container(
+                decoration: BoxDecoration(
                   color: context.colors.primary,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                onDeleted: () => controller.removerFuncao(funcao),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => controller.removerFuncao(funcao),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            funcao,
+                            style: TextStyle(
+                              color: context.colors.onPrimary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.close,
+                            size: 18,
+                            color: context.colors.onPrimary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               );
             }).toList(),
           ),
@@ -383,8 +432,7 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
                 Text(
                   '• Use nomes claros e objetivos\n'
                   '• Descreva bem as responsabilidades\n'
-                  '• Defina funções específicas\n'
-                  '• Mantenha o status atualizado',
+                  '• Defina funções específicas\n',
                   style: context.textStyles.bodySmall?.copyWith(
                     color: Colors.blue[700],
                   ),

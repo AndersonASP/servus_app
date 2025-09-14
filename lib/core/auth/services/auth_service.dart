@@ -1,16 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
-import 'package:provider/provider.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:servus_app/core/models/login_response.dart';
 import 'package:servus_app/core/models/usuario_logado.dart';
-import 'package:servus_app/core/models/ministerio.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/utils/role_util.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
-import 'package:servus_app/state/auth_state.dart';
 import 'package:servus_app/services/local_storage_service.dart';
 import 'package:servus_app/core/enums/user_role.dart';
+import 'package:servus_app/core/services/feedback_service.dart';
 
 class AuthService {
   final Dio dio;
@@ -23,7 +21,6 @@ class AuthService {
   /// Busca o tenant do usuário pelo email
   Future<String?> _findUserTenant(String email) async {
     try {
-      print('🔍 Buscando tenant do usuário: $email');
       
       final deviceId = await TokenService.getDeviceId();
       
@@ -39,14 +36,9 @@ class AuthService {
 
       if (response.statusCode == 200 && response.data != null) {
         final userData = response.data;
-        print('📋 Dados do usuário encontrados:');
-        print('   - ID: ${userData['id']}');
-        print('   - Email: ${userData['email']}');
-        print('   - Role: ${userData['role']}');
         
         // Se for servus_admin, não precisa de tenant
         if (userData['role'] == 'servus_admin') {
-          print('👑 Usuário é servus_admin - não precisa de tenant');
           return null;
         }
         
@@ -54,14 +46,12 @@ class AuthService {
         if (userData['memberships'] != null && userData['memberships'].isNotEmpty) {
           final membership = userData['memberships'][0];
           if (membership['tenant'] != null) {
-            final tenantId = membership['tenant']['tenantId'];
-            print('✅ Tenant encontrado: $tenantId');
+            final tenantId = membership['tenant']['id']; // ObjectId como string
             return tenantId;
           }
         }
         
         // Se não encontrou no membership, tenta buscar diretamente
-        print('🔍 Tentando buscar tenant diretamente...');
         final tenantResponse = await dio.get(
           '/users/$email/tenant',
           options: Options(
@@ -72,28 +62,23 @@ class AuthService {
         );
         
         if (tenantResponse.statusCode == 200 && tenantResponse.data != null) {
-          final tenantId = tenantResponse.data['tenantId'];
-          print('✅ Tenant encontrado diretamente: $tenantId');
+          final tenantId = tenantResponse.data['id']; // ObjectId como string
           return tenantId;
         }
       }
       
-      print('⚠️ Não foi possível encontrar o tenant do usuário');
       return null;
       
     } on DioException catch (e) {
-      print('❌ Erro ao buscar tenant do usuário:');
-      print('   - Status: ${e.response?.statusCode}');
-      print('   - Dados: ${e.response?.data}');
       return null;
     } catch (e) {
-      print('❌ Erro inesperado ao buscar tenant: $e');
       return null;
     }
   }
 
   /// Login com email e senha (versão inteligente)
   Future<LoginResponse> loginComEmailESenha({
+    BuildContext? context,
     required String email,
     required String senha,
     String? tenantId,
@@ -101,10 +86,11 @@ class AuthService {
     try {
       final deviceId = await TokenService.getDeviceId();
       
-      print('🔐 Iniciando login com email e senha...');
-      print('   - Email: $email');
-      print('   - Device ID: $deviceId');
-      print('   - Tenant ID (opcional): $tenantId');
+      print('🔐 [FRONTEND] Iniciando login com email e senha...');
+      print('📧 [FRONTEND] Email: $email');
+      print('🔑 [FRONTEND] Senha: ${senha.isNotEmpty ? '***' : 'VAZIA'}');
+      print('📱 [FRONTEND] Device ID: $deviceId');
+      print('🏢 [FRONTEND] Tenant ID (opcional): $tenantId');
       
       // Primeira tentativa de login
       LoginResponse? loginResponse;
@@ -112,39 +98,42 @@ class AuthService {
       
       try {
         // Tenta fazer login com o tenant fornecido (ou sem tenant)
+        print('🚀 [FRONTEND] Primeira tentativa de login...');
         loginResponse = await _attemptLogin(email, senha, deviceId, discoveredTenantId);
-        print('✅ Login realizado com sucesso na primeira tentativa');
+        print('✅ [FRONTEND] Login realizado com sucesso na primeira tentativa');
         
       } catch (e) {
-        print('⚠️ Primeira tentativa de login falhou: $e');
+        print('⚠️ [FRONTEND] Primeira tentativa de login falhou: $e');
         
         // Se a falha foi por credenciais inválidas (401), não tenta descobrir tenant
         if (e.toString().contains('Email ou senha incorretos')) {
-          print('❌ Credenciais inválidas - não tentando descobrir tenant');
+          print('❌ [FRONTEND] Credenciais inválidas - não tentando descobrir tenant');
           throw e; // Re-throw o erro de credenciais
         }
         
         // Se falhou por outro motivo e não temos tenant, tenta descobrir
         if (discoveredTenantId == null || discoveredTenantId.isEmpty) {
-          print('🔍 Tentando descobrir tenant automaticamente...');
+          print('🔍 [FRONTEND] Tentando descobrir tenant automaticamente...');
           discoveredTenantId = await _findUserTenant(email);
           
           if (discoveredTenantId != null) {
-            print('✅ Tenant descoberto: $discoveredTenantId');
+            print('✅ [FRONTEND] Tenant descoberto: $discoveredTenantId');
             
             // Segunda tentativa com o tenant descoberto
             try {
+              print('🚀 [FRONTEND] Segunda tentativa de login com tenant descoberto...');
               loginResponse = await _attemptLogin(email, senha, deviceId, discoveredTenantId);
-              print('✅ Login realizado com sucesso na segunda tentativa');
+              print('✅ [FRONTEND] Login realizado com sucesso na segunda tentativa');
             } catch (e2) {
-              print('❌ Segunda tentativa também falhou: $e2');
+              print('❌ [FRONTEND] Segunda tentativa também falhou: $e2');
               throw e2; // Re-throw o erro da segunda tentativa
             }
           } else {
-            print('❌ Não foi possível descobrir o tenant');
+            print('❌ [FRONTEND] Não foi possível descobrir o tenant');
             throw Exception('Não foi possível determinar o tenant do usuário');
           }
         } else {
+          print('❌ [FRONTEND] Já tinha tenant e falhou - re-throwing erro');
           // Se já tinha tenant e falhou, re-throw o erro
           rethrow;
         }
@@ -152,23 +141,29 @@ class AuthService {
       
       // Salva tokens
       await TokenService.saveTokens(
-        accessToken: loginResponse!.accessToken,
+        accessToken: loginResponse.accessToken,
         refreshToken: loginResponse.refreshToken,
         expiresIn: loginResponse.expiresIn,
       );
-      print('✅ Tokens salvos com sucesso');
+      // print('✅ Tokens salvos com sucesso');
 
       // 🆕 Extrair claims de segurança do JWT
       await TokenService.extractSecurityClaims(loginResponse.accessToken);
-      print('✅ Claims de segurança extraídos do JWT');
+      // print('✅ Claims de segurança extraídos do JWT');
 
       // Extrai contexto do membership (se disponível)
       await _extractAndSaveContextFromLogin(loginResponse);
 
+      if (context != null) {
+        FeedbackService.showSuccess(context, 'Login realizado com sucesso!');
+      }
       return loginResponse;
       
     } catch (e) {
-      print('❌ Erro final no login: $e');
+      // print('❌ Erro final no login: $e');
+      if (context != null) {
+        FeedbackService.showError(context, 'Erro no login. Tente novamente.');
+      }
       rethrow;
     }
   }
@@ -180,9 +175,13 @@ class AuthService {
     String deviceId, 
     String? tenantId
   ) async {
-    print('🚀 Tentando login com tenant: ${tenantId ?? "nenhum"}');
+    print('🚀 [FRONTEND] Tentando login com tenant: ${tenantId ?? "nenhum"}');
+    print('📧 [FRONTEND] Email para envio: $email');
+    print('🔑 [FRONTEND] Senha para envio: ${senha.isNotEmpty ? '***' : 'VAZIA'}');
+    print('📱 [FRONTEND] DeviceId para envio: $deviceId');
     
     try {
+      print('🌐 [FRONTEND] Enviando requisição para /auth/login...');
       final response = await dio.post(
         '/auth/login',
         data: {
@@ -197,7 +196,7 @@ class AuthService {
         ),
       );
 
-      print('📡 Resposta do login recebida:');
+      print('📡 [FRONTEND] Resposta do login recebida:');
       print('   - Status: ${response.statusCode}');
       print('   - Headers: ${response.headers}');
       print('   - Dados brutos: ${response.data}');
@@ -206,7 +205,7 @@ class AuthService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Verifica se a resposta tem dados
         if (response.data == null) {
-          print('❌ Resposta vazia do backend');
+          print('❌ [FRONTEND] Resposta vazia do backend');
           throw Exception('Resposta vazia do backend');
         }
 
@@ -214,48 +213,51 @@ class AuthService {
         try {
           final loginResponse = LoginResponse.fromJson(response.data);
           
-          print('🔍 LoginResponse processado com sucesso:');
-          print('   - User: ${loginResponse.user.name} (${loginResponse.user.role})');
-          print('   - Tenant: ${loginResponse.tenant?.name} (${loginResponse.tenant?.tenantId})');
-          print('   - Branches: ${loginResponse.branches?.length ?? 0}');
-          print('   - Memberships: ${loginResponse.memberships?.length ?? 0}');
+          // print('🔍 LoginResponse processado com sucesso:');
+          // print('   - User: ${loginResponse.user.name} (${loginResponse.user.role})');
+          // print('   - Tenant: ${loginResponse.tenant?.name} (${loginResponse.tenant?.tenantId})');
+          // print('   - Branches: ${loginResponse.branches?.length ?? 0}');
+          // print('   - Memberships: ${loginResponse.memberships?.length ?? 0}');
           
           // Log detalhado de cada campo
-          print('📋 Análise detalhada:');
-          print('   - user: ${loginResponse.user.name} (${loginResponse.user.role})');
-          print('   - tenant: ${loginResponse.tenant?.name} (${loginResponse.tenant?.tenantId})');
-          print('   - branches: ${loginResponse.branches?.length ?? 0}');
-          print('   - memberships: ${loginResponse.memberships?.length ?? 0}');
+          // print('📋 Análise detalhada:');
+          // print('   - user: ${loginResponse.user.name} (${loginResponse.user.role})');
+          // print('   - tenant: ${loginResponse.tenant?.name} (${loginResponse.tenant?.tenantId})');
+          // print('   - branches: ${loginResponse.branches?.length ?? 0}');
+          // print('   - memberships: ${loginResponse.memberships?.length ?? 0}');
           
           if (loginResponse.memberships?.isNotEmpty == true) {
-            print('   - Primeiro membership:');
+            // print('   - Primeiro membership:');
             final firstMembership = loginResponse.memberships!.first;
-            print('     * ID: ${firstMembership.id}');
-            print('     * Role: ${firstMembership.role}');
-            print('     * Branch: ${firstMembership.branch?.name} (${firstMembership.branch?.branchId})');
-            print('     * Ministry: ${firstMembership.ministry?.name} (${firstMembership.ministry?.id})');
+            // print('     * ID: ${firstMembership.id}');
+            // print('     * Role: ${firstMembership.role}');
+            // print('     * Branch: ${firstMembership.branch?.name} (${firstMembership.branch?.branchId})');
+            // print('     * Ministry: ${firstMembership.ministry?.name} (${firstMembership.ministry?.id})');
           }
           
           return loginResponse;
           
         } catch (parseError) {
-          print('❌ Erro ao fazer parse da resposta: $parseError');
-          print('   - Dados que falharam: ${response.data}');
+          // print('❌ Erro ao fazer parse da resposta: $parseError');
+          // print('   - Dados que falharam: ${response.data}');
           throw Exception('Erro ao processar resposta do login: $parseError');
         }
       } else {
         throw Exception('Erro no login: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      print('❌ Erro DioException no login:');
+      print('❌ [FRONTEND] Erro DioException no login:');
       print('   - Status: ${e.response?.statusCode}');
       print('   - Dados: ${e.response?.data}');
       print('   - Mensagem: ${e.message}');
+      print('   - Tipo: ${e.type}');
       
       // Trata erros específicos do backend
       if (e.response?.statusCode == 401) {
+        print('❌ [FRONTEND] Status 401 - Credenciais inválidas');
         throw Exception('Email ou senha incorretos');
       } else if (e.response?.statusCode == 400) {
+        print('❌ [FRONTEND] Status 400 - Dados inválidos');
         final errorData = e.response?.data;
         if (errorData is Map && errorData['message'] != null) {
           throw Exception(errorData['message']);
@@ -263,30 +265,35 @@ class AuthService {
           throw Exception('Dados de login inválidos');
         }
       } else if (e.response?.statusCode == 404) {
+        print('❌ [FRONTEND] Status 404 - Usuário não encontrado');
         throw Exception('Usuário não encontrado');
       } else if (e.response?.statusCode == 403) {
+        print('❌ [FRONTEND] Status 403 - Acesso negado');
         throw Exception('Acesso negado');
       } else if (e.response?.statusCode == 500) {
+        print('❌ [FRONTEND] Status 500 - Erro interno no servidor');
         throw Exception('Erro interno no servidor');
       } else {
+        print('❌ [FRONTEND] Erro de conexão: ${e.message}');
         throw Exception('Erro de conexão: ${e.message}');
       }
     } catch (e) {
-      print('❌ Erro inesperado no login: $e');
+      print('❌ [FRONTEND] Erro inesperado no login: $e');
       throw Exception('Erro inesperado: $e');
     }
   }
 
   /// Login com Google (versão inteligente)
   Future<LoginResponse> loginComGoogle({
+    BuildContext? context,
     String? tenantId,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
       
-      print('🔐 Iniciando login com Google...');
-      print('   - Device ID: $deviceId');
-      print('   - Tenant ID (opcional): $tenantId');
+      // print('🔐 Iniciando login com Google...');
+      // print('   - Device ID: $deviceId');
+      // print('   - Tenant ID (opcional): $tenantId');
       
       // Faz login com Google
       final googleUser = await googleSignIn.signIn();
@@ -302,9 +309,9 @@ class AuthService {
         throw Exception('Falha na autenticação com Google');
       }
 
-      print('✅ Autenticação Google realizada');
-      print('   - Email: ${googleUser.email}');
-      print('   - Nome: ${googleUser.displayName}');
+      // print('✅ Autenticação Google realizada');
+      // print('   - Email: ${googleUser.email}');
+      // print('   - Nome: ${googleUser.displayName}');
 
       // Primeira tentativa de login
       LoginResponse? loginResponse;
@@ -313,29 +320,29 @@ class AuthService {
       try {
         // Tenta fazer login com o tenant fornecido (ou sem tenant)
         loginResponse = await _attemptGoogleLogin(idToken, accessToken, deviceId, discoveredTenantId);
-        print('✅ Login realizado com sucesso na primeira tentativa');
+        // print('✅ Login realizado com sucesso na primeira tentativa');
         
       } catch (e) {
-        print('⚠️ Primeira tentativa de login falhou: $e');
+        // print('⚠️ Primeira tentativa de login falhou: $e');
         
         // Se falhou e não temos tenant, tenta descobrir
         if (discoveredTenantId == null || discoveredTenantId.isEmpty) {
-          print('🔍 Tentando descobrir tenant automaticamente...');
+          // print('🔍 Tentando descobrir tenant automaticamente...');
           discoveredTenantId = await _findUserTenant(googleUser.email);
           
           if (discoveredTenantId != null) {
-            print('✅ Tenant descoberto: $discoveredTenantId');
+            // print('✅ Tenant descoberto: $discoveredTenantId');
             
             // Segunda tentativa com o tenant descoberto
             try {
               loginResponse = await _attemptGoogleLogin(idToken, accessToken, deviceId, discoveredTenantId);
-              print('✅ Login realizado com sucesso na segunda tentativa');
+              // print('✅ Login realizado com sucesso na segunda tentativa');
             } catch (e2) {
-              print('❌ Segunda tentativa também falhou: $e2');
+              // print('❌ Segunda tentativa também falhou: $e2');
               throw e2; // Re-throw o erro da segunda tentativa
             }
           } else {
-            print('❌ Não foi possível descobrir o tenant');
+            // print('❌ Não foi possível descobrir o tenant');
             throw Exception('Não foi possível determinar o tenant do usuário');
           }
         } else {
@@ -346,23 +353,29 @@ class AuthService {
       
       // Salva tokens
       await TokenService.saveTokens(
-        accessToken: loginResponse!.accessToken,
+        accessToken: loginResponse.accessToken,
         refreshToken: loginResponse.refreshToken,
         expiresIn: loginResponse.expiresIn,
       );
-      print('✅ Tokens salvos com sucesso');
+      // print('✅ Tokens salvos com sucesso');
 
       // 🆕 Extrair claims de segurança do JWT
       await TokenService.extractSecurityClaims(loginResponse.accessToken);
-      print('✅ Claims de segurança extraídos do JWT');
+      // print('✅ Claims de segurança extraídos do JWT');
 
       // Extrai contexto do membership (se disponível)
       await _extractAndSaveContextFromLogin(loginResponse);
 
+      if (context != null) {
+        FeedbackService.showSuccess(context, 'Login com Google realizado com sucesso!');
+      }
       return loginResponse;
       
     } catch (e) {
-      print('❌ Erro final no login com Google: $e');
+      // print('❌ Erro final no login com Google: $e');
+      if (context != null) {
+        FeedbackService.showError(context, 'Erro no login com Google. Tente novamente.');
+      }
       rethrow;
     }
   }
@@ -374,7 +387,7 @@ class AuthService {
     String deviceId, 
     String? tenantId
   ) async {
-    print('🚀 Tentando login Google com tenant: ${tenantId ?? "nenhum"}');
+    // print('🚀 Tentando login Google com tenant: ${tenantId ?? "nenhum"}');
     
     final response = await dio.post(
       '/auth/google',
@@ -390,16 +403,16 @@ class AuthService {
       ),
     );
 
-    print('📡 Resposta do login Google recebida:');
-    print('   - Status: ${response.statusCode}');
-    print('   - Headers: ${response.headers}');
-    print('   - Dados brutos: ${response.data}');
-    print('   - Tipo de dados: ${response.data.runtimeType}');
+    // print('📡 Resposta do login Google recebida:');
+    // print('   - Status: ${response.statusCode}');
+    // print('   - Headers: ${response.headers}');
+    // print('   - Dados brutos: ${response.data}');
+    // print('   - Tipo de dados: ${response.data.runtimeType}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       // Verifica se a resposta tem dados
       if (response.data == null) {
-        print('❌ Resposta vazia do backend');
+        // print('❌ Resposta vazia do backend');
         throw Exception('Resposta vazia do backend');
       }
 
@@ -407,33 +420,33 @@ class AuthService {
       try {
         final loginResponse = LoginResponse.fromJson(response.data);
         
-        print('🔍 LoginResponse Google processado com sucesso:');
-        print('   - User: ${loginResponse.user.name} (${loginResponse.user.role})');
-        print('   - Tenant: ${loginResponse.tenant?.name} (${loginResponse.tenant?.tenantId})');
-        print('   - Branches: ${loginResponse.branches?.length ?? 0}');
-        print('   - Memberships: ${loginResponse.memberships?.length ?? 0}');
+        // print('🔍 LoginResponse Google processado com sucesso:');
+        // print('   - User: ${loginResponse.user.name} (${loginResponse.user.role})');
+        // print('   - Tenant: ${loginResponse.tenant?.name} (${loginResponse.tenant?.tenantId})');
+        // print('   - Branches: ${loginResponse.branches?.length ?? 0}');
+        // print('   - Memberships: ${loginResponse.memberships?.length ?? 0}');
         
         // Log detalhado de cada campo
-        print('📋 Análise detalhada:');
-        print('   - user: ${loginResponse.user.name} (${loginResponse.user.role})');
-        print('   - tenant: ${loginResponse.tenant?.name} (${loginResponse.tenant?.tenantId})');
-        print('   - branches: ${loginResponse.branches?.length ?? 0}');
-        print('   - memberships: ${loginResponse.memberships?.length ?? 0}');
+        // print('📋 Análise detalhada:');
+        // print('   - user: ${loginResponse.user.name} (${loginResponse.user.role})');
+        // print('   - tenant: ${loginResponse.tenant?.name} (${loginResponse.tenant?.tenantId})');
+        // print('   - branches: ${loginResponse.branches?.length ?? 0}');
+        // print('   - memberships: ${loginResponse.memberships?.length ?? 0}');
         
         if (loginResponse.memberships?.isNotEmpty == true) {
-          print('   - Primeiro membership:');
+          // print('   - Primeiro membership:');
           final firstMembership = loginResponse.memberships!.first;
-          print('     * ID: ${firstMembership.id}');
-          print('     * Role: ${firstMembership.role}');
-          print('     * Branch: ${firstMembership.branch?.name} (${firstMembership.branch?.branchId})');
-          print('     * Ministry: ${firstMembership.ministry?.name} (${firstMembership.ministry?.id})');
+          // print('     * ID: ${firstMembership.id}');
+          // print('     * Role: ${firstMembership.role}');
+          // print('     * Branch: ${firstMembership.branch?.name} (${firstMembership.branch?.branchId})');
+          // print('     * Ministry: ${firstMembership.ministry?.name} (${firstMembership.ministry?.id})');
         }
         
         return loginResponse;
         
       } catch (parseError) {
-        print('❌ Erro ao fazer parse da resposta Google: $parseError');
-        print('   - Dados que falharam: ${response.data}');
+        // print('❌ Erro ao fazer parse da resposta Google: $parseError');
+        // print('   - Dados que falharam: ${response.data}');
         throw Exception('Erro ao processar resposta do login Google: $parseError');
       }
     } else {
@@ -441,10 +454,65 @@ class AuthService {
     }
   }
 
+  /// Busca contexto do usuário via endpoint /auth/me/context
+  Future<void> _fetchUserContext() async {
+    try {
+      // print('🔍 Buscando contexto do usuário via /auth/me/context...');
+      
+      final token = await TokenService.getAccessToken();
+      if (token == null) {
+        // print('❌ Token não encontrado para buscar contexto');
+        return;
+      }
+
+      // print('🔍 Token encontrado, fazendo requisição...');
+      final response = await dio.get('/auth/me/context');
+      
+      // print('🔍 Resposta recebida: ${response.statusCode}');
+      // print('🔍 Dados da resposta: ${response.data}');
+      
+      if (response.statusCode == 200) {
+        final data = response.data;
+        // print('✅ Contexto obtido com sucesso: $data');
+        
+        // Processar contexto e salvar
+        if (data['tenants'] != null && data['tenants'].isNotEmpty) {
+          final tenant = data['tenants'][0]; // Usar primeiro tenant
+          final tenantId = tenant['tenantId'];
+          final branchId = tenant['branches']?.isNotEmpty == true 
+              ? tenant['branches'][0]['branchId'] 
+              : null;
+          
+          // print('💾 Salvando contexto do endpoint:');
+          // print('   - Tenant ID: $tenantId');
+          // print('   - Branch ID: $branchId');
+          
+          await TokenService.saveContext(
+            tenantId: tenantId,
+            branchId: branchId,
+          );
+          // print('✅ Contexto salvo com sucesso via endpoint');
+        } else {
+          // print('⚠️ Nenhum tenant encontrado no contexto');
+          // print('   - Dados recebidos: $data');
+        }
+      } else {
+        // print('❌ Erro ao buscar contexto: ${response.statusCode}');
+        // print('   - Response data: ${response.data}');
+      }
+    } catch (e) {
+      // print('❌ Erro ao buscar contexto: $e');
+      if (e is DioException) {
+        // print('❌ Status code: ${e.response?.statusCode}');
+        // print('❌ Response data: ${e.response?.data}');
+      }
+    }
+  }
+
   /// Extrai e salva contexto do login (sem chamadas adicionais)
   Future<void> _extractAndSaveContextFromLogin(LoginResponse loginResponse) async {
     try {
-      print('🔍 Extraindo contexto do login...');
+      // print('🔍 Extraindo contexto do login...');
       
       String? tenantId;
       String? branchId;
@@ -452,68 +520,73 @@ class AuthService {
       // Tenta obter do tenant direto
       if (loginResponse.tenant != null) {
         tenantId = loginResponse.tenant!.tenantId;
-        print('   - Tenant ID do tenant: $tenantId');
+        // print('   - Tenant ID do tenant: $tenantId');
       }
       
       // Tenta obter do membership (mais confiável)
       if (loginResponse.memberships?.isNotEmpty == true) {
         final membership = loginResponse.memberships!.first;
-        print('   - Membership encontrado: ${membership.id}');
+        // print('   - Membership encontrado: ${membership.id}');
         
         // Branch vem do membership
         if (membership.branch != null) {
           branchId = membership.branch!.branchId;
-          print('   - Branch ID do membership: $branchId');
+          // print('   - Branch ID do membership: $branchId');
         }
         
         // Se não tiver tenantId do tenant, precisa ser obtido de outra forma
         // O membership não tem tenant diretamente
         if (tenantId == null) {
-          print('   - ⚠️ Tenant ID não encontrado - membership não tem campo tenant');
+          // print('   - ⚠️ Tenant ID não encontrado - membership não tem campo tenant');
         }
       }
       
       // Tenta obter branch das branches (fallback)
       if (branchId == null && loginResponse.branches?.isNotEmpty == true) {
         branchId = loginResponse.branches!.first.branchId;
-        print('   - Branch ID das branches: $branchId');
+        // print('   - Branch ID das branches: $branchId');
       }
       
       // Salva contexto se encontrou
       if (tenantId != null) {
-        print('💾 Salvando contexto extraído:');
-        print('   - Tenant ID: $tenantId');
-        print('   - Branch ID: $branchId');
+        // print('💾 Salvando contexto extraído:');
+        // print('   - Tenant ID: $tenantId');
+        // print('   - Branch ID: $branchId');
         
         await TokenService.saveContext(
           tenantId: tenantId,
           branchId: branchId,
         );
-        print('✅ Contexto salvo com sucesso');
+        // print('✅ Contexto salvo com sucesso');
       } else {
-        print('⚠️ Nenhum contexto encontrado no login');
-        print('   - Verifique se o backend está retornando tenant no login');
-        print('   - Verifique se o usuário tem vínculos ativos');
-        print('   - O membership não contém tenant diretamente');
+        // print('⚠️ Nenhum contexto encontrado no login');
+        // print('   - Tentando obter contexto via /auth/me/context');
+        
+        // Tentar obter contexto via endpoint específico
+        try {
+          await _fetchUserContext();
+        } catch (e) {
+          // print('❌ Erro ao obter contexto: $e');
+        }
       }
 
       // 🆕 SALVAR USUÁRIO NO LOCAL STORAGE (para compatibilidade)
       try {
-        print('💾 Salvando usuário no LocalStorage para compatibilidade...');
+        // print('💾 Salvando usuário no LocalStorage para compatibilidade...');
         
         // 🆕 CORREÇÃO: Para ServusAdmin, sempre usa user.role
         String rolePrincipal = loginResponse.user.role;
         if (loginResponse.user.role == 'servus_admin') {
           // ServusAdmin sempre usa seu role global, não o do membership
           rolePrincipal = loginResponse.user.role;
-          print('   - 🎯 ServusAdmin detectado - usando role global: $rolePrincipal');
+          // print('   - 🎯 ServusAdmin detectado - usando role global: $rolePrincipal');
         } else if (loginResponse.memberships?.isNotEmpty == true) {
           final membership = loginResponse.memberships!.first;
           // Para outros usuários, membership role tem prioridade sobre user role
           rolePrincipal = membership.role;
-          print('   - Role do membership usado: $rolePrincipal');
+          // print('   - Role do membership usado: $rolePrincipal');
         } else {
-          print('   - Role do usuário usado: $rolePrincipal');
+          // print('   - Role do usuário usado: $rolePrincipal');
         }
 
         // Cria objeto UsuarioLogado
@@ -533,20 +606,20 @@ class AuthService {
 
         // Salva no LocalStorage
         await LocalStorageService.salvarUsuario(usuario);
-        print('✅ Usuário salvo no LocalStorage com sucesso');
-        print('   - Nome: ${usuario.nome}');
-        print('   - Email: ${usuario.email}');
-        print('   - Role: ${usuario.role.name}');
-        print('   - Tenant: ${usuario.tenantName}');
-        print('   - Branch: ${usuario.branchName}');
+        // print('✅ Usuário salvo no LocalStorage com sucesso');
+        // print('   - Nome: ${usuario.nome}');
+        // print('   - Email: ${usuario.email}');
+        // print('   - Role: ${usuario.role.name}');
+        // print('   - Tenant: ${usuario.tenantName}');
+        // print('   - Branch: ${usuario.branchName}');
         
       } catch (e) {
-        print('❌ Erro ao salvar usuário no LocalStorage: $e');
+        // print('❌ Erro ao salvar usuário no LocalStorage: $e');
         // Não falha o login por isso, apenas loga o erro
       }
       
     } catch (e) {
-      print('❌ Erro ao extrair contexto: $e');
+      // print('❌ Erro ao extrair contexto: $e');
     }
   }
 
@@ -564,15 +637,13 @@ class AuthService {
       case 'volunteer':
         return UserRole.volunteer;
       default:
-        print('⚠️ Role desconhecido: $role, usando volunteer como padrão');
+        // print('⚠️ Role desconhecido: $role, usando volunteer como padrão');
         return UserRole.volunteer;
     }
   }
 
   /// Renova token
   Future<bool> renovarToken(BuildContext context) async {
-    final auth = Provider.of<AuthState>(context, listen: false);
-    
     try {
       final refreshToken = await TokenService.getRefreshToken();
       if (refreshToken == null) return false;
@@ -609,10 +680,10 @@ class AuthService {
         return false;
       }
     } on DioException catch (e) {
-      print('❌ Erro ao renovar token: ${e.message}');
+      // print('❌ Erro ao renovar token: ${e.message}');
       return false;
     } catch (e) {
-      print('❌ Erro inesperado: $e');
+      // print('❌ Erro inesperado: $e');
       return false;
     }
   }
@@ -635,7 +706,7 @@ class AuthService {
         ),
       );
     } on DioException catch (e) {
-      print('Erro ao fazer logout no backend: $e');
+      // print('Erro ao fazer logout no backend: $e');
       // Mesmo com erro, limpa os dados locais
     } finally {
       await TokenService.clearAll();
@@ -666,7 +737,7 @@ class AuthService {
       
       return null;
     } on DioException catch (e) {
-      print('❌ Erro ao obter contexto: ${e.message}');
+      // print('❌ Erro ao obter contexto: ${e.message}');
       return null;
     }
   }
@@ -674,7 +745,7 @@ class AuthService {
   /// Obtém contexto do usuário via membership
   Future<Map<String, dynamic>?> getUserMembershipContext() async {
     try {
-      print('🔍 Consultando membership do usuário...');
+      // print('🔍 Consultando membership do usuário...');
       
       final deviceId = await TokenService.getDeviceId();
       
@@ -690,7 +761,7 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = response.data;
-        print('📄 Dados do membership recebidos: $data');
+        // print('📄 Dados do membership recebidos: $data');
         
         // Extrai informações do membership
         final membership = data['membership'];
@@ -699,10 +770,10 @@ class AuthService {
           final branchId = membership['branch']?['branchId'];
           final role = membership['role'];
           
-          print('🔍 Contexto extraído do membership:');
-          print('   - Tenant ID: $tenantId');
-          print('   - Branch ID: $branchId');
-          print('   - Role: $role');
+          // print('🔍 Contexto extraído do membership:');
+          // print('   - Tenant ID: $tenantId');
+          // print('   - Branch ID: $branchId');
+          // print('   - Role: $role');
           
           return {
             'tenantId': tenantId,
@@ -715,32 +786,32 @@ class AuthService {
       
       return null;
     } on DioException catch (e) {
-      print('❌ Erro ao obter membership: ${e.message}');
-      print('   - Status: ${e.response?.statusCode}');
-      print('   - Dados: ${e.response?.data}');
+      // print('❌ Erro ao obter membership: ${e.message}');
+      // print('   - Status: ${e.response?.statusCode}');
+      // print('   - Dados: ${e.response?.data}');
       return null;
     } catch (e) {
-      print('❌ Erro inesperado ao obter membership: $e');
+      // print('❌ Erro inesperado ao obter membership: $e');
       return null;
     }
   }
 
   /// Converte LoginResponse para UsuarioLogado
   UsuarioLogado convertToUsuarioLogado(LoginResponse loginResponse) {
-    print('DEBUG: Role recebido do backend: "${loginResponse.user.role}"');
+    // print('DEBUG: Role recebido do backend: "${loginResponse.user.role}"');
     
     // Tenta usar o role do membership primeiro, depois do user
     String? roleToUse;
     if (loginResponse.memberships != null && loginResponse.memberships!.isNotEmpty) {
       roleToUse = loginResponse.memberships!.first.role;
-      print('DEBUG: Usando role do membership: "$roleToUse"');
+      // print('DEBUG: Usando role do membership: "$roleToUse"');
     } else if (loginResponse.user.role.isNotEmpty) {
       roleToUse = loginResponse.user.role;
-      print('DEBUG: Usando role do user: "$roleToUse"');
+      // print('DEBUG: Usando role do user: "$roleToUse"');
     }
     
     final userRole = mapRoleToEnum(roleToUse);
-    print('DEBUG: Role convertido para enum: $userRole');
+    // print('DEBUG: Role convertido para enum: $userRole');
     
     return UsuarioLogado(
       nome: loginResponse.user.name,
@@ -759,31 +830,11 @@ class AuthService {
     );
   }
 
-  /// Trata erros do Dio para mensagens mais amigáveis
-  String _handleDioError(DioException e) {
-    if (e.response != null) {
-      final status = e.response?.statusCode ?? 0;
-      switch (status) {
-        case 400:
-          return 'Requisição inválida';
-        case 401:
-          return 'Credenciais inválidas';
-        case 403:
-          return 'Acesso negado';
-        case 500:
-          return 'Erro interno no servidor';
-        default:
-          return 'Erro desconhecido (${e.message})';
-      }
-    } else {
-      return 'Erro de conexão: ${e.message}';
-    }
-  }
 
   /// Testa se o backend está funcionando
   Future<void> testBackendConnection() async {
     try {
-      print('🧪 Testando conexão com o backend...');
+      // print('🧪 Testando conexão com o backend...');
       
       final deviceId = await TokenService.getDeviceId();
       
@@ -797,25 +848,25 @@ class AuthService {
         ),
       );
 
-      print('✅ Backend está funcionando:');
-      print('   - Status: ${response.statusCode}');
-      print('   - Dados: ${response.data}');
+      // print('✅ Backend está funcionando:');
+      // print('   - Status: ${response.statusCode}');
+      // print('   - Dados: ${response.data}');
       
     } on DioException catch (e) {
-      print('❌ Backend não está funcionando:');
-      print('   - Tipo: ${e.type}');
-      print('   - Mensagem: ${e.message}');
-      print('   - Status: ${e.response?.statusCode}');
-      print('   - Dados: ${e.response?.data}');
+      // print('❌ Backend não está funcionando:');
+      // print('   - Tipo: ${e.type}');
+      // print('   - Mensagem: ${e.message}');
+      // print('   - Status: ${e.response?.statusCode}');
+      // print('   - Dados: ${e.response?.data}');
     } catch (e) {
-      print('❌ Erro inesperado ao testar backend: $e');
+      // print('❌ Erro inesperado ao testar backend: $e');
     }
   }
 
   /// Testa endpoint de login sem credenciais (para ver estrutura)
   Future<void> testLoginEndpoint() async {
     try {
-      print('🧪 Testando endpoint de login...');
+      // print('🧪 Testando endpoint de login...');
       
       final deviceId = await TokenService.getDeviceId();
       
@@ -833,17 +884,17 @@ class AuthService {
         ),
       );
 
-      print('✅ Endpoint de login está funcionando:');
-      print('   - Status: ${response.statusCode}');
-      print('   - Dados: ${response.data}');
+      // print('✅ Endpoint de login está funcionando:');
+      // print('   - Status: ${response.statusCode}');
+      // print('   - Dados: ${response.data}');
       
     } on DioException catch (e) {
-      print('📋 Endpoint de login respondeu (esperado para credenciais inválidas):');
-      print('   - Status: ${e.response?.statusCode}');
-      print('   - Dados: ${e.response?.data}');
-      print('   - Estrutura da resposta: ${e.response?.data.runtimeType}');
+      // print('📋 Endpoint de login respondeu (esperado para credenciais inválidas):');
+      // print('   - Status: ${e.response?.statusCode}');
+      // print('   - Dados: ${e.response?.data}');
+      // print('   - Estrutura da resposta: ${e.response?.data.runtimeType}');
     } catch (e) {
-      print('❌ Erro inesperado ao testar login: $e');
+      // print('❌ Erro inesperado ao testar login: $e');
     }
   }
 }

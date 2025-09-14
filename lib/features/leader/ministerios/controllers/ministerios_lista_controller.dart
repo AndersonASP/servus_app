@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:servus_app/core/auth/services/ministry_service.dart';
-import 'package:servus_app/core/models/ministry_dto.dart';
+import 'package:servus_app/features/ministries/services/ministry_service.dart';
+import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
-import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class MinisterioListController extends ChangeNotifier {
   final MinistryService _ministryService = MinistryService();
@@ -20,7 +19,8 @@ class MinisterioListController extends ChangeNotifier {
   
   // Filtros
   String searchQuery = '';
-  bool showOnlyActive = true;
+  bool showOnlyActive = false; // Mudança: agora mostra todos por padrão
+  String filterStatus = 'todos'; // Mudança: filtro padrão é 'todos' ao invés de 'ativos'
 
   // Getters para compatibilidade com a UI existente
   bool get hasData => ministerios.isNotEmpty;
@@ -44,20 +44,38 @@ class MinisterioListController extends ChangeNotifier {
       final tenantId = context['tenantId'];
       final branchId = context['branchId'];
       
-      if (tenantId == null || branchId == null) {
-        throw Exception('Contexto de tenant/branch não encontrado');
+      if (tenantId == null) {
+        throw Exception('Contexto de tenant não encontrado');
+      }
+      
+      // Para ministérios da matriz, branchId pode ser null
+      // Para ministérios de filiais, branchId deve ser fornecido
+
+      // Determina o filtro de status baseado no filterStatus
+      bool? isActiveFilter;
+      switch (filterStatus) {
+        case 'ativos':
+          isActiveFilter = true;
+          break;
+        case 'inativos':
+          isActiveFilter = false;
+          break;
+        case 'todos':
+        default:
+          isActiveFilter = null;
+          break;
       }
 
       final filters = ListMinistryDto(
         page: currentPage,
         limit: 20,
         search: searchQuery.isNotEmpty ? searchQuery : null,
-        isActive: showOnlyActive ? true : null,
+        isActive: isActiveFilter,
       );
 
       final response = await _ministryService.listMinistries(
         tenantId: tenantId,
-        branchId: branchId,
+        branchId: branchId ?? '', // Para ministérios da matriz, usa string vazia
         filters: filters,
       );
 
@@ -77,7 +95,7 @@ class MinisterioListController extends ChangeNotifier {
     } catch (e) {
       isLoading = false;
       notifyListeners();
-      print('❌ Erro ao carregar ministérios: $e');
+      // print('❌ Erro ao carregar ministérios: $e');
       rethrow;
     }
   }
@@ -96,34 +114,16 @@ class MinisterioListController extends ChangeNotifier {
     await carregarMinisterios(refresh: true);
   }
 
-  /// Filtra por status ativo/inativo
-  Future<void> filtrarPorStatus(bool ativo) async {
-    showOnlyActive = ativo;
+  /// Filtra por status ativo/inativo/todos
+  Future<void> filtrarPorStatus(String status) async {
+    filterStatus = status;
     await carregarMinisterios(refresh: true);
   }
 
   /// Altera status do ministério (integração com backend)
   Future<void> alterarStatus(String id, bool ativo) async {
     try {
-      isUpdating = true;
-      notifyListeners();
-
-      final context = await TokenService.getContext();
-      final tenantId = context['tenantId'];
-      final branchId = context['branchId'];
-      
-      if (tenantId == null || branchId == null) {
-        throw Exception('Contexto de tenant/branch não encontrado');
-      }
-
-      await _ministryService.toggleMinistryStatus(
-        tenantId: tenantId,
-        branchId: branchId,
-        ministryId: id,
-        isActive: ativo,
-      );
-
-      // Atualiza na lista local
+      // Atualiza na lista local primeiro para feedback imediato
       final index = ministerios.indexWhere((m) => m.id == id);
       if (index != -1) {
         // Recria o objeto com o novo status
@@ -139,14 +139,50 @@ class MinisterioListController extends ChangeNotifier {
         );
       }
 
+      isUpdating = true;
+      notifyListeners();
+
+      final context = await TokenService.getContext();
+      final tenantId = context['tenantId'];
+      final branchId = context['branchId'];
+      
+      if (tenantId == null) {
+        throw Exception('Contexto de tenant não encontrado');
+      }
+      
+      // Para ministérios da matriz, branchId pode ser null
+      // Para ministérios de filiais, branchId deve ser fornecido
+
+      await _ministryService.toggleMinistryStatus(
+        tenantId: tenantId,
+        branchId: branchId ?? '', // Para ministérios da matriz, usa string vazia
+        ministryId: id,
+        isActive: ativo,
+      );
+
       isUpdating = false;
       notifyListeners();
 
-      print('✅ Ministério ${ativo ? 'ativado' : 'desativado'} com sucesso!');
+      // print('✅ Ministério ${ativo ? 'ativado' : 'desativado'} com sucesso!');
     } catch (e) {
+      // Reverte a mudança em caso de erro
+      final index = ministerios.indexWhere((m) => m.id == id);
+      if (index != -1) {
+        final oldMinistry = ministerios[index];
+        ministerios[index] = MinistryResponse(
+          id: oldMinistry.id,
+          name: oldMinistry.name,
+          description: oldMinistry.description,
+          ministryFunctions: oldMinistry.ministryFunctions,
+          isActive: !ativo, // Reverte o status
+          createdAt: oldMinistry.createdAt,
+          updatedAt: oldMinistry.updatedAt,
+        );
+      }
+      
       isUpdating = false;
       notifyListeners();
-      print('❌ Erro ao alterar status: ${e.toString()}');
+      // print('❌ Erro ao alterar status: ${e.toString()}');
       rethrow;
     }
   }
@@ -158,13 +194,16 @@ class MinisterioListController extends ChangeNotifier {
       final tenantId = context['tenantId'];
       final branchId = context['branchId'];
       
-      if (tenantId == null || branchId == null) {
-        throw Exception('Contexto de tenant/branch não encontrado');
+      if (tenantId == null) {
+        throw Exception('Contexto de tenant não encontrado');
       }
+      
+      // Para ministérios da matriz, branchId pode ser null
+      // Para ministérios de filiais, branchId deve ser fornecido
 
       final success = await _ministryService.deleteMinistry(
         tenantId: tenantId,
-        branchId: branchId,
+        branchId: branchId ?? '', // Para ministérios da matriz, usa string vazia
         ministryId: id,
       );
 
@@ -172,10 +211,10 @@ class MinisterioListController extends ChangeNotifier {
         ministerios.removeWhere((m) => m.id == id);
         totalItems--;
         notifyListeners();
-        print('✅ Ministério removido com sucesso!');
+        // print('✅ Ministério removido com sucesso!');
       }
     } catch (e) {
-      print('❌ Erro ao remover ministério: $e');
+      // print('❌ Erro ao remover ministério: $e');
       rethrow;
     }
   }
@@ -190,13 +229,16 @@ class MinisterioListController extends ChangeNotifier {
       final tenantId = context['tenantId'];
       final branchId = context['branchId'];
       
-      if (tenantId == null || branchId == null) {
-        throw Exception('Contexto de tenant/branch não encontrado');
+      if (tenantId == null) {
+        throw Exception('Contexto de tenant não encontrado');
       }
+      
+      // Para ministérios da matriz, branchId pode ser null
+      // Para ministérios de filiais, branchId deve ser fornecido
 
       final newMinistry = await _ministryService.createMinistry(
         tenantId: tenantId,
-        branchId: branchId,
+        branchId: branchId ?? '', // Para ministérios da matriz, usa string vazia
         ministryData: ministryData,
       );
 
@@ -210,7 +252,7 @@ class MinisterioListController extends ChangeNotifier {
     } catch (e) {
       isCreating = false;
       notifyListeners();
-      print('❌ Erro ao criar ministério: $e');
+      // print('❌ Erro ao criar ministério: $e');
       rethrow;
     }
   }
@@ -225,13 +267,16 @@ class MinisterioListController extends ChangeNotifier {
       final tenantId = context['tenantId'];
       final branchId = context['branchId'];
       
-      if (tenantId == null || branchId == null) {
-        throw Exception('Contexto de tenant/branch não encontrado');
+      if (tenantId == null) {
+        throw Exception('Contexto de tenant não encontrado');
       }
+      
+      // Para ministérios da matriz, branchId pode ser null
+      // Para ministérios de filiais, branchId deve ser fornecido
 
       final updatedMinistry = await _ministryService.updateMinistry(
         tenantId: tenantId,
-        branchId: branchId,
+        branchId: branchId ?? '', // Para ministérios da matriz, usa string vazia
         ministryId: id,
         ministryData: ministryData,
       );
@@ -248,7 +293,7 @@ class MinisterioListController extends ChangeNotifier {
     } catch (e) {
       isUpdating = false;
       notifyListeners();
-      print('❌ Erro ao atualizar ministério: $e');
+      // print('❌ Erro ao atualizar ministério: $e');
       rethrow;
     }
   }
@@ -256,7 +301,7 @@ class MinisterioListController extends ChangeNotifier {
   /// Limpa filtros
   Future<void> limparFiltros() async {
     searchQuery = '';
-    showOnlyActive = true;
+    filterStatus = 'todos'; // Mudança: agora volta para 'todos' ao invés de 'ativos'
     await carregarMinisterios(refresh: true);
   }
 
@@ -268,7 +313,7 @@ class MinisterioListController extends ChangeNotifier {
     totalItems = 0;
     hasMorePages = true;
     searchQuery = '';
-    showOnlyActive = true;
+    filterStatus = 'todos'; // Mudança: agora volta para 'todos' ao invés de 'ativos'
     isLoading = false;
     isCreating = false;
     isUpdating = false;

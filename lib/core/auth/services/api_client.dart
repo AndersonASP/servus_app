@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:servus_app/core/constants/env.dart';
 
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
@@ -12,9 +13,9 @@ class ApiClient {
 
   ApiClient._internal() {
     dio = Dio(BaseOptions(
-      baseUrl: 'http://10.0.2.2:3000', // trocar pelo IP ou URL ngrok
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      baseUrl: Env.baseUrl,
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
     ));
 
     dio.interceptors.add(InterceptorsWrapper(

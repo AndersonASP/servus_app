@@ -20,10 +20,10 @@ class DrawerMenuLider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final usuario = context.read<AuthState>().usuario!;
-    
+
     // Debug temporário para identificar o problema
-    print('DEBUG: usuario.role no build = ${usuario.role}');
-    print('DEBUG: usuario completo = $usuario');
+    // print('DEBUG: usuario.role no build = ${usuario.role}');
+    // print('DEBUG: usuario completo = $usuario');
 
     return Drawer(
       shape: const RoundedRectangleBorder(
@@ -50,24 +50,24 @@ class DrawerMenuLider extends StatelessWidget {
               color: context.colors.onSurface.withValues(alpha: 0.2),
             ),
 
-            // Ministério atual
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Text(
-                'Ministério atual:',
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                ministerioSelecionado?.nome ?? 'Carregando...',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: context.colors.primary,
-                    ),
-              ),
-            ),
+            // // Ministério atual
+            // Padding(
+            //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            //   child: Text(
+            //     'Ministério atual:',
+            //     style: Theme.of(context).textTheme.labelMedium,
+            //   ),
+            // ),
+            // Padding(
+            //   padding: const EdgeInsets.symmetric(horizontal: 16),
+            //   child: Text(
+            //     ministerioSelecionado?.nome ?? 'Carregando...',
+            //     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            //           fontWeight: FontWeight.w600,
+            //           color: context.colors.primary,
+            //         ),
+            //   ),
+            // ),
 
             const SizedBox(height: 16),
 
@@ -85,7 +85,7 @@ class DrawerMenuLider extends StatelessWidget {
                       context.go('/leader/dashboard');
                     },
                   ),
-                  
+
                   // Ministérios (não visível para servus_admin)
                   if (usuario.role != UserRole.servus_admin)
                     ListTile(
@@ -94,22 +94,36 @@ class DrawerMenuLider extends StatelessWidget {
                       subtitle: const Text('Gerenciar ministérios'),
                       onTap: () {
                         Navigator.pop(context);
-                        context.go('/leader/ministerio/lista');
+                        context.push('/leader/ministerio/lista');
                       },
                     ),
-                  
+
+
+                  // Membros (visível para tenant_admin, branch_admin e leader)
+                  if (usuario.role == UserRole.tenant_admin ||
+                      usuario.role == UserRole.branch_admin ||
+                      usuario.role == UserRole.leader)
+                    ListTile(
+                      leading: const Icon(Icons.group_add),
+                      title: const Text('Membros'),
+                      subtitle: const Text('Gerenciar membros'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/leader/members');
+                      },
+                    ),
                   // Criar Tenants (apenas para ServusAdmin)
                   if (usuario.role == UserRole.servus_admin)
                     ListTile(
                       leading: const Icon(Icons.business),
-                      title: const Text('Criar Tenant'),
+                      title: const Text('Nova igreja'),
                       subtitle: const Text('Nova organização'),
                       onTap: () {
                         Navigator.pop(context);
-                        context.go('/leader/tenants/create');
+                        context.push('/leader/tenants/create');
                       },
                     ),
-                  
+
                   // Escalas (não visível para servus_admin)
                   if (usuario.role != UserRole.servus_admin)
                     ListTile(
@@ -118,10 +132,10 @@ class DrawerMenuLider extends StatelessWidget {
                       subtitle: const Text('Gerenciar escalas'),
                       onTap: () {
                         Navigator.pop(context);
-                        context.go('/leader/escalas');
+                        context.push('/leader/escalas');
                       },
                     ),
-                  
+
                   // Eventos (não visível para servus_admin)
                   if (usuario.role != UserRole.servus_admin)
                     ListTile(
@@ -133,7 +147,7 @@ class DrawerMenuLider extends StatelessWidget {
                         context.go('/leader/eventos');
                       },
                     ),
-                  
+
                   // Templates (não visível para servus_admin)
                   if (usuario.role != UserRole.servus_admin)
                     ListTile(
@@ -145,18 +159,18 @@ class DrawerMenuLider extends StatelessWidget {
                         context.go('/leader/templates');
                       },
                     ),
-                  
+
                   // Voluntários (não visível para servus_admin)
-                  if (usuario.role != UserRole.servus_admin)
-                    ListTile(
-                      leading: const Icon(Icons.people),
-                      title: const Text('Voluntários'),
-                      subtitle: const Text('Gerenciar voluntários'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.go('/leader/dashboard/voluntarios');
-                      },
-                    ),
+                  // if (usuario.role != UserRole.servus_admin)
+                  //   ListTile(
+                  //     leading: const Icon(Icons.people),
+                  //     title: const Text('Voluntários'),
+                  //     subtitle: const Text('Gerenciar voluntários'),
+                  //     onTap: () {
+                  //       Navigator.pop(context);
+                  //       context.go('/leader/dashboard/voluntarios');
+                  //     },
+                  //   ),
                 ],
               ),
             ),
@@ -168,7 +182,9 @@ class DrawerMenuLider extends StatelessWidget {
               thickness: 0.6,
               color: context.colors.onSurface.withValues(alpha: 0.2),
             ),
-            if (usuario.role == UserRole.tenant_admin || usuario.role == UserRole.branch_admin || usuario.role == UserRole.leader)
+            if (usuario.role == UserRole.tenant_admin ||
+                usuario.role == UserRole.branch_admin ||
+                usuario.role == UserRole.leader)
               ListTile(
                 leading: const Icon(Icons.swap_horiz),
                 title: const Text('Trocar para voluntário'),
@@ -182,7 +198,7 @@ class DrawerMenuLider extends StatelessWidget {
   }
 
   String _labelDoPapel(UserRole role) {
-    print('DEBUG: _labelDoPapel recebeu role: $role');
+    // print('DEBUG: _labelDoPapel recebeu role: $role');
     switch (role) {
       case UserRole.servus_admin:
         return 'Servus Admin';

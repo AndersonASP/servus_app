@@ -60,6 +60,7 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
   void _adicionarFuncao() {
     setState(() {
       funcoes.add(FuncaoEscala(
+
         nome: '',
         ministerioId: '',
         quantidade: 1,

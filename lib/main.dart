@@ -9,8 +9,12 @@ import 'package:servus_app/features/leader/escalas/controllers/evento/evento_con
 import 'package:servus_app/features/leader/escalas/controllers/template/template_controller.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerio_controller.dart';
 import 'package:servus_app/features/volunteers/indisponibilidade/bloqueios/controller/bloqueio_controller.dart';
+
 import 'package:servus_app/features/volunteers/indisponibilidade/indisponibilidade_controller.dart';
 import 'package:servus_app/features/perfil/perfil_controller.dart';
+import 'package:servus_app/features/ministries/controllers/ministry_functions_controller.dart';
+import 'package:servus_app/features/ministries/services/ministry_functions_service.dart';
+import 'package:dio/dio.dart';
 import 'package:servus_app/routes/app_router.dart';
 import 'package:servus_app/state/app_state.dart';
 import 'package:servus_app/state/auth_state.dart';
@@ -46,6 +50,8 @@ class ServusApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MinisterioController()),
         ChangeNotifierProvider(create: (_) => MinisterioController()),
         ChangeNotifierProvider(create: (_) => EventoController()),
+        ChangeNotifierProvider(create: (_) => MinistryFunctionsController(MinistryFunctionsService())),
+
       ],
       child: MaterialApp.router(
         debugShowCheckedModeBanner: false,

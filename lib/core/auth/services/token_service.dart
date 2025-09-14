@@ -130,6 +130,11 @@ class TokenService {
     final branchId = await _storage.read(key: _keyBranchId);
     final ministryId = await _storage.read(key: _keyMinistryId);
     
+    // print('🔍 Contexto atual:');
+    // print('   - Tenant ID: $tenantId');
+    // print('   - Branch ID: $branchId');
+    // print('   - Ministry ID: $ministryId');
+    
     return {
       'tenantId': tenantId,
       'branchId': branchId,
@@ -157,22 +162,11 @@ class TokenService {
   // 🆕 Extrair e cachear claims de segurança do JWT
   static Future<void> extractSecurityClaims(String accessToken) async {
     try {
-      print('🔐 Extraindo claims de segurança do JWT...');
-      
       // Decodifica o JWT (sem verificar assinatura - apenas para leitura)
       final decodedToken = JwtDecoder.decode(accessToken);
-      
-      print('📋 JWT decodificado:');
-      print('   - Subject: ${decodedToken['sub']}');
-      print('   - Email: ${decodedToken['email']}');
-      print('   - Role: ${decodedToken['role']}');
-      print('   - Tenant ID: ${decodedToken['tenantId']}');
-      print('   - Branch ID: ${decodedToken['branchId']}');
-      print('   - Membership Role: ${decodedToken['membershipRole']}');
-      print('   - Permissions: ${decodedToken['permissions']}');
 
-      // Cachear claims de segurança
-      _cachedTenantId = decodedToken['tenantId'];
+      // Cachear claims de segurança (tenantId agora é ObjectId como string)
+      _cachedTenantId = decodedToken['tenantId']; // ObjectId como string
       _cachedBranchId = decodedToken['branchId'];
       _cachedUserRole = decodedToken['role'];
       _cachedMembershipRole = decodedToken['membershipRole'];
@@ -181,15 +175,7 @@ class TokenService {
       // Salvar claims no storage seguro
       await _saveSecurityClaims();
       
-      print('✅ Claims de segurança extraídos e salvos:');
-      print('   - Tenant ID: $_cachedTenantId');
-      print('   - Branch ID: $_cachedBranchId');
-      print('   - User Role: $_cachedUserRole');
-      print('   - Membership Role: $_cachedMembershipRole');
-      print('   - Permissions: $_cachedPermissions');
-      
     } catch (e) {
-      print('❌ Erro ao extrair claims de segurança: $e');
       // Em caso de erro, limpa o cache
       _clearSecurityCache();
     }
@@ -214,15 +200,13 @@ class TokenService {
         await _storage.write(key: _permissionsKey, value: jsonEncode(_cachedPermissions));
       }
     } catch (e) {
-      print('❌ Erro ao salvar claims de segurança: $e');
+      // Erro ao salvar claims - silencioso por segurança
     }
   }
 
   // 🆕 Carregar claims de segurança do storage
   static Future<void> loadSecurityClaims() async {
     try {
-      print('🔍 Carregando claims de segurança do storage...');
-      
       _cachedTenantId = await _storage.read(key: _tenantIdKey);
       _cachedBranchId = await _storage.read(key: _branchIdKey);
       _cachedUserRole = await _storage.read(key: _userRoleKey);
@@ -232,16 +216,8 @@ class TokenService {
       if (permissionsJson != null) {
         _cachedPermissions = List<String>.from(jsonDecode(permissionsJson));
       }
-
-      print('✅ Claims de segurança carregados:');
-      print('   - Tenant ID: $_cachedTenantId');
-      print('   - Branch ID: $_cachedBranchId');
-      print('   - User Role: $_cachedUserRole');
-      print('   - Membership Role: $_cachedMembershipRole');
-      print('   - Permissions: $_cachedPermissions');
       
     } catch (e) {
-      print('❌ Erro ao carregar claims de segurança: $e');
       _clearSecurityCache();
     }
   }

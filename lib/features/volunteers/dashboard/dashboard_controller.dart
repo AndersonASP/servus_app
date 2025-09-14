@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:servus_app/core/models/usuario_logado.dart';
 import 'package:servus_app/state/auth_state.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:servus_app/features/volunteers/dashboard/models/botao_status_model.dart';
 
 enum TesteEscalaModo { nenhuma, uma, varias }
@@ -62,7 +61,6 @@ class DashboardController extends ChangeNotifier {
   }
 
   Future<List<Map<String, dynamic>>> fetchEscalas() async {
-    await Future.delayed(const Duration(seconds: 2)); // simula delay da API
 
     final List<Map<String, dynamic>> escalasBrutas = [
       {

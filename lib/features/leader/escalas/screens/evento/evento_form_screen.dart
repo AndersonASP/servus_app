@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/escalas/controllers/evento/evento_controller.dart';
 import 'package:servus_app/features/leader/escalas/models/evento_model.dart';
-import 'package:servus_app/shared/widgets/app_notifier/app_notifier.dart';
+import 'package:servus_app/core/services/feedback_service.dart';
 
 class EventoFormScreen extends StatefulWidget {
   final EventoModel? eventoExistente;
@@ -85,11 +85,11 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
     }
 
     // Mostra notificação
-    AppNotifier.show(
-      context,
-      message: isNovo ? 'Evento criado com sucesso!' : 'Evento atualizado!',
-      type: NotificationType.success,
-    );
+    if (isNovo) {
+      FeedbackService.showCreateSuccess(context, 'Evento');
+    } else {
+      FeedbackService.showUpdateSuccess(context, 'Evento');
+    }
 
     context.pop(); // volta à tela anterior
   }

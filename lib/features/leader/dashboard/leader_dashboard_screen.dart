@@ -73,7 +73,7 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> {
                 context.pop(context); // Fecha o Drawer
                 context.go('/volunteer/dashboard');
               },
-              ministerioSelecionado: controller.ministerioSelecionado,
+              ministerioSelecionado: null, // TODO: Converter MinistryResponse para Ministerio
             ),
             body: SafeArea(
               child: SingleChildScrollView(
@@ -250,7 +250,7 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> {
                                           : context.colors.onSurface),
                                   const SizedBox(height: 8),
                                   Text(
-                                    ministerio.nome,
+                                    ministerio.name,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -307,6 +307,21 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> {
                       ],
                     ),
 
+                    const SizedBox(height: 24),
+                    
+                    // Card de Filiais
+                    if (controller.usuario.isAdmin)
+                      _infoCard(
+                        title: 'Filiais',
+                        value: 'Gerenciar',
+                        isLoading: false,
+                        icon: Icons.business,
+                        iconColor: context.colors.primary,
+                        onTap: () {
+                          context.push('/leader/branches');
+                        },
+                      ),
+
                     const EscalasResumoWidget(
                       ministerioId: '2',
                     ),
@@ -336,6 +351,8 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> {
       ),
     );
   }
+
+
 
   Widget _infoCard({
     required String title,

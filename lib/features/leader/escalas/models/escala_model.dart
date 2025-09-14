@@ -2,25 +2,28 @@ import 'package:uuid/uuid.dart';
 
 class Escalado {
   final String funcaoId;        // ID da função do template
+      // ID da função do catálogo
   final String voluntarioId;    // ID do voluntário escolhido
 
   Escalado({
     required this.funcaoId,
+
     required this.voluntarioId,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'funcaoId': funcaoId,
+
       'voluntarioId': voluntarioId,
     };
   }
 
   factory Escalado.fromMap(Map<String, dynamic> map) {
-    return Escalado(
-      funcaoId: map['funcaoId'],
-      voluntarioId: map['voluntarioId'],
-    );
+          return Escalado(
+        funcaoId: map['funcaoId'] ?? map['id'], // Fallback para compatibilidade
+        voluntarioId: map['voluntarioId'],
+      );
   }
 }
 

@@ -37,6 +37,7 @@ class _EscalaFormScreenState extends State<EscalaFormScreen> {
         .where((entry) => entry.value != null)
         .map((entry) => Escalado(
               funcaoId: entry.key,
+      
               voluntarioId: entry.value!,
             ))
         .toList();

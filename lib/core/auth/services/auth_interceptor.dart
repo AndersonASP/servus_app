@@ -25,14 +25,20 @@ class AuthInterceptor extends Interceptor {
     final context = await TokenService.getContext();
     if (context['tenantId'] != null) {
       options.headers['x-tenant-id'] = context['tenantId'];
+      // print('🔑 Adicionando header x-tenant-id: ${context['tenantId']}');
+    } else {
+      // print('⚠️ Tenant ID não encontrado no contexto');
     }
     if (context['branchId'] != null) {
       options.headers['x-branch-id'] = context['branchId'];
+      // print('🔑 Adicionando header x-branch-id: ${context['branchId']}');
     }
     if (context['ministryId'] != null) {
       options.headers['x-ministry-id'] = context['ministryId'];
+      // print('🔑 Adicionando header x-ministry-id: ${context['ministryId']}');
     }
 
+    // print('🌐 Headers finais: ${options.headers}');
     handler.next(options);
   }
 
@@ -145,7 +151,7 @@ class AuthInterceptor extends Interceptor {
       
       return false;
     } catch (e) {
-      print('❌ Erro ao renovar token: $e');
+      // print('❌ Erro ao renovar token: $e');
       return false;
     }
   }

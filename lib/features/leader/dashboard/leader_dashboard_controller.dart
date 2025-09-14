@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:servus_app/core/enums/ministry_module.dart';
-import 'package:servus_app/core/models/ministerio.dart';
 import 'package:servus_app/core/models/usuario_logado.dart';
+import 'package:servus_app/features/ministries/models/ministry_dto.dart';
+import 'package:servus_app/features/ministries/services/ministry_service.dart';
+import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/state/auth_state.dart';
 
 class DashboardLiderController extends ChangeNotifier {
   final AuthState auth;
   final ScrollController scrollController = ScrollController();
+  final MinistryService _ministryService = MinistryService();
 
   late UsuarioLogado usuario;
-  late List<Ministerio> ministerios;
-  Ministerio? ministerioSelecionado;
+  List<MinistryResponse> ministerios = [];
+  MinistryResponse? ministerioSelecionado;
 
   bool isLoading = true;
 
@@ -26,7 +28,9 @@ class DashboardLiderController extends ChangeNotifier {
 
   Future<void> init() async {
     usuario = auth.usuario!;
-    ministerios = usuario.ministerios;
+    
+    // Carrega ministérios da matriz
+    await carregarMinisterios();
 
     if (ministerios.isNotEmpty) {
       ministerioSelecionado = ministerios.first;
@@ -37,7 +41,35 @@ class DashboardLiderController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> carregarDadosDoMinisterio(Ministerio ministerio,
+  Future<void> carregarMinisterios() async {
+    try {
+      final context = await TokenService.getContext();
+      final tenantId = context['tenantId'];
+      
+      if (tenantId == null) {
+        // print('❌ Contexto de tenant não encontrado');
+        return;
+      }
+
+      final response = await _ministryService.listMinistries(
+        tenantId: tenantId,
+        branchId: '', // Ministérios da matriz
+        filters: ListMinistryDto(
+          page: 1,
+          limit: 10, // Limita para o dashboard
+          isActive: true,
+        ),
+      );
+
+      ministerios = response.items;
+      // print('✅ Carregados ${ministerios.length} ministérios no dashboard');
+    } catch (e) {
+      // print('❌ Erro ao carregar ministérios: $e');
+      ministerios = [];
+    }
+  }
+
+  Future<void> carregarDadosDoMinisterio(MinistryResponse ministerio,
       {bool notify = true}) async {
     ministerioSelecionado = ministerio;
 
@@ -46,12 +78,11 @@ class DashboardLiderController extends ChangeNotifier {
     isLoadingModuloLouvor = true;
     if (notify) notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 500));
 
     totalVoluntarios = 18;
     totalSolicitacoesPendentes = 3;
-    moduloLouvorAtivo =
-        ministerio.modulosAtivos.contains(MinistryModule.louvor);
+    // Para ministérios da matriz, assumimos que todos os módulos estão ativos
+    moduloLouvorAtivo = true;
 
     isLoadingVoluntarios = false;
     isLoadingSolicitacoes = false;

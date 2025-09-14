@@ -1,5 +1,5 @@
 import 'package:go_router/go_router.dart';
-import 'package:servus_app/features/perfil/perfil_sceen.dart';
+import 'package:servus_app/features/perfil/perfil_screen.dart';
 import 'package:servus_app/features/volunteers/dashboard/escala/escala_detalhes/escala_detalhes.dart';
 import 'package:servus_app/routes/auth_routes.dart';
 import 'package:servus_app/routes/qr_routes.dart';

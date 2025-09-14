@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
-import 'package:servus_app/core/models/ministry_dto.dart';
+import 'package:flutter/material.dart';
+import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/core/services/feedback_service.dart';
 
 class MinistryService {
   final Dio dio;
@@ -13,10 +15,10 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     ListMinistryDto? filters,
+    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
-      final context = await TokenService.getContext();
 
       // 🆕 CORREÇÃO: Usa rota diferente para matriz vs filial
       final String url;
@@ -31,8 +33,8 @@ class MinistryService {
           'x-tenant-id': tenantId,
           // Não inclui x-branch-id para matriz
         };
-        print('🏢 Listando ministérios da MATRIZ');
-        print('   - Branch ID recebido: "$branchId" (vazio)');
+        // print('🏢 Listando ministérios da MATRIZ');
+        // print('   - Branch ID recebido: "$branchId" (vazio)');
       } else {
         // 🏪 Ministérios de filial específica
         url = '/tenants/$tenantId/branches/$branchId/ministries';
@@ -41,7 +43,7 @@ class MinistryService {
           'x-tenant-id': tenantId,
           'x-branch-id': branchId,
         };
-        print('🏪 Listando ministérios da FILIAL: $branchId');
+        // print('🏪 Listando ministérios da FILIAL: $branchId');
       }
 
       final response = await dio.get(
@@ -53,9 +55,15 @@ class MinistryService {
       if (response.statusCode == 200) {
         return MinistryListResponse.fromJson(response.data);
       } else {
+        if (context != null) {
+          FeedbackService.showLoadError(context, 'ministérios');
+        }
         throw Exception('Erro ao listar ministérios: ${response.statusCode}');
       }
     } on DioException catch (e) {
+      if (context != null) {
+        FeedbackService.showLoadError(context, 'ministérios');
+      }
       throw Exception(_handleDioError(e));
     }
   }
@@ -65,10 +73,10 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     required String ministryId,
+    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
-      final context = await TokenService.getContext();
 
       // 🆕 CORREÇÃO: Usa rota diferente para matriz vs filial
       final String url;
@@ -83,8 +91,8 @@ class MinistryService {
           'x-tenant-id': tenantId,
           // Não inclui x-branch-id para matriz
         };
-        print('🏢 Obtendo ministério da MATRIZ');
-        print('   - Branch ID recebido: "$branchId" (vazio)');
+        // print('🏢 Obtendo ministério da MATRIZ');
+        // print('   - Branch ID recebido: "$branchId" (vazio)');
       } else {
         // 🏪 Ministério de filial específica
         url = '/tenants/$tenantId/branches/$branchId/ministries/$ministryId';
@@ -93,7 +101,7 @@ class MinistryService {
           'x-tenant-id': tenantId,
           'x-branch-id': branchId,
         };
-        print('🏪 Obtendo ministério da FILIAL: $branchId');
+        // print('🏪 Obtendo ministério da FILIAL: $branchId');
       }
 
       final response = await dio.get(
@@ -104,9 +112,15 @@ class MinistryService {
       if (response.statusCode == 200) {
         return MinistryResponse.fromJson(response.data);
       } else {
+        if (context != null) {
+          FeedbackService.showLoadError(context, 'ministério');
+        }
         throw Exception('Erro ao obter ministério: ${response.statusCode}');
       }
     } on DioException catch (e) {
+      if (context != null) {
+        FeedbackService.showLoadError(context, 'ministério');
+      }
       throw Exception(_handleDioError(e));
     }
   }
@@ -116,10 +130,10 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     required CreateMinistryDto ministryData,
+    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
-      final context = await TokenService.getContext();
 
       // 🆕 CORREÇÃO: Usa rota diferente para matriz vs filial
       final String url;
@@ -134,8 +148,8 @@ class MinistryService {
           'x-tenant-id': tenantId,
           // Não inclui x-branch-id para matriz
         };
-        print('🏢 Criando ministério da MATRIZ');
-        print('   - Branch ID recebido: "$branchId" (vazio)');
+        // print('🏢 Criando ministério da MATRIZ');
+        // print('   - Branch ID recebido: "$branchId" (vazio)');
       } else {
         // 🏪 Ministério de filial específica
         url = '/tenants/$tenantId/branches/$branchId/ministries';
@@ -144,13 +158,13 @@ class MinistryService {
           'x-tenant-id': tenantId,
           'x-branch-id': branchId,
         };
-        print('🏪 Criando ministério da FILIAL: $branchId');
+        // print('🏪 Criando ministério da FILIAL: $branchId');
       }
 
-      print('🚀 MinistryService.createMinistry:');
-      print('   - URL: $url');
-      print('   - Dados: ${ministryData.toJson()}');
-      print('   - Headers: $headers');
+      // print('🚀 MinistryService.createMinistry:');
+      // print('   - URL: $url');
+      // print('   - Dados: ${ministryData.toJson()}');
+      // print('   - Headers: $headers');
 
       final response = await dio.post(
         url,
@@ -158,16 +172,30 @@ class MinistryService {
         options: Options(headers: headers),
       );
 
+      // print('📡 Resposta do servidor:');
+      // print('   - Status: ${response.statusCode}');
+      // print('   - Data: ${response.data}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
+        if (context != null) {
+          FeedbackService.showCreateSuccess(context, 'Ministério');
+        }
         return MinistryResponse.fromJson(response.data);
       } else {
+        if (context != null) {
+          FeedbackService.showCreateError(context, 'ministério');
+        }
         throw Exception('Erro ao criar ministério: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      print('❌ DioException ao criar ministério:');
-      print('   - Status: ${e.response?.statusCode}');
-      print('   - Mensagem: ${e.message}');
-      print('   - Dados: ${e.response?.data}');
+      // print('❌ DioException ao criar ministério:');
+      // print('   - Status: ${e.response?.statusCode}');
+      // print('   - Data: ${e.response?.data}');
+      // print('   - Message: ${e.message}');
+      
+      if (context != null) {
+        FeedbackService.showCreateError(context, 'ministério');
+      }
       throw Exception(_handleDioError(e));
     }
   }
@@ -178,10 +206,10 @@ class MinistryService {
     required String branchId,
     required String ministryId,
     required UpdateMinistryDto ministryData,
+    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
-      final context = await TokenService.getContext();
 
       // 🆕 CORREÇÃO: Usa rota diferente para matriz vs filial
       final String url;
@@ -196,8 +224,8 @@ class MinistryService {
           'x-tenant-id': tenantId,
           // Não inclui x-branch-id para matriz
         };
-        print('🏢 Atualizando ministério da MATRIZ');
-        print('   - Branch ID recebido: "$branchId" (vazio)');
+        // print('🏢 Atualizando ministério da MATRIZ');
+        // print('   - Branch ID recebido: "$branchId" (vazio)');
       } else {
         // 🏪 Ministério de filial específica
         url = '/tenants/$tenantId/branches/$branchId/ministries/$ministryId';
@@ -206,13 +234,13 @@ class MinistryService {
           'x-tenant-id': tenantId,
           'x-branch-id': branchId,
         };
-        print('🏪 Atualizando ministério da FILIAL: $branchId');
+        // print('🏪 Atualizando ministério da FILIAL: $branchId');
       }
 
-      print('🔄 MinistryService.updateMinistry:');
-      print('   - URL: $url');
-      print('   - Dados: ${ministryData.toJson()}');
-      print('   - Headers: $headers');
+      // print('🔄 MinistryService.updateMinistry:');
+      // print('   - URL: $url');
+      // print('   - Dados: ${ministryData.toJson()}');
+      // print('   - Headers: $headers');
 
       final response = await dio.patch(
         url,
@@ -220,22 +248,29 @@ class MinistryService {
         options: Options(headers: headers),
       );
 
-      print('✅ Resposta do backend: ${response.statusCode}');
-      print('📄 Dados da resposta: ${response.data}');
+      // print('✅ Resposta do backend: ${response.statusCode}');
+      // print('📄 Dados da resposta: ${response.data}');
 
       if (response.statusCode == 200) {
+        if (context != null) {
+          FeedbackService.showUpdateSuccess(context, 'Ministério');
+        }
         return MinistryResponse.fromJson(response.data);
       } else {
+        if (context != null) {
+          FeedbackService.showUpdateError(context, 'ministério');
+        }
         throw Exception('Erro ao atualizar ministério: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      print('❌ DioException ao atualizar ministério:');
-      print('   - Status: ${e.response?.statusCode}');
-      print('   - Mensagem: ${e.message}');
-      print('   - Dados: ${e.response?.data}');
+      if (context != null) {
+        FeedbackService.showUpdateError(context, 'ministério');
+      }
       throw Exception(_handleDioError(e));
     } catch (e) {
-      print('❌ Erro inesperado ao atualizar ministério: $e');
+      if (context != null) {
+        FeedbackService.showUpdateError(context, 'ministério');
+      }
       rethrow;
     }
   }
@@ -245,10 +280,10 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     required String ministryId,
+    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
-      final context = await TokenService.getContext();
 
       // 🆕 CORREÇÃO: Usa rota diferente para matriz vs filial
       final String url;
@@ -263,8 +298,8 @@ class MinistryService {
           'x-tenant-id': tenantId,
           // Não inclui x-branch-id para matriz
         };
-        print('🏢 Removendo ministério da MATRIZ');
-        print('   - Branch ID recebido: "$branchId" (vazio)');
+        // print('🏢 Removendo ministério da MATRIZ');
+        // print('   - Branch ID recebido: "$branchId" (vazio)');
       } else {
         // 🏪 Ministério de filial específica
         url = '/tenants/$tenantId/branches/$branchId/ministries/$ministryId';
@@ -273,7 +308,7 @@ class MinistryService {
           'x-tenant-id': tenantId,
           'x-branch-id': branchId,
         };
-        print('🏪 Removendo ministério da FILIAL: $branchId');
+        // print('🏪 Removendo ministério da FILIAL: $branchId');
       }
 
       final response = await dio.delete(
@@ -281,8 +316,21 @@ class MinistryService {
         options: Options(headers: headers),
       );
 
-      return response.statusCode == 200 || response.statusCode == 204;
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (context != null) {
+          FeedbackService.showDeleteSuccess(context, 'Ministério');
+        }
+        return true;
+      } else {
+        if (context != null) {
+          FeedbackService.showDeleteError(context, 'ministério');
+        }
+        return false;
+      }
     } on DioException catch (e) {
+      if (context != null) {
+        FeedbackService.showDeleteError(context, 'ministério');
+      }
       throw Exception(_handleDioError(e));
     }
   }
@@ -293,12 +341,14 @@ class MinistryService {
     required String branchId,
     required String ministryId,
     required bool isActive,
+    BuildContext? context,
   }) async {
     return await updateMinistry(
       tenantId: tenantId,
       branchId: branchId,
       ministryId: ministryId,
       ministryData: UpdateMinistryDto(isActive: isActive),
+      context: context,
     );
   }
 

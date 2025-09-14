@@ -52,7 +52,22 @@ class DrawerMenuVoluntario extends StatelessWidget {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                children: [],
+                children: [
+                  // Membros (visível para tenant_admin, branch_admin e leader)
+                  if (usuario!.role == UserRole.tenant_admin || 
+                      usuario.role == UserRole.branch_admin || 
+                      usuario.role == UserRole.leader)
+                    ListTile(
+                      leading: const Icon(Icons.group_add),
+                      title: const Text('Membros'),
+                      subtitle: const Text('Gerenciar membros'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        // TODO: Implementar navegação para tela de membros
+                        // context.go('/leader/members');
+                      },
+                    ),
+                ],
               ),
             ),
 

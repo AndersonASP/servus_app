@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:servus_app/core/auth/services/ministry_service.dart';
-import 'package:servus_app/core/models/ministry_dto.dart';
+import 'package:servus_app/features/ministries/services/ministry_service.dart';
+import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 
 class MinistryController extends ChangeNotifier {
@@ -21,7 +21,7 @@ class MinistryController extends ChangeNotifier {
   
   // Filtros
   String _searchQuery = '';
-  bool _showOnlyActive = true;
+  bool _showOnlyActive = false; // Mudança: agora mostra todos por padrão
   
   // Getters
   List<MinistryResponse> get ministries => _ministries;
@@ -92,7 +92,7 @@ class MinistryController extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      print('❌ Erro ao carregar ministérios: $e');
+      // print('❌ Erro ao carregar ministérios: $e');
       rethrow;
     } finally {
       _setLoading(false);
@@ -133,7 +133,7 @@ class MinistryController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      print('❌ Erro ao criar ministério: $e');
+      // print('❌ Erro ao criar ministério: $e');
       rethrow;
     } finally {
       _setCreating(false);
@@ -174,7 +174,7 @@ class MinistryController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      print('❌ Erro ao atualizar ministério: $e');
+      // print('❌ Erro ao atualizar ministério: $e');
       rethrow;
     } finally {
       _setUpdating(false);
@@ -215,7 +215,7 @@ class MinistryController extends ChangeNotifier {
       
       return success;
     } catch (e) {
-      print('❌ Erro ao deletar ministério: $e');
+      // print('❌ Erro ao deletar ministério: $e');
       rethrow;
     } finally {
       _setDeleting(false);
@@ -254,7 +254,7 @@ class MinistryController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      print('❌ Erro ao alterar status do ministério: $e');
+      // print('❌ Erro ao alterar status do ministério: $e');
       rethrow;
     }
   }
@@ -286,7 +286,7 @@ class MinistryController extends ChangeNotifier {
   /// Limpa filtros
   Future<void> clearFilters() async {
     _searchQuery = '';
-    _showOnlyActive = true;
+    _showOnlyActive = false; // Mudança: agora mostra todos por padrão
     _currentPage = 1;
     
     await loadMinistries(refresh: true);
@@ -300,7 +300,7 @@ class MinistryController extends ChangeNotifier {
     _totalPages = 1;
     _totalItems = 0;
     _searchQuery = '';
-    _showOnlyActive = true;
+    _showOnlyActive = false; // Mudança: agora mostra todos por padrão
     _setLoading(false);
     _setCreating(false);
     _setUpdating(false);
