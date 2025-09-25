@@ -7,6 +7,9 @@ import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 import 'package:dio/dio.dart';
 import 'package:servus_app/core/network/dio_client.dart';
+import 'package:servus_app/core/enums/user_role.dart';
+import 'package:servus_app/state/auth_state.dart';
+import 'package:provider/provider.dart';
 
 class MultiLinkMemberModal extends StatefulWidget {
   final MinisterioDetalhesController controller;
@@ -35,6 +38,15 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
   List<Map<String, dynamic>> _availableFunctions = [];
   Map<String, List<String>> _memberFunctionIds = {}; // Membro ID -> Lista de funções
   bool _isLoadingFunctions = false;
+
+  /// Verifica se o usuário logado pode vincular líderes
+  bool get _canLinkLeaders {
+    final authState = Provider.of<AuthState>(context, listen: false);
+    final userRole = authState.usuario?.role;
+    
+    // TenantAdmin e BranchAdmin podem vincular líderes
+    return userRole == UserRole.tenant_admin || userRole == UserRole.branch_admin;
+  }
 
   @override
   void initState() {

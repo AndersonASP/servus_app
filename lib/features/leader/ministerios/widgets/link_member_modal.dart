@@ -4,6 +4,9 @@ import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerios_detalhes_controller.dart';
 import 'package:servus_app/services/members_service.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/core/enums/user_role.dart';
+import 'package:servus_app/state/auth_state.dart';
+import 'package:provider/provider.dart';
 
 class LinkMemberModal extends StatefulWidget {
   final MinisterioDetalhesController controller;
@@ -27,6 +30,30 @@ class _LinkMemberModalState extends State<LinkMemberModal> {
   int _currentPage = 1;
   bool _hasMoreResults = false;
   String _selectedRole = 'volunteer';
+
+  /// Verifica se o usuário logado pode vincular líderes
+  bool get _canLinkLeaders {
+    try {
+      final authState = Provider.of<AuthState>(context, listen: false);
+      final userRole = authState.usuario?.role;
+      
+      // Debug: Log do role do usuário
+      print('🔍 [LinkMemberModal] Verificando permissões:');
+      print('   - Usuario: ${authState.usuario != null}');
+      print('   - User Role: $userRole');
+      print('   - UserRole.tenant_admin: ${UserRole.tenant_admin}');
+      print('   - UserRole.branch_admin: ${UserRole.branch_admin}');
+      print('   - Tenant Admin: ${userRole == UserRole.tenant_admin}');
+      print('   - Branch Admin: ${userRole == UserRole.branch_admin}');
+      print('   - Can Link Leaders: ${userRole == UserRole.tenant_admin || userRole == UserRole.branch_admin}');
+      
+      // TenantAdmin e BranchAdmin podem vincular líderes
+      return userRole == UserRole.tenant_admin || userRole == UserRole.branch_admin;
+    } catch (e) {
+      print('❌ [LinkMemberModal] Erro ao verificar permissões: $e');
+      return false;
+    }
+  }
 
   @override
   void initState() {
@@ -307,16 +334,19 @@ class _LinkMemberModalState extends State<LinkMemberModal> {
                             ),
                             const Text('Voluntário'),
                             const SizedBox(width: 16),
-                            Radio<String>(
-                              value: 'leader',
-                              groupValue: _selectedRole,
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedRole = value!;
-                                });
-                              },
-                            ),
-                            const Text('Líder'),
+                            // Mostrar opção de líder apenas se o usuário tem permissão
+                            if (_canLinkLeaders) ...[
+                              Radio<String>(
+                                value: 'leader',
+                                groupValue: _selectedRole,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedRole = value!;
+                                  });
+                                },
+                              ),
+                              const Text('Líder'),
+                            ],
                           ],
                         ),
                       ),

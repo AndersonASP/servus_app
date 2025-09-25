@@ -8,6 +8,9 @@ import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:dio/dio.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/core/enums/user_role.dart';
+import 'package:servus_app/state/auth_state.dart';
+import 'package:provider/provider.dart';
 
 class AutocompleteLinkMemberModal extends StatefulWidget {
   final MinisterioDetalhesController controller;
@@ -37,6 +40,30 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
   List<Map<String, dynamic>> _availableFunctions = [];
   List<String> _selectedFunctionIds = [];
   bool _isLoadingFunctions = false;
+
+  /// Verifica se o usuário logado pode vincular líderes
+  bool get _canLinkLeaders {
+    try {
+      final authState = Provider.of<AuthState>(context, listen: false);
+      final userRole = authState.usuario?.role;
+      
+      // Debug: Log do role do usuário
+      print('🔍 [AutocompleteLinkMemberModal] Verificando permissões:');
+      print('   - Usuario: ${authState.usuario != null}');
+      print('   - User Role: $userRole');
+      print('   - UserRole.tenant_admin: ${UserRole.tenant_admin}');
+      print('   - UserRole.branch_admin: ${UserRole.branch_admin}');
+      print('   - Tenant Admin: ${userRole == UserRole.tenant_admin}');
+      print('   - Branch Admin: ${userRole == UserRole.branch_admin}');
+      print('   - Can Link Leaders: ${userRole == UserRole.tenant_admin || userRole == UserRole.branch_admin}');
+      
+      // TenantAdmin e BranchAdmin podem vincular líderes
+      return userRole == UserRole.tenant_admin || userRole == UserRole.branch_admin;
+    } catch (e) {
+      print('❌ [AutocompleteLinkMemberModal] Erro ao verificar permissões: $e');
+      return false;
+    }
+  }
 
   @override
   void initState() {
@@ -482,8 +509,9 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
       );
     }
 
-    return Column(
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        children: [
         // Autocomplete para busca de membros
         Autocomplete<Member>(
           optionsBuilder: (TextEditingValue textEditingValue) {
@@ -703,12 +731,19 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
         // Membro selecionado
         if (_selectedMember != null) _buildSelectedMember(),
         
-        // Funções (se houver membro selecionado)
+        // Seleção de Role (Voluntário ou Líder) - apenas se membro selecionado
         if (_selectedMember != null) ...[
+          const SizedBox(height: 16),
+          _buildRoleSelection(),
+        ],
+        
+        // Funções (apenas para voluntários)
+        if (_selectedMember != null && _selectedRole == 'volunteer') ...[
           const SizedBox(height: 16),
           _buildFunctionsSection(),
         ],
       ],
+      ),
     );
   }
 
@@ -777,6 +812,69 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRoleSelection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: context.colors.outline.withOpacity(0.3),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tipo de Vínculo',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: context.colors.onSurface,
+              fontSize: 14,
+            ),
+          ),
+          Row(
+            children: [
+              Radio<String>(
+                value: 'volunteer',
+                groupValue: _selectedRole,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedRole = value!;
+                    // Limpar funções selecionadas ao mudar para líder
+                    if (value == 'leader') {
+                      _selectedFunctionIds = [];
+                    }
+                  });
+                },
+              ),
+              const Text('Voluntário'),
+              const SizedBox(width: 16),
+              // Mostrar opção de líder apenas se o usuário tem permissão
+              if (_canLinkLeaders) ...[
+                Radio<String>(
+                  value: 'leader',
+                  groupValue: _selectedRole,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedRole = value!;
+                      // Limpar funções selecionadas ao mudar para líder
+                      if (value == 'leader') {
+                        _selectedFunctionIds = [];
+                      }
+                    });
+                  },
+                ),
+                const Text('Líder'),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -866,73 +964,104 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
             ),
           ]
           else
-            SizedBox(
-              height: 200, // Altura fixa para evitar problemas de layout
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _availableFunctions.map((function) {
-                final functionId = function['id']?.toString() ?? '';
-                if (functionId.isEmpty) return const SizedBox.shrink();
-                
-                final isSelected = _selectedFunctionIds.contains(functionId);
-                return GestureDetector(
-                  onTap: () => _toggleFunction(functionId),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected 
-                          ? context.colors.primary 
-                          : context.colors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected 
-                            ? context.colors.primary
-                            : context.colors.outline.withOpacity(0.3),
-                        width: isSelected ? 2 : 1,
-                      ),
-                      boxShadow: isSelected ? [
-                        BoxShadow(
-                          color: context.colors.primary.withOpacity(0.3),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ] : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isSelected) ...[
-                          Icon(
-                            Icons.check,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                        ],
-                        Text(
-                          function['name'],
-                          style: TextStyle(
-                            color: isSelected 
-                                ? Colors.white 
-                                : context.colors.onSurface,
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-                ),
-              ),
-            ),
+            _buildResponsiveFunctionsList(),
         ],
       ),
+    );
+  }
+
+  Widget _buildResponsiveFunctionsList() {
+    // Calcular altura baseada na quantidade de funções
+    final functionCount = _availableFunctions.length;
+    final maxHeight = MediaQuery.of(context).size.height * 0.4; // Máximo 40% da tela
+    
+    // Altura baseada na quantidade de funções
+    double calculatedHeight;
+    if (functionCount <= 2) {
+      calculatedHeight = 80; // Altura mínima para poucas funções
+    } else if (functionCount <= 4) {
+      calculatedHeight = 120; // Altura média
+    } else if (functionCount <= 6) {
+      calculatedHeight = 160; // Altura maior
+    } else {
+      calculatedHeight = 200; // Altura máxima com scroll
+    }
+    
+    // Limitar altura máxima
+    final finalHeight = calculatedHeight > maxHeight ? maxHeight : calculatedHeight;
+    
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: finalHeight,
+        minHeight: 60,
+      ),
+      child: functionCount > 6 
+        ? SingleChildScrollView(
+            child: _buildFunctionsWrap(),
+          )
+        : _buildFunctionsWrap(),
+    );
+  }
+
+  Widget _buildFunctionsWrap() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _availableFunctions.map((function) {
+        final functionId = function['id']?.toString() ?? '';
+        if (functionId.isEmpty) return const SizedBox.shrink();
+        
+        final isSelected = _selectedFunctionIds.contains(functionId);
+        return GestureDetector(
+          onTap: () => _toggleFunction(functionId),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected 
+                  ? context.colors.primary 
+                  : context.colors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected 
+                    ? context.colors.primary
+                    : context.colors.outline.withOpacity(0.3),
+                width: isSelected ? 2 : 1,
+              ),
+              boxShadow: isSelected ? [
+                BoxShadow(
+                  color: context.colors.primary.withOpacity(0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ] : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected) ...[
+                  Icon(
+                    Icons.check,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  function['name'],
+                  style: TextStyle(
+                    color: isSelected 
+                        ? Colors.white 
+                        : context.colors.onSurface,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
