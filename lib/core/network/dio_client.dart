@@ -83,6 +83,11 @@ class RetryInterceptor extends Interceptor {
   }
 
   bool _shouldRetry(DioException err) {
+    // Não faz retry para endpoints de refresh para evitar loops infinitos
+    if (err.requestOptions.path.contains('/auth/refresh')) {
+      return false;
+    }
+    
     return err.type == DioExceptionType.connectionTimeout ||
         err.type == DioExceptionType.receiveTimeout ||
         err.type == DioExceptionType.sendTimeout ||

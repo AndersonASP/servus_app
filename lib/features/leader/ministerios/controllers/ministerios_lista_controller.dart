@@ -95,7 +95,6 @@ class MinisterioListController extends ChangeNotifier {
     } catch (e) {
       isLoading = false;
       notifyListeners();
-      // print('❌ Erro ao carregar ministérios: $e');
       rethrow;
     }
   }
@@ -163,7 +162,6 @@ class MinisterioListController extends ChangeNotifier {
       isUpdating = false;
       notifyListeners();
 
-      // print('✅ Ministério ${ativo ? 'ativado' : 'desativado'} com sucesso!');
     } catch (e) {
       // Reverte a mudança em caso de erro
       final index = ministerios.indexWhere((m) => m.id == id);
@@ -182,7 +180,6 @@ class MinisterioListController extends ChangeNotifier {
       
       isUpdating = false;
       notifyListeners();
-      // print('❌ Erro ao alterar status: ${e.toString()}');
       rethrow;
     }
   }
@@ -211,10 +208,8 @@ class MinisterioListController extends ChangeNotifier {
         ministerios.removeWhere((m) => m.id == id);
         totalItems--;
         notifyListeners();
-        // print('✅ Ministério removido com sucesso!');
       }
     } catch (e) {
-      // print('❌ Erro ao remover ministério: $e');
       rethrow;
     }
   }
@@ -252,7 +247,6 @@ class MinisterioListController extends ChangeNotifier {
     } catch (e) {
       isCreating = false;
       notifyListeners();
-      // print('❌ Erro ao criar ministério: $e');
       rethrow;
     }
   }
@@ -293,7 +287,6 @@ class MinisterioListController extends ChangeNotifier {
     } catch (e) {
       isUpdating = false;
       notifyListeners();
-      // print('❌ Erro ao atualizar ministério: $e');
       rethrow;
     }
   }
@@ -302,6 +295,11 @@ class MinisterioListController extends ChangeNotifier {
   Future<void> limparFiltros() async {
     searchQuery = '';
     filterStatus = 'todos'; // Mudança: agora volta para 'todos' ao invés de 'ativos'
+    await carregarMinisterios(refresh: true);
+  }
+
+  /// Força o refresh da lista
+  Future<void> forceRefresh() async {
     await carregarMinisterios(refresh: true);
   }
 

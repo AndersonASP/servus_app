@@ -1,4 +1,3 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:servus_app/core/utils/role_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:servus_app/core/models/usuario_logado.dart';

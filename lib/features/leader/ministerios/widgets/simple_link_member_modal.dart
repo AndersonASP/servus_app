@@ -4,7 +4,9 @@ import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerios_detalhes_controller.dart';
 import 'package:servus_app/services/members_service.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 import 'package:dio/dio.dart';
+import 'package:servus_app/core/network/dio_client.dart';
 
 class SimpleLinkMemberModal extends StatefulWidget {
   final MinisterioDetalhesController controller;
@@ -38,8 +40,6 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
   @override
   void initState() {
     super.initState();
-    print('🔍 SimpleLinkMemberModal initState');
-    print('🔍 controller.ministerioId: "${widget.controller.ministerioId}"');
     _searchController.addListener(_onSearchChanged);
     _scrollController.addListener(_onScroll);
     _loadAllMembers();
@@ -70,7 +70,6 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
     });
 
     try {
-      print('🔍 Carregando todos os membros...');
       final response = await MembersService.getMembers(
         filter: MemberFilter(
           page: 1,
@@ -79,13 +78,11 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
         context: context,
       );
 
-      print('✅ Membros carregados: ${response.members.length}');
       setState(() {
         _allMembers = response.members;
         _filteredMembers = response.members;
       });
     } catch (e) {
-      print('❌ Erro ao carregar membros: $e');
       setState(() {
         _errorMessage = e.toString();
       });
@@ -113,7 +110,6 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
       }).toList();
     });
     
-    print('🔍 Filtro aplicado: "$query" -> ${_filteredMembers.length} membros');
   }
 
   void _selectMember(Member member) {
@@ -128,12 +124,8 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
 
 
   Future<void> _loadMinistryFunctions() async {
-    print('🔍 _loadMinistryFunctions chamada');
-    print('🔍 ministerioId: "${widget.controller.ministerioId}"');
-    print('🔍 ministerioId.isEmpty: ${widget.controller.ministerioId.isEmpty}');
     
     if (widget.controller.ministerioId.isEmpty) {
-      print('❌ ministerioId está vazio, retornando');
       return;
     }
     
@@ -142,16 +134,12 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
     });
 
     try {
-      final dio = Dio();
+      final dio = DioClient.instance;
       final context = await TokenService.getContext();
       final token = context['token'];
-      final baseUrl = context['baseUrl'];
 
-      print('🔍 Carregando funções do ministério: ${widget.controller.ministerioId}');
-      print('🔍 baseUrl: $baseUrl');
       
-      final url = '$baseUrl/ministries/${widget.controller.ministerioId}/functions';
-      print('🔍 URL completa: $url');
+      final url = '/ministries/${widget.controller.ministerioId}/functions';
 
       final response = await dio.get(
         url,
@@ -163,24 +151,16 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
         ),
       );
 
-      print('✅ Resposta das funções: ${response.statusCode}');
-      print('📊 Dados das funções: ${response.data}');
 
       if (response.statusCode == 200) {
         final List<dynamic> functionsData = response.data;
-        print('🔍 Dados brutos das funções: $functionsData');
-        print('🔍 Tipo dos dados: ${functionsData.runtimeType}');
-        print('🔍 Quantidade de funções: ${functionsData.length}');
         
         if (functionsData.isNotEmpty) {
-          print('🔍 Primeira função: ${functionsData.first}');
-          print('🔍 Chaves da primeira função: ${functionsData.first.keys}');
         }
         
         setState(() {
           _availableFunctions = functionsData
             .map((f) {
-              print('🔍 Processando função: $f');
               return {
                 'id': f['functionId']?.toString() ?? f['_id']?.toString() ?? '',
                 'name': f['name']?.toString() ?? f['functionName']?.toString() ?? 'Função sem nome',
@@ -191,13 +171,10 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
             .toList();
         });
         
-        print('✅ Funções mapeadas: ${_availableFunctions.length}');
-        print('✅ Funções finais: $_availableFunctions');
       } else {
         throw Exception('Erro ao carregar funções: ${response.statusMessage}');
       }
     } catch (e) {
-      print('❌ Erro ao carregar funções: $e');
       setState(() {
         _errorMessage = 'Erro ao carregar funções: $e';
       });
@@ -217,7 +194,6 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
       }
     });
     
-    print('🔧 Funções selecionadas: $_selectedFunctionIds');
   }
 
   Future<void> _linkMember() async {
@@ -228,13 +204,8 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
         _isLoading = true;
       });
 
-      print('🔗 Iniciando vinculação do membro ${_selectedMember!.name}');
-      print('   - Ministério: ${widget.controller.ministerioId}');
-      print('   - Role: $_selectedRole');
-      print('   - Funções: $_selectedFunctionIds');
 
       // PASSO 1: Vincular ao ministério
-      print('📝 PASSO 1: Vinculando ao ministério...');
       final membershipSuccess = await widget.controller.vincularMembro(
         _selectedMember!.id, 
         _selectedRole,
@@ -243,13 +214,10 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
       if (!membershipSuccess) {
         throw Exception('Erro ao vincular membro ao ministério');
       }
-      print('✅ Membro vinculado ao ministério');
 
       // PASSO 2: Vincular às funções (se houver)
       if (_selectedFunctionIds.isNotEmpty) {
-        print('📝 PASSO 2: Vinculando às funções...');
         await _linkToFunctions(_selectedMember!.id, _selectedFunctionIds);
-        print('✅ Funções vinculadas');
       }
 
       // Sucesso
@@ -259,29 +227,24 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
             : '${_selectedMember!.name} vinculado ao ministério com ${_selectedFunctionIds.length} função(ões)!';
             
         try {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              backgroundColor: Colors.green,
-            ),
+          ServusSnackQueue.addToQueue(
+            context: context,
+            message: message,
+            type: ServusSnackType.success,
           );
         } catch (e) {
-          print('⚠️ Erro ao mostrar SnackBar de sucesso: $e');
         }
         Navigator.of(context).pop();
       }
     } catch (e) {
-      print('❌ Erro na vinculação: $e');
       if (mounted && context.mounted) {
         try {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erro: $e'),
-              backgroundColor: Colors.red,
-            ),
+          ServusSnackQueue.addToQueue(
+            context: context,
+            message: 'Erro: $e',
+            type: ServusSnackType.error,
           );
         } catch (e) {
-          print('⚠️ Erro ao mostrar SnackBar de erro: $e');
         }
       }
     } finally {
@@ -293,18 +256,16 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
 
   Future<void> _linkToFunctions(String memberId, List<String> functionIds) async {
     try {
-      final dio = Dio();
+      final dio = DioClient.instance;
       final context = await TokenService.getContext();
       final token = context['token'];
-      final baseUrl = context['baseUrl'];
 
-      print('🔧 Vinculando às funções: $functionIds');
 
       final response = await dio.post(
-        '$baseUrl/ministries/${widget.controller.ministerioId}/members/$memberId/functions',
+        '/ministries/${widget.controller.ministerioId}/members/$memberId/functions',
         data: {
           'functionIds': functionIds,
-          'status': 'em_treino',
+          'status': 'pending',
         },
         options: Options(
           headers: {
@@ -314,15 +275,12 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
         ),
       );
 
-      print('📡 Resposta das funções: ${response.statusCode}');
-      print('📊 Dados da resposta: ${response.data}');
 
       if (response.statusCode != 200) {
         throw Exception('Erro ao vincular funções: ${response.statusMessage}');
       }
     } catch (e) {
-      print('❌ Erro ao vincular funções: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -428,7 +386,7 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
                         )
                       : null,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   filled: true,
                   fillColor: context.colors.surface,
@@ -679,7 +637,7 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
                     decoration: BoxDecoration(
                       color: isSelected 
                           ? context.colors.primary 
-                          : context.colors.surfaceVariant,
+                          : context.colors.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isSelected 

@@ -89,7 +89,7 @@ class _EscalaFormScreenState extends State<EscalaFormScreen> {
         child: ListView(
           children: [
             DropdownButtonFormField<String>(
-              value: eventoIdSelecionado,
+              initialValue: eventoIdSelecionado,
               decoration: const InputDecoration(labelText: 'Evento'),
               items: eventos
                   .map((e) => DropdownMenuItem(
@@ -105,7 +105,7 @@ class _EscalaFormScreenState extends State<EscalaFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: templateIdSelecionado,
+              initialValue: templateIdSelecionado,
               decoration: const InputDecoration(labelText: 'Template'),
               items: templates
                   .map((t) => DropdownMenuItem(
@@ -139,7 +139,7 @@ class _EscalaFormScreenState extends State<EscalaFormScreen> {
                       Text(
                           '${f.nome} (${f.quantidade} pessoa${f.quantidade > 1 ? 's' : ''})'),
                       DropdownButtonFormField<String>(
-                        value: selecaoVoluntariosPorFuncao[key],
+                        initialValue: selecaoVoluntariosPorFuncao[key],
                         decoration: const InputDecoration(
                             labelText: 'Selecionar voluntário'),
                         items: mockVoluntarios

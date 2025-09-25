@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerios_detalhes_controller.dart';
 import 'package:servus_app/features/leader/ministerios/widgets/autocomplete_link_member_modal.dart';
+import 'package:servus_app/features/leader/ministerios/widgets/invite_code_modal.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/core/network/dio_client.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/shared/widgets/fab_safe_scroll_view.dart';
 
 class MinistryMembersTab extends StatefulWidget {
   final MinisterioDetalhesController controller;
@@ -57,141 +60,181 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
     );
   }
 
+  void _showInviteCodeModal() {
+    showDialog(
+      context: context,
+      builder: (context) => InviteCodeModal(
+        ministryId: widget.controller.ministerioId,
+        ministryName: widget.controller.nomeMinisterio,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          // Barra de pesquisa
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Pesquisar membros...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {});
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+      body: FabSafeScrollView(
+        controller: _scrollController,
+        child: Column(
+          children: [
+            // Barra de pesquisa
+            Padding(
+              padding: const EdgeInsets.all(5),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Pesquisar membros...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  filled: true,
+                  fillColor: context.colors.surface,
                 ),
-                filled: true,
-                fillColor: context.colors.surface,
+                onChanged: (value) {
+                  setState(() {});
+                  // TODO: Implementar busca em tempo real
+                },
               ),
-              onChanged: (value) {
-                setState(() {});
-                // TODO: Implementar busca em tempo real
-              },
             ),
-          ),
 
-          // Lista de membros
-          Expanded(
-            child: _buildMembersList(),
+            // Lista de membros
+            _buildMembersList(),
+          ],
+        ),
+      ),
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Botão de convite por código
+          FloatingActionButton.extended(
+            onPressed: _showInviteCodeModal,
+            icon: const Icon(Icons.card_giftcard),
+            label: const Text('Convidar'),
+            backgroundColor: context.colors.secondary,
+            foregroundColor: context.colors.onSecondary,
+            heroTag: 'invite_button',
+          ),
+          const SizedBox(width: 8),
+          // Botão de vincular membro existente
+          FloatingActionButton.extended(
+            onPressed: _showLinkMemberModal,
+            icon: const Icon(Icons.person_add),
+            label: const Text('Vincular'),
+            backgroundColor: context.colors.primary,
+            foregroundColor: context.colors.onPrimary,
+            heroTag: 'link_button',
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showLinkMemberModal,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Vincular Membro'),
-        backgroundColor: context.colors.primary,
-        foregroundColor: context.colors.onPrimary,
-      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
   Widget _buildMembersList() {
     if (widget.controller.isLoadingMembers && widget.controller.membros.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(),
+      return SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: const Center(
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 
     if (widget.controller.membersErrorMessage.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Erro ao carregar membros',
-              style: context.textStyles.titleMedium?.copyWith(
-                color: Colors.red[600],
+      return SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red[400],
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.controller.membersErrorMessage,
-              style: context.textStyles.bodyMedium?.copyWith(
-                color: Colors.grey[600],
+              const SizedBox(height: 16),
+              Text(
+                'Erro ao carregar membros',
+                style: context.textStyles.titleMedium?.copyWith(
+                  color: Colors.red[600],
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => widget.controller.carregarMembros(refresh: true),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Tentar Novamente'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.colors.primary,
-                foregroundColor: context.colors.onPrimary,
+              const SizedBox(height: 8),
+              Text(
+                widget.controller.membersErrorMessage,
+                style: context.textStyles.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => widget.controller.carregarMembros(refresh: true),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tentar Novamente'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.colors.primary,
+                  foregroundColor: context.colors.onPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (widget.controller.membros.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.people_outline,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Nenhum membro encontrado',
-              style: context.textStyles.titleMedium?.copyWith(
-                color: Colors.grey[600],
+      return SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.people_outline,
+                size: 64,
+                color: Colors.grey[400],
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Este ministério ainda não possui membros vinculados.',
-              style: context.textStyles.bodyMedium?.copyWith(
-                color: Colors.grey[500],
+              const SizedBox(height: 16),
+              Text(
+                'Nenhum membro encontrado',
+                style: context.textStyles.titleMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Este ministério ainda não possui membros vinculados.',
+                style: context.textStyles.bodyMedium?.copyWith(
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return RefreshIndicator(
       onRefresh: () => widget.controller.carregarMembros(refresh: true),
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
         itemCount: widget.controller.membros.length + 
             (widget.controller.hasMoreMembers ? 1 : 0),
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           if (index >= widget.controller.membros.length) {
             // Indicador de carregamento para paginação
@@ -220,7 +263,7 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
     final isExpanded = _expandedCards.contains(membershipId);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.fromLTRB(5, 0, 5, 8),
       child: Column(
         children: [
           // Cabeçalho do card (sempre visível)
@@ -355,12 +398,8 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
 
   // Carregar funções do membro no ministério
   Future<void> _loadMemberFunctions(String membershipId, String userId) async {
-    print('🔍 [FRONTEND] _loadMemberFunctions iniciado');
-    print('🔍 [FRONTEND] membershipId: $membershipId');
-    print('🔍 [FRONTEND] userId: $userId');
     
     if (_loadingFunctions[membershipId] == true) {
-      print('⚠️ [FRONTEND] Já está carregando funções para este membership');
       return;
     }
     
@@ -369,19 +408,15 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
     });
 
     try {
-      print('🚀 [FRONTEND] Chamando _getUserFunctionsInMinistry...');
       // Buscar funções do usuário no ministério atual
-      final functions = await _getUserFunctionsInMinistry(userId);
-      print('✅ [FRONTEND] Funções obtidas: ${functions.length}');
+      final functions = await _getMemberFunctionsInMinistry(userId);
       
       setState(() {
         _memberFunctions[membershipId] = functions;
         _loadingFunctions[membershipId] = false;
       });
       
-      print('✅ [FRONTEND] Estado atualizado com ${functions.length} funções');
     } catch (e) {
-      print('❌ [FRONTEND] Erro ao carregar funções: $e');
       setState(() {
         _memberFunctions[membershipId] = [];
         _loadingFunctions[membershipId] = false;
@@ -390,62 +425,42 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
   }
 
   // Buscar funções do usuário no ministério atual
-  Future<List<Map<String, dynamic>>> _getUserFunctionsInMinistry(String userId) async {
+  Future<List<Map<String, dynamic>>> _getMemberFunctionsInMinistry(String userId) async {
     try {
-      print('🔍 [FRONTEND] _getUserFunctionsInMinistry iniciado');
-      print('🔍 [FRONTEND] userId recebido: $userId');
       
       final context = await TokenService.getContext();
       final tenantId = context['tenantId'];
       final branchId = context['branchId'];
       final ministryId = widget.controller.ministerioId;
 
-      print('🔍 [FRONTEND] Context obtido:');
-      print('   - tenantId: $tenantId');
-      print('   - branchId: $branchId');
-      print('   - ministryId: $ministryId');
 
       if (tenantId == null || ministryId.isEmpty) {
-        print('❌ [FRONTEND] Context inválido - retornando lista vazia');
         return [];
       }
 
       // Fazer requisição para buscar funções do usuário no ministério específico
       final dio = DioClient.instance;
 
-      String url = '/user-functions/user/$userId/ministry/$ministryId';
+      String url = '/member-functions/user/$userId/ministry/$ministryId';
       Map<String, String> queryParams = {};
 
       if (branchId != null && branchId.isNotEmpty) {
         queryParams['branchId'] = branchId;
       }
 
-      print('🔍 [FRONTEND] Fazendo requisição:');
-      print('   - URL: $url');
-      print('   - Query params: $queryParams');
       
       final response = await dio.get(
         url,
         queryParameters: queryParams,
       );
       
-      print('🔍 [FRONTEND] Resposta recebida:');
-      print('   - Status: ${response.statusCode}');
-      print('   - Data: ${response.data}');
-      
       if (response.statusCode == 200) {
         final List<dynamic> functionsData = response.data;
-        print('✅ [FRONTEND] Funções encontradas: ${functionsData.length}');
-        for (int i = 0; i < functionsData.length; i++) {
-          print('   - Função $i: ${functionsData[i]}');
-        }
         return functionsData.cast<Map<String, dynamic>>();
       }
       
-      print('❌ [FRONTEND] Status não é 200 - retornando lista vazia');
       return [];
     } catch (e) {
-      print('❌ [FRONTEND] Erro ao buscar funções do usuário: $e');
       return [];
     }
   }
@@ -563,23 +578,20 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
 
   // Widget para item de função
   Widget _buildFunctionItem(Map<String, dynamic> function) {
-    print('🔍 [FRONTEND] _buildFunctionItem processando:');
-    print('   - function: $function');
-    print('   - function[\'function\']: ${function['function']}');
-    print('   - function[\'function\'][\'name\']: ${function['function']?['name']}');
-    print('   - function[\'name\']: ${function['name']}');
-    print('   - function[\'status\']: ${function['status']}');
     
-    final functionName = function['function']?['name'] ?? function['name'] ?? 'Função não informada';
+    // Suportar a estrutura retornada pelo backend MemberFunctionService
+    // O backend retorna: { function: { name, description }, status, ... }
+    // Se function é null/undefined, significa que a função não foi populada (função deletada)
+    final functionData = function['function'];
+    final functionName = functionData != null && functionData['name'] != null 
+        ? functionData['name'] 
+        : 'Função não encontrada';
+    final functionDescription = functionData?['description'];
     final status = function['status'] ?? 'pending';
     final statusText = _getStatusText(status);
     final statusColor = _getStatusColor(status);
     final primaryColor = context.colors.primary;
     
-    print('✅ [FRONTEND] Dados processados:');
-    print('   - functionName: $functionName');
-    print('   - status: $status');
-    print('   - statusText: $statusText');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -603,10 +615,10 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (function['function']?['description'] != null) ...[
+                if (functionDescription != null && functionDescription.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    function['function']['description'],
+                    functionDescription,
                     style: context.textStyles.bodySmall?.copyWith(
                       color: Colors.grey[600],
                     ),
@@ -638,13 +650,15 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
   String _getStatusText(String status) {
     switch (status) {
       case 'approved':
+      case 'aprovado': // ✅ Suporte ao status em português do backend
         return 'Aprovada';
       case 'pending':
         return 'Pendente';
       case 'rejected':
+      case 'rejeitado': // ✅ Suporte ao status em português do backend
         return 'Rejeitada';
       default:
-        return 'Desconhecido';
+        return 'Desconhecido ($status)'; // ✅ Mostrar o status real para debug
     }
   }
 
@@ -652,10 +666,12 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'approved':
+      case 'aprovado': // ✅ Suporte ao status em português do backend
         return Colors.green;
       case 'pending':
         return Colors.orange;
       case 'rejected':
+      case 'rejeitado': // ✅ Suporte ao status em português do backend
         return Colors.red;
       default:
         return Colors.grey;
@@ -663,51 +679,262 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
   }
 
   void _showRemoveMemberDialog(String membershipId, String memberName) {
+    // Encontrar o membro na lista para obter informações detalhadas
+    final membro = widget.controller.membros.firstWhere(
+      (m) => m['_id'] == membershipId,
+      orElse: () => {},
+    );
+    
+    final user = membro['userId'] ?? membro['user'] ?? {};
+    final role = membro['role'] ?? 'volunteer';
+    final memberEmail = user['email'] ?? 'Email não informado';
+    final memberPhone = user['phone'] ?? 'Telefone não informado';
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Remover membro',
-          style: context.textStyles.titleLarge?.copyWith(
-            color: context.colors.onSurface,
-          ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning,
+              color: Colors.red,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Desvincular do Ministério',
+                style: context.textStyles.titleLarge?.copyWith(
+                  color: context.colors.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
-        content: Text(
-          'Tem certeza que deseja remover "$memberName" deste ministério?',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Você está prestes a desvincular:',
+              style: context.textStyles.bodyMedium?.copyWith(
+                color: context.colors.onSurface.withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Informações do membro
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.person, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          memberName,
+                          style: context.textStyles.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.email, color: Colors.red.shade600, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          memberEmail,
+                          style: context.textStyles.bodyMedium?.copyWith(
+                            color: Colors.red.shade600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.phone, color: Colors.red.shade600, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          memberPhone,
+                          style: context.textStyles.bodyMedium?.copyWith(
+                            color: Colors.red.shade600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        role == 'leader' ? Icons.admin_panel_settings : Icons.person,
+                        color: Colors.red.shade600,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        role == 'leader' ? 'Líder do Ministério' : 'Voluntário',
+                        style: context.textStyles.bodyMedium?.copyWith(
+                          color: Colors.red.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Aviso sobre consequências
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Consequências da desvinculação:',
+                        style: context.textStyles.bodySmall?.copyWith(
+                          color: Colors.orange.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '• Todas as funções do membro neste ministério serão removidas\n'
+                    '• O membro perderá acesso às atividades do ministério\n'
+                    '• Esta ação não pode ser desfeita automaticamente',
+                    style: context.textStyles.bodySmall?.copyWith(
+                      color: Colors.orange.shade600,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(
+                color: context.colors.onSurface.withOpacity(0.7),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              final success = await widget.controller.removerMembro(membershipId);
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$memberName removido do ministério com sucesso!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Erro ao remover membro do ministério'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
+            onPressed: () => _confirmRemoveMember(context, membershipId, memberName),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Remover'),
+            child: const Text('Desvincular'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmRemoveMember(BuildContext context, String membershipId, String memberName) async {
+    // Salvar referência do navigator antes de qualquer operação assíncrona
+    final navigator = Navigator.of(context);
+    
+    // Fechar dialog de confirmação
+    navigator.pop();
+    
+    // Mostrar loading
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Desvinculando membro...',
+              style: context.textStyles.bodyMedium?.copyWith(
+                color: context.colors.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final success = await widget.controller.removerMembro(membershipId);
+      
+      // Fechar loading
+      if (mounted) navigator.pop();
+      
+      if (success) {
+        if (mounted) {
+          showSuccess(context, '$memberName foi desvinculado do ministério com sucesso!');
+        }
+      } else {
+        if (mounted) {
+          showError(context, 'Erro ao desvincular membro do ministério. Tente novamente.');
+        }
+      }
+    } catch (e) {
+      // Fechar loading
+      if (mounted) navigator.pop();
+      
+      if (mounted) {
+        String errorMessage = 'Erro ao desvincular membro';
+        
+        if (e.toString().contains('permissão') || e.toString().contains('403')) {
+          errorMessage = 'Você não tem permissão para desvincular este membro. Verifique se você é líder deste ministério.';
+        } else if (e.toString().contains('não encontrado') || e.toString().contains('404')) {
+          errorMessage = 'Membro não encontrado ou já foi desvinculado';
+        } else if (e.toString().contains('conexão') || e.toString().contains('timeout')) {
+          errorMessage = 'Problema de conexão. Verifique sua internet e tente novamente';
+        } else if (e.toString().contains('membership ativo')) {
+          errorMessage = 'Problema de permissão: Verifique se você tem acesso a este ministério';
+        } else {
+          errorMessage = 'Erro ao desvincular membro: ${e.toString()}';
+        }
+        
+        showError(context, errorMessage);
+      }
+    }
   }
 }

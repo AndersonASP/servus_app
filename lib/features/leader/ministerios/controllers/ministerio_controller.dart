@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:servus_app/features/ministries/services/ministry_service.dart';
 import 'package:servus_app/features/ministries/services/ministry_functions_service.dart';
 import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/services/local_storage_service.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/state/auth_state.dart';
+import 'package:servus_app/core/enums/user_role.dart';
 
 class MinisterioController extends ChangeNotifier {
   final MinistryService _ministryService = MinistryService();
@@ -80,7 +83,6 @@ class MinisterioController extends ChangeNotifier {
   /// Carrega contexto de segurança do JWT
   Future<void> _loadContext() async {
     try {
-      // print('🔍 Carregando contexto de segurança...');
       
       // 🆕 Primeiro, tenta carregar claims de segurança do storage
       await TokenService.loadSecurityClaims();
@@ -90,18 +92,13 @@ class MinisterioController extends ChangeNotifier {
         _tenantId = TokenService.tenantId;
         _branchId = TokenService.branchId;
         
-        // print('✅ Contexto carregado dos claims de segurança:');
-        // print('   - Tenant ID: $_tenantId');
-        // print('   - Branch ID: $_branchId');
         return;
       }
       
       // 🆕 Se não tem claims, tenta carregar do storage antigo (fallback)
-      // print('⚠️ Claims não encontrados, tentando storage antigo...');
       await _loadContextFromLocalStorage();
       
     } catch (e) {
-      // print('❌ Erro ao carregar contexto: $e');
     }
   }
 
@@ -112,7 +109,6 @@ class MinisterioController extends ChangeNotifier {
       final tenantId = infoBasica['tenantId'];
       final branchId = infoBasica['branchId'];
       
-      // print('🔍 LocalStorage: tenantId=$tenantId, branchId=$branchId');
       
       if (tenantId != null && branchId != null && tenantId.isNotEmpty && branchId.isNotEmpty) {
         _tenantId = tenantId;
@@ -124,12 +120,9 @@ class MinisterioController extends ChangeNotifier {
           branchId: branchId,
         );
         
-        // print('✅ Contexto carregado do LocalStorage e salvo no TokenService');
       } else {
-        // print('⚠️ LocalStorage não tem contexto válido');
       }
     } catch (e) {
-      // print('❌ Erro ao carregar contexto do LocalStorage: $e');
     }
   }
 
@@ -144,6 +137,50 @@ class MinisterioController extends ChangeNotifier {
     ativo = ministerio.isActive;
     funcoes = List.from(ministerio.ministryFunctions);
     notifyListeners();
+  }
+
+  /// Inicializa o controller para líder editar seu próprio ministério
+  void initializeForLeader() {
+    isEditing = true;
+    loadLeaderMinistry();
+  }
+
+  /// Carrega o ministério do líder atual
+  Future<void> loadLeaderMinistry() async {
+    try {
+      await _loadContext();
+      
+      if (_tenantId == null || _tenantId!.isEmpty) {
+        throw Exception('Contexto inválido: tenantId="$_tenantId"');
+      }
+
+      // Buscar o ministério do líder atual usando endpoints existentes
+      final leaderMinistry = await _ministryService.getLeaderMinistryV2(
+        tenantId: _tenantId!,
+        branchId: _branchId ?? '',
+        context: null,
+      );
+
+      if (leaderMinistry != null) {
+        ministerioId = leaderMinistry.id;
+        nomeController.text = leaderMinistry.name;
+        descricaoController.text = leaderMinistry.description ?? '';
+        funcoes = List.from(leaderMinistry.ministryFunctions);
+        ativo = leaderMinistry.isActive;
+        notifyListeners();
+      } else {
+        throw Exception('Ministério do líder não encontrado');
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar ministério do líder: $e');
+      // Limpar campos em caso de erro
+      ministerioId = null;
+      nomeController.clear();
+      descricaoController.clear();
+      funcoes.clear();
+      ativo = true;
+      notifyListeners();
+    }
   }
 
   /// Adiciona uma nova função
@@ -230,7 +267,6 @@ class MinisterioController extends ChangeNotifier {
 
     // Verifica se o contexto está disponível
     if (!hasValidContext) {
-      // print('❌ Contexto não disponível - tentando recarregar...');
       await _loadContext();
       
       if (!hasValidContext) {
@@ -243,35 +279,23 @@ class MinisterioController extends ChangeNotifier {
       isSaving = true;
       notifyListeners();
 
-      // print('🚀 Salvando ministério com contexto: $_tenantId, $_branchId');
-      // print('📝 Dados do ministério:');
-      // print('   - Nome: ${nomeController.text.trim()}');
-      // print('   - Descrição: ${descricaoController.text.trim()}');
-      // print('   - Funções: ${funcoes.join(', ')}');
-      // print('   - Ativo: $ativo');
-      // print('   - Modo: ${isEditing ? 'Edição' : 'Criação'}');
       if (isEditing) {
-        // print('   - ID para edição: $ministerioId');
       }
 
       // Validação específica por tipo de usuário
       if (_isServusAdmin) {
-        // print('👑 Usuário servus_admin - operação global');
         // Para servus_admin, pode criar ministérios globais
       } else {
         // Usuário normal precisa de tenantId
         if (_tenantId == null || _tenantId!.isEmpty) {
           throw Exception('Contexto inválido: tenantId="$_tenantId"');
         }
-        // print('🏢 Usuário com tenant: $_tenantId');
-        // print('🏪 Branch: ${_branchId ?? 'matriz'}');
       }
 
       bool success;
       
       if (isEditing) {
         // Atualização
-        // print('🔄 Atualizando ministério existente...');
         final updateData = UpdateMinistryDto(
           name: nomeController.text.trim(),
           description: descricaoController.text.trim().isEmpty ? null : descricaoController.text.trim(),
@@ -279,7 +303,6 @@ class MinisterioController extends ChangeNotifier {
           isActive: ativo,
         );
         
-        // print('📤 Dados de atualização: ${updateData.toJson()}');
         
         if (_isServusAdmin) {
           // TODO: Implementar atualização global para servus_admin
@@ -289,9 +312,7 @@ class MinisterioController extends ChangeNotifier {
           String? branchIdParaAPI;
           if (_branchId != null && _branchId!.isNotEmpty) {
             branchIdParaAPI = _branchId;
-            // print('🏪 Usando branch específica: $branchIdParaAPI');
           } else {
-            // print('🏢 Usuário da matriz - sem branch específica');
             // Para usuários da matriz, não passa branchId na URL
             // O backend deve tratar isso como ministério da matriz
           }
@@ -309,9 +330,7 @@ class MinisterioController extends ChangeNotifier {
             // TODO: Implementar lógica para desativar funções que não estão mais na lista
             // Por enquanto, o backend não tem endpoint para remover funções do ministério
             // As funções removidas continuarão aparecendo na aba, mas inativas
-            // print('✅ Funções sincronizadas na tabela function');
           } catch (e) {
-            // print('⚠️ Erro ao sincronizar funções: $e');
             // Continua mesmo se der erro, pois as funções podem já existir
           }
           
@@ -324,10 +343,8 @@ class MinisterioController extends ChangeNotifier {
         }
         
         success = true;
-        // print('✅ Ministério atualizado com sucesso!');
       } else {
         // Criação
-        // print('🆕 Criando novo ministério...');
         final createData = CreateMinistryDto(
           name: nomeController.text.trim(),
           description: descricaoController.text.trim().isEmpty ? null : descricaoController.text.trim(),
@@ -335,7 +352,6 @@ class MinisterioController extends ChangeNotifier {
           isActive: ativo,
         );
         
-        // print('📤 Dados de criação: ${createData.toJson()}');
         
         if (_isServusAdmin) {
           // TODO: Implementar criação global para servus_admin
@@ -345,9 +361,7 @@ class MinisterioController extends ChangeNotifier {
           String? branchIdParaAPI;
           if (_branchId != null && _branchId!.isNotEmpty) {
             branchIdParaAPI = _branchId;
-            // print('🏪 Usando branch específica: $branchIdParaAPI');
           } else {
-            // print('🏢 Usuário da matriz - sem branch específica');
             // Para usuários da matriz, não passa branchId na URL
             // O backend deve tratar isso como ministério da matriz
           }
@@ -361,17 +375,28 @@ class MinisterioController extends ChangeNotifier {
         }
         
         success = true;
-        // print('✅ Ministério criado com sucesso!');
       }
 
       isSaving = false;
       notifyListeners();
       
       if (success) {
-        // Navega de volta para a lista com parâmetro para forçar refresh
         if (context.mounted) {
-          // print('🔄 Navegando para lista de ministérios...');
-          context.go('/leader/ministerio/lista?refresh=true');
+          // Redirecionamento condicional por papel: líder volta para detalhes do seu ministério
+          try {
+            final authState = context.read<AuthState>();
+            final role = authState.usuario?.role;
+            final isLeader = role == UserRole.leader;
+
+            if (isLeader && isEditing && ministerioId != null && ministerioId!.isNotEmpty) {
+              context.go('/leader/ministerio-detalhes/${ministerioId!}?t=${DateTime.now().millisecondsSinceEpoch}');
+            } else {
+              context.go('/leader/ministerio/lista?refresh=true&t=${DateTime.now().millisecondsSinceEpoch}');
+            }
+          } catch (_) {
+            // Fallback seguro caso não consiga ler o AuthState
+            context.go('/leader/ministerio/lista?refresh=true&t=${DateTime.now().millisecondsSinceEpoch}');
+          }
         }
       }
       
@@ -380,12 +405,7 @@ class MinisterioController extends ChangeNotifier {
       isSaving = false;
       notifyListeners();
       
-      // print('❌ Erro ao salvar ministério: $e');
-      // print('🔍 Detalhes do erro:');
-      // print('   - Tipo: ${e.runtimeType}');
-      // print('   - Mensagem: ${e.toString()}');
       if (e is Exception) {
-        // print('   - Exception: $e');
       }
       
       // Mostra erro específico para o usuário
@@ -404,7 +424,7 @@ class MinisterioController extends ChangeNotifier {
           errorMessage = 'Erro: Funcionalidade não disponível para administradores globais.';
         }
         
-        FeedbackService.showError(context, errorMessage);
+        showError(context, errorMessage);
       }
       
       return false;
@@ -414,7 +434,7 @@ class MinisterioController extends ChangeNotifier {
   /// Mostra erro de contexto
   void _showContextError(BuildContext context) {
     if (context.mounted) {
-      FeedbackService.showAuthError(context);
+      showAuthError(context);
     }
   }
 

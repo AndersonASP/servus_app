@@ -3,17 +3,17 @@ import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/ministries/controllers/ministry_functions_controller.dart';
 import 'package:servus_app/features/ministries/models/ministry_function.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class MinistryFunctionsTab extends StatefulWidget {
   final String ministryId;
   final String ministryName;
 
   const MinistryFunctionsTab({
-    Key? key,
+    super.key,
     required this.ministryId,
     required this.ministryName,
-  }) : super(key: key);
+  });
 
   @override
   State<MinistryFunctionsTab> createState() => _MinistryFunctionsTabState();
@@ -170,7 +170,7 @@ class _MinistryFunctionsTabState extends State<MinistryFunctionsTab> {
               decoration: BoxDecoration(
                 color: function.isActive
                     ? context.colors.primary.withOpacity(0.1)
-                    : context.colors.surfaceVariant,
+                    : context.colors.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -255,11 +255,11 @@ class _MinistryFunctionsTabState extends State<MinistryFunctionsTab> {
                   
                   // Mostrar erro se necessário
                   if (mounted) {
-                    FeedbackService.showUpdateError(context, 'função');
+                    showUpdateError(context, 'função');
                   }
                 }
               },
-              activeColor: Colors.green,
+              activeThumbColor: Colors.green,
               inactiveThumbColor: Colors.red,
               inactiveTrackColor: Colors.red.withOpacity(0.3),
             ),

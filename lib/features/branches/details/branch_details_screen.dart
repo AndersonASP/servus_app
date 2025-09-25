@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:servus_app/core/models/branch.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class BranchDetailsScreen extends StatelessWidget {
   final Branch branch;
@@ -24,9 +25,7 @@ class BranchDetailsScreen extends StatelessWidget {
             icon: const Icon(Icons.edit),
             onPressed: () {
               // TODO: Implementar edição
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Funcionalidade de edição em desenvolvimento')),
-              );
+              showInfo(context, 'Funcionalidade de edição em desenvolvimento');
             },
           ),
         ],

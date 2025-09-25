@@ -4,6 +4,7 @@ import 'package:servus_app/features/ministries/services/ministry_functions_servi
 
 class MinistryFunctionsController extends ChangeNotifier {
   final MinistryFunctionsService _service;
+  bool _disposed = false;
 
   MinistryFunctionsController(this._service);
 
@@ -37,15 +38,20 @@ class MinistryFunctionsController extends ChangeNotifier {
 
   /// Carrega funções do ministério
   Future<void> loadMinistryFunctions(String ministryId) async {
+    if (_disposed) return;
     _setLoading(true);
     _clearError();
 
     try {
       // Carregar todas as funções (ativas e inativas)
       _ministryFunctions = await _service.getMinistryFunctions(ministryId);
-      notifyListeners();
+      if (!_disposed) {
+        notifyListeners();
+      }
     } catch (e) {
-      _setError('Erro ao carregar funções do ministério: $e');
+      if (!_disposed) {
+        _setError('Erro ao carregar funções do ministério: $e');
+      }
     } finally {
       _setLoading(false);
     }
@@ -53,6 +59,7 @@ class MinistryFunctionsController extends ChangeNotifier {
 
   /// Carrega catálogo do tenant
   Future<void> loadTenantFunctions({String? ministryId, String? search}) async {
+    if (_disposed) return;
     _setLoading(true);
     _clearError();
 
@@ -61,9 +68,13 @@ class MinistryFunctionsController extends ChangeNotifier {
         ministryId: ministryId,
         search: search,
       );
-      notifyListeners();
+      if (!_disposed) {
+        notifyListeners();
+      }
     } catch (e) {
-      _setError('Erro ao carregar funções do tenant: $e');
+      if (!_disposed) {
+        _setError('Erro ao carregar funções do tenant: $e');
+      }
     } finally {
       _setLoading(false);
     }
@@ -75,6 +86,7 @@ class MinistryFunctionsController extends ChangeNotifier {
     List<String> names, {
     String? category,
   }) async {
+    if (_disposed) throw Exception('Controller disposed');
     _setLoading(true);
     _clearError();
 
@@ -86,12 +98,16 @@ class MinistryFunctionsController extends ChangeNotifier {
       );
 
       // Recarregar funções após criação
-      await loadMinistryFunctions(ministryId);
-      await loadTenantFunctions(ministryId: ministryId);
+      if (!_disposed) {
+        await loadMinistryFunctions(ministryId);
+        await loadTenantFunctions(ministryId: ministryId);
+      }
 
       return response;
     } catch (e) {
-      _setError('Erro ao criar funções: $e');
+      if (!_disposed) {
+        _setError('Erro ao criar funções: $e');
+      }
       rethrow;
     } finally {
       _setLoading(false);
@@ -106,6 +122,7 @@ class MinistryFunctionsController extends ChangeNotifier {
     int? defaultSlots,
     String? notes,
   }) async {
+    if (_disposed) return;
     _setLoading(true);
     _clearError();
 
@@ -119,10 +136,14 @@ class MinistryFunctionsController extends ChangeNotifier {
       );
 
       // Recarregar funções após atualização
-      await loadMinistryFunctions(ministryId);
-      await loadTenantFunctions(ministryId: ministryId);
+      if (!_disposed) {
+        await loadMinistryFunctions(ministryId);
+        await loadTenantFunctions(ministryId: ministryId);
+      }
     } catch (e) {
-      _setError('Erro ao atualizar função: $e');
+      if (!_disposed) {
+        _setError('Erro ao atualizar função: $e');
+      }
     } finally {
       _setLoading(false);
     }
@@ -130,12 +151,14 @@ class MinistryFunctionsController extends ChangeNotifier {
 
   /// Alterna filtro entre ministério e tenant
   void toggleFilter() {
+    if (_disposed) return;
     _showOnlyMinistry = !_showOnlyMinistry;
     notifyListeners();
   }
 
   /// Busca funções no catálogo
   Future<void> searchFunctions(String ministryId, String search) async {
+    if (_disposed) return;
     if (search.isEmpty) {
       await loadTenantFunctions(ministryId: ministryId);
     } else {
@@ -145,21 +168,25 @@ class MinistryFunctionsController extends ChangeNotifier {
 
   // Métodos privados
   void _setLoading(bool loading) {
+    if (_disposed) return;
     _isLoading = loading;
     notifyListeners();
   }
 
   void _setError(String error) {
+    if (_disposed) return;
     _error = error;
     notifyListeners();
   }
 
   void _clearError() {
+    if (_disposed) return;
     _error = null;
   }
 
   @override
   void dispose() {
+    _disposed = true;
     super.dispose();
   }
 }

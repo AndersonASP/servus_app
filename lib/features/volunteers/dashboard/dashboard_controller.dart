@@ -179,4 +179,17 @@ class DashboardController extends ChangeNotifier {
     if (diferenca == 1) return 'Amanhã';
     return 'Em $diferenca dias';
   }
+
+  /// Atualiza todos os dados do dashboard
+  Future<void> refreshDashboard() async {
+    isLoading = true;
+    notifyListeners();
+    
+    try {
+      await carregarEscalasComQtd();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 }

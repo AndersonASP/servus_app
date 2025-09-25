@@ -130,16 +130,28 @@ class TokenService {
     final branchId = await _storage.read(key: _keyBranchId);
     final ministryId = await _storage.read(key: _keyMinistryId);
     
-    // print('🔍 Contexto atual:');
-    // print('   - Tenant ID: $tenantId');
-    // print('   - Branch ID: $branchId');
-    // print('   - Ministry ID: $ministryId');
+    // Obter userId do token JWT
+    final userId = await getUserId();
     
     return {
       'tenantId': tenantId,
       'branchId': branchId,
       'ministryId': ministryId,
+      'userId': userId,
     };
+  }
+
+  /// Obtém o ID do usuário atual do token JWT
+  static Future<String?> getUserId() async {
+    try {
+      final token = await getAccessToken();
+      if (token == null) return null;
+      
+      final decodedToken = JwtDecoder.decode(token);
+      return decodedToken['sub'] ?? decodedToken['_id'];
+    } catch (e) {
+      return null;
+    }
   }
 
   /// Limpa contexto

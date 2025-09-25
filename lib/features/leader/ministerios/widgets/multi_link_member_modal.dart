@@ -4,7 +4,9 @@ import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerios_detalhes_controller.dart';
 import 'package:servus_app/services/members_service.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 import 'package:dio/dio.dart';
+import 'package:servus_app/core/network/dio_client.dart';
 
 class MultiLinkMemberModal extends StatefulWidget {
   final MinisterioDetalhesController controller;
@@ -83,7 +85,6 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
     });
 
     try {
-      print('🔍 Carregando todos os membros...');
       final response = await MembersService.getMembers(
         filter: MemberFilter(
           page: 1,
@@ -92,13 +93,11 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
         context: context,
       );
 
-      print('✅ Membros carregados: ${response.members.length}');
       setState(() {
         _allMembers = response.members;
         _filteredMembers = response.members;
       });
     } catch (e) {
-      print('❌ Erro ao carregar membros: $e');
       setState(() {
         _errorMessage = 'Erro ao carregar membros: $e';
       });
@@ -117,15 +116,13 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
     });
 
     try {
-      final dio = Dio();
+      final dio = DioClient.instance;
       final context = await TokenService.getContext();
       final token = context['token'];
-      final baseUrl = context['baseUrl'];
 
-      print('🔍 Carregando funções do ministério: ${widget.controller.ministerioId}');
 
       final response = await dio.get(
-        '$baseUrl/ministries/${widget.controller.ministerioId}/functions',
+        '/ministries/${widget.controller.ministerioId}/functions',
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -134,7 +131,6 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
         ),
       );
 
-      print('✅ Resposta das funções: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final List<dynamic> functionsData = response.data;
@@ -145,10 +141,7 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
             'description': f['description'] ?? '',
           }).toList();
         });
-        print('✅ Funções carregadas: ${_availableFunctions.length}');
       }
-    } catch (e) {
-      print('❌ Erro ao carregar funções: $e');
     } finally {
       setState(() {
         _isLoadingFunctions = false;
@@ -167,20 +160,18 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
       _memberFunctionIds[memberId] = functionIds;
     });
     
-    print('🔧 Funções selecionadas para $memberId: ${_memberFunctionIds[memberId]}');
   }
 
   Future<void> _linkToFunctions(String memberId, List<String> functionIds) async {
-    final dio = Dio();
+    final dio = DioClient.instance;
     final context = await TokenService.getContext();
     final token = context['token'];
-    final baseUrl = context['baseUrl'];
 
     await dio.post(
-      '$baseUrl/ministries/${widget.controller.ministerioId}/members/$memberId/functions',
+      '/ministries/${widget.controller.ministerioId}/members/$memberId/functions',
       data: {
         'functionIds': functionIds,
-        'status': 'em_treino',
+        'status': 'pending',
       },
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
@@ -194,14 +185,12 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
         _isLoading = true;
       });
 
-      print('🔗 Vinculando ${_selectedMembers.length} membros ao ministério...');
       
       int successCount = 0;
       int errorCount = 0;
       
       for (final member in _selectedMembers) {
         try {
-          print('🔗 Vinculando ${member.name}...');
           
           // PASSO 1: Vincular membro ao ministério (membership)
           final membershipSuccess = await widget.controller.vincularMembro(
@@ -212,19 +201,15 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
           if (!membershipSuccess) {
             throw Exception('Erro ao vincular ${member.name} ao ministério');
           }
-          print('✅ ${member.name} vinculado ao ministério');
 
           // PASSO 2: Vincular às funções (se houver)
           final functionIds = _memberFunctionIds[member.id] ?? [];
           if (functionIds.isNotEmpty) {
-            print('📝 Vinculando ${member.name} às funções...');
             await _linkToFunctions(member.id, functionIds);
-            print('✅ Funções vinculadas para ${member.name}');
           }
           
           successCount++;
         } catch (e) {
-          print('❌ Erro ao vincular ${member.name}: $e');
           errorCount++;
         }
       }
@@ -238,23 +223,20 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
           message = '$successCount membro(s) vinculado(s), $errorCount erro(s)';
         }
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: errorCount == 0 ? Colors.green : Colors.orange,
-          ),
+        ServusSnackQueue.addToQueue(
+          context: context,
+          message: message,
+          type: errorCount == 0 ? ServusSnackType.success : ServusSnackType.warning,
         );
         
         Navigator.of(context).pop(true);
       }
     } catch (e) {
-      print('❌ Erro geral ao vincular membros: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
+        ServusSnackQueue.addToQueue(
+          context: context,
+          message: 'Erro: $e',
+          type: ServusSnackType.error,
         );
       }
     } finally {
@@ -449,7 +431,7 @@ class _MultiLinkMemberModalState extends State<MultiLinkMemberModal> {
                       decoration: BoxDecoration(
                         color: isSelected 
                             ? context.colors.primary 
-                            : context.colors.surfaceVariant,
+                            : context.colors.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected 

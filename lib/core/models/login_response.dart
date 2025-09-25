@@ -110,6 +110,7 @@ class MembershipData {
   final String id;
   final String role;
   final List<String> permissions;
+  final bool isActive;
   final BranchData? branch;
   final MinistryData? ministry;
 
@@ -117,6 +118,7 @@ class MembershipData {
     required this.id,
     required this.role,
     required this.permissions,
+    required this.isActive,
     this.branch,
     this.ministry,
   });
@@ -126,6 +128,7 @@ class MembershipData {
       id: json['id'] ?? '',
       role: json['role'] ?? '',
       permissions: List<String>.from(json['permissions'] ?? []),
+      isActive: json['isActive'] ?? true,
       branch: json['branch'] != null ? BranchData.fromJson(json['branch']) : null,
       ministry: json['ministry'] != null ? MinistryData.fromJson(json['ministry']) : null,
     );

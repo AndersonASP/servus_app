@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:servus_app/core/models/usuario_logado.dart';
+import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/features/ministries/services/ministry_service.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
@@ -9,6 +11,7 @@ class DashboardLiderController extends ChangeNotifier {
   final AuthState auth;
   final ScrollController scrollController = ScrollController();
   final MinistryService _ministryService = MinistryService();
+  final Dio _dio = DioClient.instance;
 
   late UsuarioLogado usuario;
   List<MinistryResponse> ministerios = [];
@@ -47,7 +50,6 @@ class DashboardLiderController extends ChangeNotifier {
       final tenantId = context['tenantId'];
       
       if (tenantId == null) {
-        // print('❌ Contexto de tenant não encontrado');
         return;
       }
 
@@ -62,9 +64,7 @@ class DashboardLiderController extends ChangeNotifier {
       );
 
       ministerios = response.items;
-      // print('✅ Carregados ${ministerios.length} ministérios no dashboard');
     } catch (e) {
-      // print('❌ Erro ao carregar ministérios: $e');
       ministerios = [];
     }
   }
@@ -78,16 +78,64 @@ class DashboardLiderController extends ChangeNotifier {
     isLoadingModuloLouvor = true;
     if (notify) notifyListeners();
 
+    try {
+      // Carregar dados reais de voluntários
+      await _loadVolunteersData();
+      
+      // Carregar dados de solicitações (mantendo mock por enquanto)
+      totalSolicitacoesPendentes = 3;
+      
+      // Para ministérios da matriz, assumimos que todos os módulos estão ativos
+      moduloLouvorAtivo = true;
+    } catch (e) {
+      debugPrint('Erro ao carregar dados do ministério: $e');
+      // Fallback para dados mockados em caso de erro
+      totalVoluntarios = 0;
+      totalSolicitacoesPendentes = 0;
+    } finally {
+      isLoadingVoluntarios = false;
+      isLoadingSolicitacoes = false;
+      isLoadingModuloLouvor = false;
+      if (notify) notifyListeners();
+    }
+  }
 
-    totalVoluntarios = 18;
-    totalSolicitacoesPendentes = 3;
-    // Para ministérios da matriz, assumimos que todos os módulos estão ativos
-    moduloLouvorAtivo = true;
+  Future<void> _loadVolunteersData() async {
+    try {
+      final tenantId = usuario.tenantId;
+      if (tenantId == null) {
+        totalVoluntarios = 0;
+        return;
+      }
 
-    isLoadingVoluntarios = false;
-    isLoadingSolicitacoes = false;
-    isLoadingModuloLouvor = false;
-    if (notify) notifyListeners();
+      // Buscar voluntários aprovados através das submissões de formulários
+      final response = await _dio.get('/forms/submissions', queryParameters: {
+        'tenantId': tenantId,
+        'status': 'approved',
+        'limit': '1000', // Buscar todos para contar
+      });
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final submissions = data['data'] as List<dynamic>? ?? [];
+        
+        // Filtrar apenas submissões do ministério selecionado se houver
+        final filteredSubmissions = ministerioSelecionado != null
+            ? submissions.where((submission) {
+                final preferredMinistry = submission['preferredMinistry'];
+                return preferredMinistry != null && 
+                       preferredMinistry['_id'] == ministerioSelecionado!.id;
+              }).toList()
+            : submissions;
+        
+        totalVoluntarios = filteredSubmissions.length;
+      } else {
+        totalVoluntarios = 0;
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar voluntários: $e');
+      totalVoluntarios = 0;
+    }
   }
 
   void scrollToCard(BuildContext context, int index) {
@@ -109,6 +157,25 @@ class DashboardLiderController extends ChangeNotifier {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
+  }
+
+  /// Atualiza todos os dados do dashboard
+  Future<void> refreshDashboard() async {
+    isLoading = true;
+    notifyListeners();
+    
+    try {
+      // Recarrega ministérios
+      await carregarMinisterios();
+      
+      // Se há ministério selecionado, recarrega os dados
+      if (ministerioSelecionado != null) {
+        await carregarDadosDoMinisterio(ministerioSelecionado!, notify: false);
+      }
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
   }
 
   void disposeController() {

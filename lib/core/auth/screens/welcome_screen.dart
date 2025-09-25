@@ -74,37 +74,73 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
 
-            // BOTÃO
+            // BOTÕES
             Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: DesignTokens.spacingMd),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.theme.colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(DesignTokens.radiusMd),
+              child: Column(
+                children: [
+                  // Botão principal - Entrar
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.theme.colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(DesignTokens.radiusMd),
+                        ),
+                      ),
+                      onPressed: () async{
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('viu_welcome', true);
+                        if (!context.mounted) return;
+                        // Redireciona para a tela de login
+                        context.go('/login');
+                      },
+                      child: Text(
+                        'Entrar',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                          color: context.theme.colorScheme.onPrimary,
+                        ),
+                      ),
                     ),
                   ),
-                  onPressed: () async{
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setBool('viu_welcome', true);
-                    if (!context.mounted) return;
-                    // Redireciona para a tela de login
-                    context.go('/login');
-                  },
-                  child: Text(
-                    'Entrar',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 18,
-                      color: context.theme.colorScheme.onPrimary,
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Botão secundário - Código de convite
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(DesignTokens.radiusMd),
+                        ),
+                        side: BorderSide(
+                          color: context.theme.colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                      onPressed: () {
+                        context.go('/invite/code');
+                      },
+                      child: Text(
+                        'Tenho código de convite',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: context.theme.colorScheme.primary,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ],

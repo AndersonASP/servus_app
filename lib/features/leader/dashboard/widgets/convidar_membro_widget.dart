@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:servus_app/core/models/ministerio.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:servus_app/core/models/ministerio.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class ConvidarMembrosCard extends StatelessWidget {
   final Ministerio ministerio;
@@ -30,7 +31,7 @@ class ConvidarMembrosCard extends StatelessWidget {
     final portas = ministerio.portasAbertas; // segurança
 
     return Material(
-      color: context.colors.surfaceVariant,
+      color: context.colors.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -80,14 +81,7 @@ class ConvidarMembrosCard extends StatelessWidget {
                   onPressed: () {
                     if (codigo != 'Não disponível') {
                       Clipboard.setData(ClipboardData(text: codigo));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Código copiado!'),
-                          behavior: SnackBarBehavior.floating,
-                          margin:
-                              EdgeInsets.only(bottom: 80, left: 16, right: 16),
-                        ),
-                      );
+                      showSuccess(context, 'Código copiado!');
                     }
                   },
                 ),

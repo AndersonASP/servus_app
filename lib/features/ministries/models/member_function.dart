@@ -1,15 +1,15 @@
-enum UserFunctionStatus {
+enum MemberFunctionStatus {
   pending,
   approved,
   rejected,
 }
 
-class UserFunction {
+class MemberFunction {
   final String id;
   final String userId;
   final String ministryId;
   final String functionId;
-  final UserFunctionStatus status;
+  final MemberFunctionStatus status;
   final String? approvedBy;
   final DateTime? approvedAt;
   final String? notes;
@@ -19,12 +19,12 @@ class UserFunction {
   final DateTime updatedAt;
   
   // Dados populados
-  final UserFunctionUser? user;
-  final UserFunctionMinistry? ministry;
-  final UserFunctionFunction? function;
-  final UserFunctionUser? approvedByUser;
+  final MemberFunctionUser? user;
+  final MemberFunctionMinistry? ministry;
+  final MemberFunctionFunction? function;
+  final MemberFunctionUser? approvedByUser;
 
-  UserFunction({
+  MemberFunction({
     required this.id,
     required this.userId,
     required this.ministryId,
@@ -43,8 +43,8 @@ class UserFunction {
     this.approvedByUser,
   });
 
-  factory UserFunction.fromJson(Map<String, dynamic> json) {
-    return UserFunction(
+  factory MemberFunction.fromJson(Map<String, dynamic> json) {
+    return MemberFunction(
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',
       ministryId: json['ministryId'] ?? '',
@@ -57,10 +57,10 @@ class UserFunction {
       branchId: json['branchId'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
-      user: json['user'] != null ? UserFunctionUser.fromJson(json['user']) : null,
-      ministry: json['ministry'] != null ? UserFunctionMinistry.fromJson(json['ministry']) : null,
-      function: json['function'] != null ? UserFunctionFunction.fromJson(json['function']) : null,
-      approvedByUser: json['approvedByUser'] != null ? UserFunctionUser.fromJson(json['approvedByUser']) : null,
+      user: json['user'] != null ? MemberFunctionUser.fromJson(json['user']) : null,
+      ministry: json['ministry'] != null ? MemberFunctionMinistry.fromJson(json['ministry']) : null,
+      function: json['function'] != null ? MemberFunctionFunction.fromJson(json['function']) : null,
+      approvedByUser: json['approvedByUser'] != null ? MemberFunctionUser.fromJson(json['approvedByUser']) : null,
     );
   }
 
@@ -85,48 +85,50 @@ class UserFunction {
     };
   }
 
-  static UserFunctionStatus _parseStatus(String? status) {
+  static MemberFunctionStatus _parseStatus(String? status) {
     switch (status) {
       case 'pending':
-        return UserFunctionStatus.pending;
+        return MemberFunctionStatus.pending;
       case 'approved':
-        return UserFunctionStatus.approved;
+      case 'aprovado': // ✅ Suporte ao status em português do backend
+        return MemberFunctionStatus.approved;
       case 'rejected':
-        return UserFunctionStatus.rejected;
+      case 'rejeitado': // ✅ Suporte ao status em português do backend
+        return MemberFunctionStatus.rejected;
       default:
-        return UserFunctionStatus.pending;
+        return MemberFunctionStatus.pending;
     }
   }
 
   String get statusDisplayName {
     switch (status) {
-      case UserFunctionStatus.pending:
+      case MemberFunctionStatus.pending:
         return 'Pendente';
-      case UserFunctionStatus.approved:
+      case MemberFunctionStatus.approved:
         return 'Aprovado';
-      case UserFunctionStatus.rejected:
+      case MemberFunctionStatus.rejected:
         return 'Rejeitado';
     }
   }
 
-  bool get isApproved => status == UserFunctionStatus.approved;
-  bool get isPending => status == UserFunctionStatus.pending;
-  bool get isRejected => status == UserFunctionStatus.rejected;
+  bool get isApproved => status == MemberFunctionStatus.approved;
+  bool get isPending => status == MemberFunctionStatus.pending;
+  bool get isRejected => status == MemberFunctionStatus.rejected;
 }
 
-class UserFunctionUser {
+class MemberFunctionUser {
   final String id;
   final String name;
   final String email;
 
-  UserFunctionUser({
+  MemberFunctionUser({
     required this.id,
     required this.name,
     required this.email,
   });
 
-  factory UserFunctionUser.fromJson(Map<String, dynamic> json) {
-    return UserFunctionUser(
+  factory MemberFunctionUser.fromJson(Map<String, dynamic> json) {
+    return MemberFunctionUser(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
@@ -142,17 +144,17 @@ class UserFunctionUser {
   }
 }
 
-class UserFunctionMinistry {
+class MemberFunctionMinistry {
   final String id;
   final String name;
 
-  UserFunctionMinistry({
+  MemberFunctionMinistry({
     required this.id,
     required this.name,
   });
 
-  factory UserFunctionMinistry.fromJson(Map<String, dynamic> json) {
-    return UserFunctionMinistry(
+  factory MemberFunctionMinistry.fromJson(Map<String, dynamic> json) {
+    return MemberFunctionMinistry(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
     );
@@ -166,19 +168,19 @@ class UserFunctionMinistry {
   }
 }
 
-class UserFunctionFunction {
+class MemberFunctionFunction {
   final String id;
   final String name;
   final String? description;
 
-  UserFunctionFunction({
+  MemberFunctionFunction({
     required this.id,
     required this.name,
     this.description,
   });
 
-  factory UserFunctionFunction.fromJson(Map<String, dynamic> json) {
-    return UserFunctionFunction(
+  factory MemberFunctionFunction.fromJson(Map<String, dynamic> json) {
+    return MemberFunctionFunction(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       description: json['description'],

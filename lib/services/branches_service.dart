@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:servus_app/core/models/branch.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/core/constants/env.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class BranchesService {
   static const String baseUrl = Env.baseUrl;
@@ -56,14 +56,14 @@ class BranchesService {
         return BranchListResponse.fromJson(data);
       } else {
         if (context != null) {
-          FeedbackService.showLoadError(context, 'filiais');
+          showLoadError(context, 'filiais');
         }
         final error = json.decode(response.body);
         throw Exception(error['message'] ?? 'Erro ao buscar filiais');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showLoadError(context, 'filiais');
+        showLoadError(context, 'filiais');
       }
       throw Exception('Erro ao conectar com o servidor: $e');
     }
@@ -84,14 +84,14 @@ class BranchesService {
         return Branch.fromJson(data);
       } else {
         if (context != null) {
-          FeedbackService.showLoadError(context, 'filial');
+          showLoadError(context, 'filial');
         }
         final error = json.decode(response.body);
         throw Exception(error['message'] ?? 'Erro ao buscar filial');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showLoadError(context, 'filial');
+        showLoadError(context, 'filial');
       }
       throw Exception('Erro ao conectar com o servidor: $e');
     }
@@ -113,20 +113,20 @@ class BranchesService {
       
       if (response.statusCode == 201) {
         if (context != null) {
-          FeedbackService.showCreateSuccess(context, 'Filial');
+          showCreateSuccess(context, 'Filial');
         }
         final data = json.decode(response.body);
         return Branch.fromJson(data);
       } else {
         if (context != null) {
-          FeedbackService.showCreateError(context, 'filial');
+          showCreateError(context, 'filial');
         }
         final error = json.decode(response.body);
         throw Exception(error['message'] ?? 'Erro ao criar filial');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showCreateError(context, 'filial');
+        showCreateError(context, 'filial');
       }
       throw Exception('Erro ao conectar com o servidor: $e');
     }
@@ -157,19 +157,19 @@ class BranchesService {
       
       if (response.statusCode == 201) {
         if (context != null) {
-          FeedbackService.showCreateSuccess(context, 'Filial com administrador');
+          showCreateSuccess(context, 'Filial com administrador');
         }
         return json.decode(response.body);
       } else {
         if (context != null) {
-          FeedbackService.showCreateError(context, 'filial com administrador');
+          showCreateError(context, 'filial com administrador');
         }
         final error = json.decode(response.body);
         throw Exception(error['message'] ?? 'Erro ao criar filial com administrador');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showCreateError(context, 'filial com administrador');
+        showCreateError(context, 'filial com administrador');
       }
       throw Exception('Erro ao conectar com o servidor: $e');
     }
@@ -191,20 +191,20 @@ class BranchesService {
       
       if (response.statusCode == 200) {
         if (context != null) {
-          FeedbackService.showUpdateSuccess(context, 'Filial');
+          showUpdateSuccess(context, 'Filial');
         }
         final data = json.decode(response.body);
         return Branch.fromJson(data);
       } else {
         if (context != null) {
-          FeedbackService.showUpdateError(context, 'filial');
+          showUpdateError(context, 'filial');
         }
         final error = json.decode(response.body);
         throw Exception(error['message'] ?? 'Erro ao atualizar filial');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showUpdateError(context, 'filial');
+        showUpdateError(context, 'filial');
       }
       throw Exception('Erro ao conectar com o servidor: $e');
     }
@@ -222,18 +222,18 @@ class BranchesService {
       
       if (response.statusCode == 200) {
         if (context != null) {
-          FeedbackService.showDeleteSuccess(context, 'Filial');
+          showDeleteSuccess(context, 'Filial');
         }
       } else {
         if (context != null) {
-          FeedbackService.showDeleteError(context, 'filial');
+          showDeleteError(context, 'filial');
         }
         final error = json.decode(response.body);
         throw Exception(error['message'] ?? 'Erro ao desativar filial');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showDeleteError(context, 'filial');
+        showDeleteError(context, 'filial');
       }
       throw Exception('Erro ao conectar com o servidor: $e');
     }
@@ -251,18 +251,18 @@ class BranchesService {
       
       if (response.statusCode == 200) {
         if (context != null) {
-          FeedbackService.showDeleteSuccess(context, 'Filial');
+          showDeleteSuccess(context, 'Filial');
         }
       } else {
         if (context != null) {
-          FeedbackService.showDeleteError(context, 'filial');
+          showDeleteError(context, 'filial');
         }
         final error = json.decode(response.body);
         throw Exception(error['message'] ?? 'Erro ao remover filial');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showDeleteError(context, 'filial');
+        showDeleteError(context, 'filial');
       }
       throw Exception('Erro ao conectar com o servidor: $e');
     }

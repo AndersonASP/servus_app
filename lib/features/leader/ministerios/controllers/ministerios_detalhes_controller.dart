@@ -41,6 +41,7 @@ class MinisterioDetalhesController extends ChangeNotifier {
 
   Future<void> carregarDados() async {
     try {
+      debugPrint('🔍 [MinisterioDetalhesController] carregarDados iniciado para ministério: $ministerioId');
       isLoading = true;
       isError = false;
       errorMessage = '';
@@ -105,12 +106,9 @@ class MinisterioDetalhesController extends ChangeNotifier {
       }
 
       // Debug: Log do ID do ministério
-      print('🔍 Debug Frontend - ministryId: $ministerioId (length: ${ministerioId.length})');
-      print('🔍 Debug Frontend - refresh: $refresh, currentPage: $currentPage');
       
       // Validar se o ID do ministério é válido (aceita tanto ObjectId 24 chars quanto UUID 36 chars)
       if (ministerioId.isEmpty || (ministerioId.length != 24 && ministerioId.length != 36)) {
-        print('❌ ID do ministério inválido no frontend: $ministerioId');
         throw Exception('ID do ministério inválido');
       }
 
@@ -125,11 +123,6 @@ class MinisterioDetalhesController extends ChangeNotifier {
         throw Exception('Contexto de tenant não encontrado');
       }
 
-      print('🔍 Debug Frontend - Fazendo requisição para getMinistryMembers...');
-      print('   - tenantId: $tenantId');
-      print('   - branchId: ${branchId ?? 'null'}');
-      print('   - ministryId: $ministerioId');
-      print('   - page: $currentPage');
 
       final membersResponse = await _membershipService.getMinistryMembers(
         tenantId: tenantId,
@@ -139,11 +132,14 @@ class MinisterioDetalhesController extends ChangeNotifier {
         limit: 20,
       );
       
+      
       final membersData = membersResponse['members'] as List<dynamic>;
 
-      print('✅ Debug Frontend - ${membersData.length} membros carregados');
+      // Debug: Log dos dados recebidos
       if (membersData.isNotEmpty) {
-        print('🔍 Debug Frontend - Primeiro membro: ${membersData.first}');
+        debugPrint('📊 [MinisterioDetalhesController] ${membersData.length} membros carregados');
+      } else {
+        debugPrint('📊 [MinisterioDetalhesController] Nenhum membro encontrado');
       }
         
       if (refresh) {
@@ -170,7 +166,6 @@ class MinisterioDetalhesController extends ChangeNotifier {
       isLoadingMembers = false;
       membersErrorMessage = e.toString();
       notifyListeners();
-      print('❌ Erro ao carregar membros: $e');
     }
   }
 
@@ -184,6 +179,10 @@ class MinisterioDetalhesController extends ChangeNotifier {
   /// Remove um membro do ministério
   Future<bool> removerMembro(String membershipId) async {
     try {
+      debugPrint('🗑️ [MinisterioDetalhesController] Iniciando remoção de membro...');
+      debugPrint('   - Membership ID: $membershipId');
+      debugPrint('   - Ministry ID: $ministerioId');
+      
       // Encontrar o membro na lista local para obter o userId
       final membro = membros.firstWhere(
         (m) => m['_id'] == membershipId,
@@ -193,29 +192,67 @@ class MinisterioDetalhesController extends ChangeNotifier {
       // A nova API retorna 'userId' populated, não 'user'
       final user = membro['userId'] ?? membro['user'] ?? {};
       final userId = user['_id'] ?? membro['userId'];
+      final memberName = user['name'] ?? 'Membro';
+      final memberRole = membro['role'] ?? 'volunteer';
+      
+      debugPrint('   - User ID: $userId');
+      debugPrint('   - Member Name: $memberName');
+      debugPrint('   - Member Role: $memberRole');
+      
       if (userId == null) {
         throw Exception('ID do usuário não encontrado');
       }
 
+      // Validar permissões antes de tentar remover
+      if (memberRole == 'leader') {
+        debugPrint('⚠️ [MinisterioDetalhesController] Tentativa de remover líder do ministério');
+        // Verificar se há outros líderes no ministério
+        final otherLeaders = membros.where((m) => 
+          m['_id'] != membershipId && 
+          (m['role'] == 'Leader' || m['role'] == 'leader')
+        ).length;
+        
+        if (otherLeaders == 0) {
+          throw Exception('Não é possível remover o último líder do ministério. Adicione outro líder antes de remover este.');
+        }
+      }
+
+      debugPrint('🔗 [MinisterioDetalhesController] Chamando serviço de remoção...');
       await _ministryMembershipService.removeUserFromMinistry(
         userId: userId,
         ministryId: ministerioId,
       );
 
+      debugPrint('✅ [MinisterioDetalhesController] Membro removido com sucesso');
+      
       // Remove o membro da lista local
       membros.removeWhere((membro) => membro['_id'] == membershipId);
+      
+      // Atualizar estatísticas
       totalMembros = (totalMembros - 1).clamp(0, double.infinity).toInt();
+      if (memberRole == 'leader' || memberRole == 'Leader') {
+        totalLideres = (totalLideres - 1).clamp(0, double.infinity).toInt();
+      } else {
+        totalVoluntarios = (totalVoluntarios - 1).clamp(0, double.infinity).toInt();
+      }
+      
       notifyListeners();
+      debugPrint('📊 [MinisterioDetalhesController] Estatísticas atualizadas:');
+      debugPrint('   - Total Membros: $totalMembros');
+      debugPrint('   - Total Líderes: $totalLideres');
+      debugPrint('   - Total Voluntários: $totalVoluntarios');
+      
       return true;
     } catch (e) {
-      print('❌ Erro ao remover membro: $e');
-      return false;
+      debugPrint('❌ [MinisterioDetalhesController] Erro ao remover membro: $e');
+      rethrow; // Re-throw para que o UI possa tratar o erro específico
     }
   }
 
   /// Vincula um membro ao ministério
   Future<bool> vincularMembro(String userId, String role) async {
     try {
+      
       final membershipRole = role == 'leader' ? 'leader' : 'volunteer';
       
       await _ministryMembershipService.addUserToMinistry(
@@ -223,12 +260,17 @@ class MinisterioDetalhesController extends ChangeNotifier {
         ministryId: ministerioId,
         role: membershipRole,
       );
+      
+
+      // Aguardar um pouco para garantir que a operação foi concluída
+      await Future.delayed(const Duration(seconds: 2));
 
       // Recarregar a lista de membros
       await carregarMembros(refresh: true);
+      
+      
       return true;
     } catch (e) {
-      print('Erro ao vincular membro: $e');
       return false;
     }
   }

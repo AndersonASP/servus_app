@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/ministries/models/ministry_function.dart';
 import 'package:servus_app/features/ministries/services/ministry_functions_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class FunctionSelectorWidget extends StatefulWidget {
   final String ministryId;
@@ -46,12 +47,7 @@ class _FunctionSelectorWidgetState extends State<FunctionSelectorWidget> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao carregar funções: $e'),
-            backgroundColor: context.colors.error,
-          ),
-        );
+        showError(context, 'Erro ao carregar funções: $e');
       }
     } finally {
       setState(() {
@@ -64,9 +60,6 @@ class _FunctionSelectorWidgetState extends State<FunctionSelectorWidget> {
     if (!widget.enabled) return;
 
     // Debug: verificar tipo antes de processar
-    print('🔍 Debug _toggleFunction - selectedFunctionIds:');
-    print('   - Tipo: ${widget.selectedFunctionIds.runtimeType}');
-    print('   - Valor: ${widget.selectedFunctionIds}');
 
     // Garantir que selectedFunctionIds é uma List<String>
     final currentIds = List<String>.from(widget.selectedFunctionIds);
@@ -79,7 +72,6 @@ class _FunctionSelectorWidgetState extends State<FunctionSelectorWidget> {
       newSelectedIds.add(functionId);
     }
     
-    print('🔍 Debug _toggleFunction - newSelectedIds: $newSelectedIds');
     widget.onFunctionsChanged(newSelectedIds);
   }
 
@@ -98,7 +90,7 @@ class _FunctionSelectorWidgetState extends State<FunctionSelectorWidget> {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: context.colors.surfaceVariant.withOpacity(0.3),
+          color: context.colors.surfaceContainerHighest.withOpacity(0.3),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: context.colors.outline.withOpacity(0.3),
@@ -141,9 +133,6 @@ class _FunctionSelectorWidgetState extends State<FunctionSelectorWidget> {
           runSpacing: 8,
           children: _availableFunctions.map((function) {
             // Debug: verificar tipo dos selectedFunctionIds
-            print('🔍 Debug FunctionSelector - selectedFunctionIds:');
-            print('   - Tipo: ${widget.selectedFunctionIds.runtimeType}');
-            print('   - Valor: ${widget.selectedFunctionIds}');
             
             // Garantir que selectedFunctionIds é uma List<String>
             final selectedIds = List<String>.from(widget.selectedFunctionIds);
@@ -158,7 +147,7 @@ class _FunctionSelectorWidgetState extends State<FunctionSelectorWidget> {
                 decoration: BoxDecoration(
                   color: isSelected 
                     ? context.colors.primary 
-                    : context.colors.surfaceVariant,
+                    : context.colors.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected 

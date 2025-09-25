@@ -370,7 +370,7 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
             Switch(
               value: controller.ativo,
               onChanged: controller.toggleAtivo,
-              activeColor: context.colors.primary,
+              activeThumbColor: context.colors.primary,
             ),
             const SizedBox(width: 12),
             Expanded(

@@ -3,8 +3,9 @@ import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/core/theme/color_scheme.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/shared/widgets/fab_safe_scroll_view.dart';
-import 'package:servus_app/features/ministries/services/user_function_service.dart';
-import 'package:servus_app/features/ministries/models/user_function.dart';
+import 'package:servus_app/features/ministries/services/member_function_service.dart';
+import 'package:servus_app/features/ministries/models/member_function.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class MemberDetailsScreen extends StatefulWidget {
   final Member member;
@@ -19,8 +20,8 @@ class MemberDetailsScreen extends StatefulWidget {
 }
 
 class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
-  final UserFunctionService _userFunctionService = UserFunctionService();
-  List<UserFunction> _approvedFunctions = [];
+  final MemberFunctionService _memberFunctionService = MemberFunctionService();
+  List<MemberFunction> _approvedFunctions = [];
   bool _isLoadingFunctions = true;
 
   @override
@@ -38,7 +39,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
     }
 
     try {
-      final functions = await _userFunctionService.getApprovedFunctionsForUser(
+      final functions = await _memberFunctionService.getApprovedFunctionsForUser(
         userId: widget.member.id,
       );
       setState(() {
@@ -107,9 +108,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           // TODO: Implementar edição
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Funcionalidade de edição em desenvolvimento')),
-          );
+          showInfo(context, 'Funcionalidade de edição em desenvolvimento');
         },
         icon: const Icon(Icons.edit),
         label: const Text('Editar Membro'),
@@ -244,7 +243,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
             ),
             const SizedBox(height: 16),
             if (widget.member.phone != null) _buildInfoRow('Telefone', widget.member.phone!),
-            if (widget.member.birthDate != null) _buildInfoRow('Data de Nascimento', widget.member.birthDate!),
+            if (widget.member.birthDate != null) _buildInfoRow('Data de Nascimento', _formatBirthDate(widget.member.birthDate!)),
             _buildInfoRow('Role Global', _normalizeRole(widget.member.role)),
             _buildInfoRow('Membro desde', _formatDate(widget.member.createdAt)),
           ],
@@ -254,7 +253,8 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
   }
 
   Widget _buildMemberships() {
-    if (widget.member.memberships.isEmpty) {
+    final activeMemberships = widget.member.memberships.where((m) => m.isActive).toList();
+    if (activeMemberships.isEmpty) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -293,7 +293,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ...widget.member.memberships.map((membership) => _buildMembershipCard(membership)),
+            ...activeMemberships.map((membership) => _buildMembershipCard(membership)),
           ],
         ),
       ),
@@ -406,7 +406,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: context.colors.surfaceVariant.withOpacity(0.3),
+                  color: context.colors.surfaceContainerHighest.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -430,7 +430,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
               )
             else
               Column(
-                children: _approvedFunctions.map((userFunction) => _buildFunctionCard(userFunction)).toList(),
+                children: _approvedFunctions.map((memberFunction) => _buildFunctionCard(memberFunction)).toList(),
               ),
           ],
         ),
@@ -438,7 +438,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
     );
   }
 
-  Widget _buildFunctionCard(UserFunction userFunction) {
+  Widget _buildFunctionCard(MemberFunction memberFunction) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -455,14 +455,14 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
           Row(
             children: [
               Icon(
-                Icons.check_circle,
-                color: context.colors.primary,
+                _getStatusIcon(memberFunction.status),
+                color: _getStatusColor(memberFunction.status),
                 size: 20,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  userFunction.function?.name ?? 'Função',
+                  memberFunction.function?.name ?? 'Função',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -473,11 +473,11 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: ServusColors.success,
+                  color: _getStatusColor(memberFunction.status),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Aprovada',
+                  memberFunction.statusDisplayName,
                   style: TextStyle(
                     color: context.colors.onPrimary,
                     fontSize: 12,
@@ -487,10 +487,10 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
               ),
             ],
           ),
-          if (userFunction.function?.description != null) ...[
+          if (memberFunction.function?.description != null) ...[
             const SizedBox(height: 8),
             Text(
-              userFunction.function!.description!,
+              memberFunction.function!.description!,
               style: TextStyle(
                 fontSize: 14,
                 color: context.colors.onSurfaceVariant,
@@ -507,7 +507,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
               ),
               const SizedBox(width: 4),
               Text(
-                'Ministério: ${userFunction.ministry?.name ?? 'N/A'}',
+                'Ministério: ${memberFunction.ministry?.name ?? 'N/A'}',
                 style: TextStyle(
                   fontSize: 14,
                   color: context.colors.onSurfaceVariant,
@@ -515,7 +515,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
               ),
             ],
           ),
-          if (userFunction.approvedAt != null) ...[
+          if (memberFunction.approvedAt != null) ...[
             const SizedBox(height: 4),
             Row(
               children: [
@@ -526,7 +526,7 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  'Aprovada em: ${_formatDate(userFunction.approvedAt!)}',
+                  'Aprovada em: ${_formatDate(memberFunction.approvedAt!)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: context.colors.onSurfaceVariant,
@@ -540,49 +540,6 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
     );
   }
 
-  Widget _buildAdditionalInfo() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Informações Adicionais',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (widget.member.bio != null) ...[
-              _buildInfoRow('Biografia', widget.member.bio!),
-              const SizedBox(height: 16),
-            ],
-            if (widget.member.availability != null)
-              _buildInfoRow('Disponibilidade', widget.member.availability!),
-            if (widget.member.skills != null && widget.member.skills!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Habilidades',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: widget.member.skills!.map((skill) => Chip(
-                  label: Text(skill),
-                )).toList(),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildAddress() {
     final address = widget.member.address!;
@@ -638,5 +595,38 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  String _formatBirthDate(String birthDate) {
+    try {
+      // Tenta converter string para DateTime
+      final date = DateTime.parse(birthDate);
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    } catch (e) {
+      // Se não conseguir converter, retorna a string original
+      return birthDate;
+    }
+  }
+
+  Color _getStatusColor(MemberFunctionStatus status) {
+    switch (status) {
+      case MemberFunctionStatus.approved:
+        return ServusColors.success;
+      case MemberFunctionStatus.pending:
+        return Colors.orange;
+      case MemberFunctionStatus.rejected:
+        return Colors.red;
+    }
+  }
+
+  IconData _getStatusIcon(MemberFunctionStatus status) {
+    switch (status) {
+      case MemberFunctionStatus.approved:
+        return Icons.check_circle;
+      case MemberFunctionStatus.pending:
+        return Icons.pending;
+      case MemberFunctionStatus.rejected:
+        return Icons.cancel;
+    }
   }
 }

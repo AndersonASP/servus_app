@@ -53,10 +53,12 @@ class DrawerMenuVoluntario extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
-                  // Membros (visível para tenant_admin, branch_admin e leader)
-                  if (usuario!.role == UserRole.tenant_admin || 
-                      usuario.role == UserRole.branch_admin || 
-                      usuario.role == UserRole.leader)
+                  // Membros (visível apenas quando NÃO está visualizando como voluntário)
+                  // Ou seja, só aparece se o usuário está realmente logado como admin/líder
+                  if (modoAtual != 'Voluntário' && 
+                      (usuario!.role == UserRole.tenant_admin || 
+                       usuario.role == UserRole.branch_admin || 
+                       usuario.role == UserRole.leader))
                     ListTile(
                       leading: const Icon(Icons.group_add),
                       title: const Text('Membros'),

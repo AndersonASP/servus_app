@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class MembershipService {
   final Dio dio = DioClient.instance;
@@ -67,19 +67,19 @@ class MembershipService {
         };
       } else {
         if (context != null) {
-          FeedbackService.showLoadError(context, 'contagem de membros');
+          showLoadError(context, 'contagem de membros');
         }
         throw Exception('Erro ao obter contagem de membros: ${response.statusCode}');
       }
     } on DioException catch (e) {
       if (context != null) {
-        FeedbackService.showLoadError(context, 'contagem de membros');
+        showLoadError(context, 'contagem de membros');
       }
       throw Exception(_handleDioError(e));
           } catch (e) {
         // Retorna dados mockados como fallback
         if (context != null) {
-          FeedbackService.showLoadError(context, 'contagem de membros');
+          showLoadError(context, 'contagem de membros');
         }
         return {
           'volunteers': 0,
@@ -151,13 +151,13 @@ class MembershipService {
         return response.data;
       } else {
         if (context != null) {
-          FeedbackService.showLoadError(context, 'membros do ministério');
+          showLoadError(context, 'membros do ministério');
         }
         throw Exception('Erro ao obter voluntários: ${response.statusCode}');
       }
     } on DioException catch (e) {
       if (context != null) {
-        FeedbackService.showLoadError(context, 'membros do ministério');
+        showLoadError(context, 'membros do ministério');
       }
       throw Exception(_handleDioError(e));
     }
@@ -210,18 +210,18 @@ class MembershipService {
 
       if (response.statusCode == 201) {
         if (context != null) {
-          FeedbackService.showCreateSuccess(context, 'Voluntário');
+          showCreateSuccess(context, 'Voluntário');
         }
         return response.data;
       } else {
         if (context != null) {
-          FeedbackService.showCreateError(context, 'voluntário');
+          showCreateError(context, 'voluntário');
         }
         throw Exception('Erro ao adicionar voluntário: ${response.statusCode}');
       }
     } on DioException catch (e) {
       if (context != null) {
-        FeedbackService.showCreateError(context, 'voluntário');
+        showCreateError(context, 'voluntário');
       }
       throw Exception(_handleDioError(e));
     }
@@ -274,18 +274,18 @@ class MembershipService {
 
       if (response.statusCode == 201) {
         if (context != null) {
-          FeedbackService.showCreateSuccess(context, 'Líder');
+          showCreateSuccess(context, 'Líder');
         }
         return response.data;
       } else {
         if (context != null) {
-          FeedbackService.showCreateError(context, 'líder');
+          showCreateError(context, 'líder');
         }
         throw Exception('Erro ao adicionar líder: ${response.statusCode}');
       }
     } on DioException catch (e) {
       if (context != null) {
-        FeedbackService.showCreateError(context, 'líder');
+        showCreateError(context, 'líder');
       }
       throw Exception(_handleDioError(e));
     }
@@ -300,14 +300,8 @@ class MembershipService {
     BuildContext? context,
   }) async {
     try {
-      print('🗑️ [MembershipService] removeMinistryMember iniciado');
-      print('   - tenantId: $tenantId');
-      print('   - branchId: $branchId');
-      print('   - ministryId: $ministryId');
-      print('   - membershipId: $membershipId');
       
       final deviceId = await TokenService.getDeviceId();
-      print('   - deviceId: $deviceId');
 
       // 🆕 CORREÇÃO: Usa rota diferente para matriz vs filial
       final String url;
@@ -321,7 +315,6 @@ class MembershipService {
           'device-id': deviceId,
           'x-tenant-id': tenantId,
         };
-        print('   - Usando rota da matriz: $url');
       } else {
         // 🏪 Ministério de filial específica
         url = '/memberships/tenants/$tenantId/branches/$branchId/ministries/$ministryId/members/$membershipId';
@@ -330,45 +323,34 @@ class MembershipService {
           'x-tenant-id': tenantId,
           'x-branch-id': branchId,
         };
-        print('   - Usando rota da filial: $url');
       }
       
-      print('   - Headers: $headers');
 
-      print('   - Fazendo requisição DELETE...');
       final response = await dio.delete(
         url,
         options: Options(headers: headers),
       );
 
-      print('   - Resposta recebida: ${response.statusCode}');
-      print('   - Dados da resposta: ${response.data}');
 
       if (response.statusCode == 204) {
-        print('✅ Membro removido com sucesso');
         if (context != null) {
-          FeedbackService.showDeleteSuccess(context, 'Membro');
+          showDeleteSuccess(context, 'Membro');
         }
         return true;
       } else {
-        print('❌ Erro na resposta: ${response.statusCode}');
         if (context != null) {
-          FeedbackService.showDeleteError(context, 'membro');
+          showDeleteError(context, 'membro');
         }
         throw Exception('Erro ao remover membro: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      print('❌ DioException ao remover membro: $e');
-      print('   - Status code: ${e.response?.statusCode}');
-      print('   - Response data: ${e.response?.data}');
       if (context != null) {
-        FeedbackService.showDeleteError(context, 'membro');
+        showDeleteError(context, 'membro');
       }
       throw Exception(_handleDioError(e));
     } catch (e) {
-      print('❌ Erro geral ao remover membro: $e');
       if (context != null) {
-        FeedbackService.showDeleteError(context, 'membro');
+        showDeleteError(context, 'membro');
       }
       rethrow;
     }

@@ -4,6 +4,7 @@ import 'package:servus_app/core/enums/user_role.dart';
 import 'package:servus_app/core/models/usuario_logado.dart';
 import 'package:servus_app/services/local_storage_service.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/services/auth_integration_service.dart';
 
 class AuthState extends ChangeNotifier {
   UsuarioLogado? _usuario;
@@ -20,6 +21,10 @@ class AuthState extends ChangeNotifier {
   void login(UsuarioLogado usuario) async {
     _usuario = usuario;
     await LocalStorageService.salvarUsuario(usuario);
+    
+    // Integrar contexto de autenticação
+    AuthIntegrationService.instance.integrateWithUsuarioLogado(usuario);
+    
     notifyListeners();
   }
 
@@ -30,10 +35,16 @@ class AuthState extends ChangeNotifier {
       _usuario = null;
       await LocalStorageService.limparDados();
       await TokenService.clearAll();
+      
+      // Limpar contexto de autenticação
+      AuthIntegrationService.instance.integrateWithUsuarioLogado(null);
     } catch (_) {
       _usuario = null;
       await LocalStorageService.limparDados();
       await TokenService.clearAll();
+      
+      // Limpar contexto de autenticação mesmo em caso de erro
+      AuthIntegrationService.instance.integrateWithUsuarioLogado(null);
     } finally {
       setLoading(false);
       notifyListeners();
@@ -50,10 +61,18 @@ class AuthState extends ChangeNotifier {
   Future<void> carregarUsuarioDoLocalStorage() async {
     try {
       setLoading(true);
+      
       final usuario = await LocalStorageService.carregarUsuario();
+      
       if (usuario != null) {
+        
         _usuario = usuario;
+        
+        // Integrar contexto de autenticação
+        AuthIntegrationService.instance.integrateWithUsuarioLogado(usuario);
+        
         notifyListeners();
+      } else {
       }
     } finally {
       setLoading(false);
@@ -96,6 +115,10 @@ class AuthState extends ChangeNotifier {
         final usuario = AuthService().convertToUsuarioLogado(loginResponse);
         _usuario = usuario;
         await LocalStorageService.salvarUsuario(usuario);
+        
+        // Integrar contexto de autenticação
+        AuthIntegrationService.instance.integrateWithUsuarioLogado(usuario);
+        
         notifyListeners();
       }
     } finally {

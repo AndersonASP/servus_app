@@ -8,13 +8,20 @@ import 'package:servus_app/features/ministries/services/ministry_service.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/features/members/widgets/function_selector_widget.dart';
-import 'package:servus_app/features/ministries/services/user_function_service.dart';
+import 'package:servus_app/features/ministries/services/member_function_service.dart';
 import 'package:servus_app/features/ministries/services/ministry_functions_service.dart';
 import 'package:servus_app/features/ministries/models/ministry_function.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class CreateMemberScreen extends StatefulWidget {
-  const CreateMemberScreen({super.key});
+  final bool restrictToVolunteer;
+  final bool restrictToLeaderMinistry;
+  
+  const CreateMemberScreen({
+    super.key,
+    this.restrictToVolunteer = false,
+    this.restrictToLeaderMinistry = false,
+  });
 
   @override
   State<CreateMemberScreen> createState() => _CreateMemberScreenState();
@@ -36,12 +43,17 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
   
   // Serviços
   final MinistryService _ministryService = MinistryService();
-  final UserFunctionService _userFunctionService = UserFunctionService();
   final MinistryFunctionsService _ministryFunctionsService = MinistryFunctionsService();
+  final MemberFunctionService _memberFunctionService = MemberFunctionService();
   
   // Dados do contexto
   String? _tenantId;
   String? _branchId;
+  
+  // Dados do usuário atual
+  String? _currentUserRole;
+  String? _currentUserMembershipRole;
+  String? _leaderMinistryId;
   
   bool _isLoading = false;
   int _currentStep = 0;
@@ -50,16 +62,70 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
   void initState() {
     super.initState();
     _clearAllCache();
+    _loadUserData();
     _loadBranchesAndMinistries();
   }
 
   /// Limpar todo o cache do frontend
   void _clearAllCache() {
-    print('🧹 Limpando todo o cache do frontend...');
     _availableMinistries.clear();
     _ministryFunctions.clear();
     _memberships.clear();
-    print('✅ Cache limpo com sucesso');
+  }
+
+  /// Carregar dados do usuário atual
+  Future<void> _loadUserData() async {
+    try {
+      _currentUserRole = TokenService.userRole;
+      _currentUserMembershipRole = TokenService.membershipRole;
+      
+      debugPrint('🔐 Dados do usuário atual:');
+      debugPrint('   - User Role: $_currentUserRole');
+      debugPrint('   - Membership Role: $_currentUserMembershipRole');
+      
+      // Se for líder, buscar o ministério do líder
+      if (_currentUserMembershipRole == 'leader') {
+        // TODO: Implementar busca do ministério do líder
+        // Por enquanto, vamos usar um valor mock
+        _leaderMinistryId = '68d1b58da422169502e5e765'; // ID do ministério "Estacionamento"
+        debugPrint('   - Leader Ministry ID: $_leaderMinistryId');
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao carregar dados do usuário: $e');
+    }
+  }
+
+  /// Obter roles disponíveis baseado no usuário atual
+  List<DropdownMenuItem<String>> _getAvailableRoles() {
+    // Se for líder ou se há restrição para voluntário, apenas voluntário
+    if (_currentUserMembershipRole == 'leader' || widget.restrictToVolunteer) {
+      return const [
+        DropdownMenuItem(
+          value: 'volunteer', 
+          child: Text('Voluntário'),
+        ),
+      ];
+    }
+    
+    // Para tenant_admin e branch_admin, todas as opções
+    return const [
+      DropdownMenuItem(
+        value: 'tenant_admin', 
+        child: Text('Administrador da Igreja (Sede)'),
+      ),
+      DropdownMenuItem(
+        value: 'branch_admin', 
+        child: Text('Administrador de Campus'),
+      ),
+      DropdownMenuItem(
+        value: 'leader', 
+        child: Text('Líder de Ministério'),
+      ),
+      DropdownMenuItem(
+        value: 'volunteer', 
+        child: Text('Voluntário'),
+      ),
+    ];
   }
 
   @override
@@ -81,18 +147,18 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
       return;
     }
 
-    // Validar se pelo menos um vínculo foi adicionado
-    if (_memberships.isEmpty) {
-      FeedbackService.showValidationError(context, 'Adicione pelo menos um vínculo organizacional');
-      return;
-    }
+    // Permitir criação sem vínculos - o usuário pode ser adicionado sem ministério inicialmente
+    // if (_memberships.isEmpty) {
+    //   showValidationError(context, 'Adicione pelo menos um vínculo organizacional');
+    //   return;
+    // }
 
     // Validar e corrigir vínculos duplicados (prioriza Líder sobre Voluntário)
     _validateAndFixDuplicateMemberships();
 
-    // Validar dados obrigatórios dos vínculos
-    if (!_validateMemberships()) {
-      FeedbackService.showValidationError(context, 'Preencha todos os campos obrigatórios dos vínculos.');
+    // Validar dados obrigatórios dos vínculos (apenas se houver vínculos)
+    if (_memberships.isNotEmpty && !_validateMemberships()) {
+      showValidationError(context, 'Preencha todos os campos obrigatórios dos vínculos.');
       return;
     }
 
@@ -107,12 +173,11 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         (member) => member.email.toLowerCase() == _emailController.text.trim().toLowerCase()
       );
       if (emailExists) {
-        FeedbackService.showValidationError(context, 'Já existe um usuário com este email. Use um email diferente.');
+        showValidationError(context, 'Já existe um usuário com este email. Use um email diferente.');
         return;
       }
     } catch (e) {
       // Se der erro na verificação, continuar (pode ser que o filtro não funcione)
-      print('Erro ao verificar email existente: $e');
     }
 
     setState(() {
@@ -120,27 +185,42 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
     });
 
     try {
+      debugPrint('🔄 Criando ${widget.restrictToVolunteer ? 'voluntário' : 'membro'}...');
+      debugPrint('📋 Dados do ${widget.restrictToVolunteer ? 'voluntário' : 'membro'}:');
+      debugPrint('   - Nome: ${_nameController.text.trim()}');
+      debugPrint('   - Email: ${_emailController.text.trim()}');
+      debugPrint('   - Telefone: ${_phoneController.text.trim()}');
+      debugPrint('   - Data nascimento: ${_birthDateController.text.trim()}');
+      debugPrint('   - Memberships: ${_memberships.length}');
+      
+      for (int i = 0; i < _memberships.length; i++) {
+        final membership = _memberships[i];
+        debugPrint('   - Membership $i: role=${membership.role}, ministryId=${membership.ministryId}, branchId=${membership.branchId}');
+      }
+
       final request = CreateMemberRequest(
         name: _nameController.text.trim(),
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-        birthDate: _birthDateController.text.trim().isEmpty ? null : _birthDateController.text.trim(),
+        birthDate: _birthDateController.text.trim().isEmpty ? null : _formatDateForBackend(_birthDateController.text.trim()),
         memberships: _memberships,
       );
 
+      debugPrint('📤 Enviando requisição para criar ${widget.restrictToVolunteer ? 'voluntário' : 'membro'}...');
       final member = await MembersService.createMember(request, context);
+      debugPrint('✅ ${widget.restrictToVolunteer ? 'Voluntário' : 'Membro'} criado com sucesso: ${member.id}');
       
-      // Criar vínculos UserFunction para funções selecionadas
-      final userFunctionSuccess = await _createUserFunctions(member.id);
+      // Criar vínculos MemberFunction para funções selecionadas
+      final memberFunctionSuccess = await _createMemberFunctions(member.id);
       
       if (mounted) {
-        if (userFunctionSuccess) {
+        if (memberFunctionSuccess) {
           Navigator.pop(context, true);
-          FeedbackService.showCreateSuccess(context, 'Membro');
+          showCreateSuccess(context, widget.restrictToVolunteer ? 'Voluntário' : 'Membro');
         } else {
           // Membro foi criado mas vínculos falharam
           Navigator.pop(context, true);
-          FeedbackService.showWarning(context, 'Membro criado, mas alguns vínculos de funções falharam. Verifique os detalhes do membro.');
+          showWarning(context, widget.restrictToVolunteer ? 'Voluntário criado, mas alguns vínculos de funções falharam. Verifique os detalhes do voluntário.' : 'Membro criado, mas alguns vínculos de funções falharam. Verifique os detalhes do membro.');
         }
       }
     } catch (e) {
@@ -259,7 +339,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
       });
       
       // Mostrar aviso sobre a correção
-      FeedbackService.showInfo(
+      showInfo(
         context, 
         'Vínculos duplicados foram corrigidos. Líder tem prioridade e mantém todas as funções para escalas.'
       );
@@ -276,13 +356,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         return false;
       }
       
-      // Para branch_admin, leader e volunteer, ministry é obrigatório
-      if ((membership.role == 'branch_admin' || 
-           membership.role == 'leader' || 
-           membership.role == 'volunteer') && 
-          (membership.ministryId == null || membership.ministryId!.isEmpty)) {
-        return false;
-      }
+      // Ministério agora é opcional para todos os roles
+      // Removida a validação obrigatória de ministério
       
       // Para branch_admin, branch é obrigatório
       if (membership.role == 'branch_admin' && 
@@ -309,7 +384,11 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
 
   /// Trata erros específicos na criação do membro
   void _handleCreateMemberError(dynamic error) {
-    String errorMessage = 'Erro ao criar membro';
+    debugPrint('❌ Erro ao criar ${widget.restrictToVolunteer ? 'voluntário' : 'membro'}: $error');
+    debugPrint('❌ Tipo do erro: ${error.runtimeType}');
+    debugPrint('❌ Stack trace: ${StackTrace.current}');
+    
+    String errorMessage = widget.restrictToVolunteer ? 'Erro ao criar voluntário' : 'Erro ao criar membro';
     
     if (error.toString().contains('E11000') || 
         error.toString().contains('duplicate key') ||
@@ -329,13 +408,14 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
       errorMessage = 'Sessão expirada. Faça login novamente.';
     } else if (error.toString().contains('403') || 
                error.toString().contains('Forbidden')) {
-      errorMessage = 'Você não tem permissão para criar membros.';
+      errorMessage = widget.restrictToVolunteer ? 'Você não tem permissão para criar voluntários.' : 'Você não tem permissão para criar membros.';
     } else if (error.toString().contains('400') || 
                error.toString().contains('Bad Request')) {
       errorMessage = 'Dados inválidos. Verifique as informações fornecidas.';
     }
     
-    FeedbackService.showError(context, errorMessage);
+    debugPrint('❌ Mensagem de erro final: $errorMessage');
+    showError(context, errorMessage);
   }
 
   void _resetForm() {
@@ -348,6 +428,27 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
       _showBranchSelection = false;
       _currentStep = 0;
     });
+  }
+
+  /// Converte data do formato brasileiro (DD/MM/YYYY) para ISO (YYYY-MM-DD)
+  String? _formatDateForBackend(String dateText) {
+    if (dateText.isEmpty) return null;
+    
+    try {
+      // Verifica se está no formato brasileiro DD/MM/YYYY
+      final parts = dateText.split('/');
+      if (parts.length == 3) {
+        final day = parts[0].padLeft(2, '0');
+        final month = parts[1].padLeft(2, '0');
+        final year = parts[2];
+        return '$year-$month-$day'; // Formato ISO
+      }
+      
+      // Se já estiver no formato ISO, retorna como está
+      return dateText;
+    } catch (e) {
+      return null;
+    }
   }
 
   Widget _buildCurrentStepContent() {
@@ -450,7 +551,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
               lastDate: DateTime.now(),
             );
             if (date != null) {
-              _birthDateController.text = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+              // Formato brasileiro: DD/MM/YYYY
+              _birthDateController.text = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
             }
           },
         ),
@@ -470,8 +572,81 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                 color: context.colors.onSurface,
               ),
             ),
+            // Mostrar "Opcional" apenas para tenant_admin e branch_admin
+            if (_currentUserMembershipRole != 'leader') ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Text(
+                  'Opcional',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
+        const SizedBox(height: 8),
+        // Mostrar mensagem diferente para líderes
+        if (_currentUserMembershipRole == 'leader') ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Como líder, você pode vincular voluntários ao seu ministério.',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.amber.shade700, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Você pode criar o membro sem vínculos e adicionar ministérios posteriormente.',
+                    style: TextStyle(
+                      color: Colors.amber.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         if (_memberships.isEmpty)
           Column(
@@ -482,15 +657,40 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                   border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Center(
-                  child: Text(
-                    'Nenhum vínculo adicionado.\nClique em "Adicionar Vínculo" para começar.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.people_outline,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Nenhum vínculo adicionado',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _currentUserMembershipRole == 'leader' 
+                          ? 'Clique em "Adicionar Vínculo" para vincular um voluntário ao seu ministério'
+                          : 'Clique em "Adicionar Vínculo" para vincular a um ministério',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
+              // Botão "Adicionar Vínculo" sempre aparece quando não há vínculos
               Center(
                 child: ElevatedButton.icon(
                   onPressed: _addMembership,
@@ -509,10 +709,10 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
             final index = entry.key;
             final membership = entry.value;
             return _buildMembershipCard(index, membership);
-          }).toList(),
+          }),
         
-        // Botão de adicionar vínculo após os cards
-        if (_memberships.isNotEmpty) ...[
+        // Botão de adicionar vínculo após os cards (não mostrar para líderes)
+        if (_memberships.isNotEmpty && _currentUserMembershipRole != 'leader') ...[
           const SizedBox(height: 16),
           Center(
             child: ElevatedButton.icon(
@@ -569,7 +769,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: false,
-        title: const Text('Criar novo membro'),
+        title: Text(widget.restrictToVolunteer ? 'Criar novo voluntário' : 'Criar novo membro'),
         actions: [
           // Botão de voltar step
           if (_currentStep > 0)
@@ -621,7 +821,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
             : Icon(_currentStep < 2 ? Icons.arrow_forward : Icons.check),
         label: _isLoading
             ? const Text('Criando...')
-            : Text(_currentStep == 0 ? 'Próximo' : _currentStep == 1 ? 'Próximo' : 'Criar Membro'),
+            : Text(_currentStep == 0 ? 'Próximo' : _currentStep == 1 ? 'Próximo' : (widget.restrictToVolunteer ? 'Criar Voluntário' : 'Criar Membro')),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
@@ -635,12 +835,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         setState(() => _currentStep = 1);
       }
     } else if (_currentStep == 1) {
-      // Validar vínculos antes de prosseguir
-      if (_memberships.isNotEmpty) {
-        setState(() => _currentStep = 2);
-      } else {
-        FeedbackService.showValidationError(context, 'Adicione pelo menos um vínculo organizacional');
-      }
+      // Permitir prosseguir mesmo sem vínculos - o usuário pode ser adicionado sem ministério
+      setState(() => _currentStep = 2);
     } else {
       // Último step - criar membro
       _createMember();
@@ -655,6 +851,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
           'Resumo das Informações',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
+            color: context.colors.onSurface,
           ),
         ),
         const SizedBox(height: 16),
@@ -670,7 +867,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                   'Dados Básicos',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
+                    color: context.colors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -699,16 +896,34 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                   'Vínculos Organizacionais',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
+                    color: context.colors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
                 if (_memberships.isEmpty)
-                  const Text(
-                    'Nenhum vínculo adicionado',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontStyle: FontStyle.italic,
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.colors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.grey.shade600, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Nenhum vínculo adicionado - membro será criado sem ministério',
+                            style: TextStyle(
+                              fontStyle: FontStyle.italic,
+                              fontSize: 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else
@@ -716,7 +931,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                     final index = entry.key;
                     final membership = entry.value;
                     return _buildMembershipSummary(index + 1, membership);
-                  }).toList(),
+                  }),
               ],
             ),
           ),
@@ -726,7 +941,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         
         // Informação sobre senha
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.blue.shade50,
             borderRadius: BorderRadius.circular(8),
@@ -774,6 +989,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
               style: const TextStyle(
                 fontWeight: FontWeight.w400,
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
         ],
@@ -801,7 +1018,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          _buildSummaryRow('Role', _getRoleDisplayName(membership.role)),
+          _buildSummaryRow('Nível de acesso', _getRoleDisplayName(membership.role)),
           if (membership.branchId != null)
             _buildSummaryRow('Branch', _getBranchName(membership.branchId!)),
           if (membership.ministryId != null)
@@ -893,7 +1110,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
           style: TextStyle(
             fontSize: 12,
             color: isActive || isCompleted 
-              ? Theme.of(context).primaryColor 
+              ? context.colors.onSurface
               : Colors.grey[600],
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
@@ -938,10 +1155,10 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
     }
   }
 
-  /// Criar vínculos UserFunction para as funções selecionadas (voluntários e líderes)
-  Future<bool> _createUserFunctions(String userId) async {
+  /// Criar vínculos MemberFunction para as funções selecionadas (voluntários e líderes)
+  Future<bool> _createMemberFunctions(String userId) async {
     try {
-      debugPrint('🔄 Iniciando criação de vínculos UserFunction para usuário: $userId');
+      debugPrint('🔄 Iniciando criação de vínculos MemberFunction para usuário: $userId');
       debugPrint('📋 Total de memberships: ${_memberships.length}');
       
       // Verificar se o usuário atual é tenant ou leader para aprovação automática
@@ -965,58 +1182,67 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         // Criar funções para voluntários e líderes
         if ((membership.role == 'volunteer' || membership.role == 'leader') && 
             membership.ministryId != null && 
-            membership.ministryId!.isNotEmpty &&
-            membership.functionIds.isNotEmpty) {
+            membership.ministryId!.isNotEmpty) {
           
-          // Validar se os IDs são válidos (24 caracteres hexadecimais)
-          if (!_isValidObjectId(userId)) {
-            debugPrint('❌ ID do usuário inválido: $userId');
-            errorCount++;
-            continue;
+          // Para líderes, carregar todas as funções do ministério automaticamente
+          List<String> functionIdsToCreate = membership.functionIds;
+          if (membership.role == 'leader' && functionIdsToCreate.isEmpty) {
+            debugPrint('🔄 Carregando todas as funções do ministério para líder: ${membership.ministryId}');
+            functionIdsToCreate = _getAllMinistryFunctionIds(membership.ministryId!);
+            debugPrint('📋 Funções carregadas para líder: ${functionIdsToCreate.length}');
           }
           
-          if (!_isValidObjectId(membership.ministryId!)) {
-            debugPrint('❌ ID do ministério inválido: ${membership.ministryId}');
-            errorCount++;
-            continue;
-          }
-          
-          for (final functionId in membership.functionIds) {
-            totalFunctions++;
-            
-            if (!_isValidObjectId(functionId)) {
-              debugPrint('❌ ID da função inválido: $functionId');
+          if (functionIdsToCreate.isNotEmpty) {
+            // Validar se os IDs são válidos (24 caracteres hexadecimais)
+            if (!_isValidObjectId(userId)) {
+              debugPrint('❌ ID do usuário inválido: $userId');
               errorCount++;
               continue;
             }
             
-            try {
-              debugPrint('✅ Criando UserFunction: userId=$userId (${userId.length} chars), ministryId=${membership.ministryId} (${membership.ministryId!.length} chars), functionId=$functionId (${functionId.length} chars)');
-              await _userFunctionService.createUserFunction(
-                userId: userId,
-                ministryId: membership.ministryId!,
-                functionId: functionId,
-                status: shouldAutoApprove ? 'approved' : null, // Aprovar automaticamente se for tenant ou leader
-                context: context,
-              );
-              successCount++;
-              debugPrint('✅ UserFunction criado com sucesso${shouldAutoApprove ? ' (aprovado automaticamente)' : ''}');
-            } catch (e) {
+            if (!_isValidObjectId(membership.ministryId!)) {
+              debugPrint('❌ ID do ministério inválido: ${membership.ministryId}');
               errorCount++;
-              debugPrint('❌ Erro ao criar UserFunction: $e');
+              continue;
+            }
+            
+            for (final functionId in functionIdsToCreate) {
+              totalFunctions++;
+              
+              if (!_isValidObjectId(functionId)) {
+                debugPrint('❌ ID da função inválido: $functionId');
+                errorCount++;
+                continue;
+              }
+              
+              try {
+                debugPrint('✅ Criando MemberFunction: userId=$userId (${userId.length} chars), ministryId=${membership.ministryId} (${membership.ministryId!.length} chars), functionId=$functionId (${functionId.length} chars)');
+                await _memberFunctionService.createMemberFunction(
+                  userId: userId,
+                  ministryId: membership.ministryId!,
+                  functionId: functionId,
+                  status: shouldAutoApprove ? 'aprovado' : null, // Aprovar automaticamente se for tenant ou leader
+                  context: context,
+                );
+                successCount++;
+                debugPrint('✅ MemberFunction criado com sucesso${shouldAutoApprove ? ' (aprovado automaticamente)' : ''}');
+              } catch (e) {
+                errorCount++;
+                debugPrint('❌ Erro ao criar MemberFunction: $e');
+              }
             }
           }
         }
       }
       
-      debugPrint('📊 Resumo da criação de UserFunctions:');
+      debugPrint('📊 Resumo da criação de MemberFunctions:');
       debugPrint('   - Total de funções: $totalFunctions');
       debugPrint('   - Sucessos: $successCount');
       debugPrint('   - Erros: $errorCount');
       
       return errorCount == 0;
     } catch (e) {
-      debugPrint('❌ Erro geral ao criar vínculos UserFunction: $e');
+      debugPrint('❌ Erro geral ao criar vínculos MemberFunction: $e');
       return false;
     }
   }
@@ -1062,9 +1288,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         return false;
       }
       
-      // Verificar se tem funções para voluntários e líderes
-      if ((membership.role == 'volunteer' || membership.role == 'leader') && 
-          membership.functionIds.isEmpty) {
+      // Verificar se tem funções apenas para voluntários (líderes têm acesso automático a todas as funções)
+      if (membership.role == 'volunteer' && membership.functionIds.isEmpty) {
         debugPrint('❌ Membership $i sem funções para role ${membership.role}');
         return false;
       }
@@ -1108,6 +1333,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         role: 'volunteer',
         isActive: true,
         functionIds: [],
+        // Se for líder ou se há restrição para ministério do líder, definir automaticamente o ministério do líder
+        ministryId: (_currentUserMembershipRole == 'leader' || widget.restrictToLeaderMinistry) ? _leaderMinistryId : null,
       ));
     });
   }
@@ -1119,20 +1346,12 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
   }
 
   void _updateMembership(int index, MembershipAssignment membership) {
-    print('🔄 Atualizando membership $index:');
-    print('   - role: ${membership.role}');
-    print('   - ministryId: ${membership.ministryId}');
-    print('   - branchId: ${membership.branchId}');
-    print('   - functionIds: ${membership.functionIds.length}');
     
     setState(() {
       _memberships[index] = membership;
     });
     
-    print('✅ Membership $index atualizado com sucesso');
-    print('   - Total de memberships: ${_memberships.length}');
     for (int i = 0; i < _memberships.length; i++) {
-      print('   - Membership $i: role=${_memberships[i].role}, ministryId=${_memberships[i].ministryId}');
     }
   }
 
@@ -1178,24 +1397,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                 style: TextStyle(
                   color: context.colors.onSurface,
                 ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'tenant_admin', 
-                    child: Text('Administrador da Igreja (Sede)'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'branch_admin', 
-                    child: Text('Administrador de Campus'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'leader', 
-                    child: Text('Líder de Ministério'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'volunteer', 
-                    child: Text('Voluntário'),
-                  ),
-                ],
+                dropdownColor: context.colors.surface,  // Ajustado para usar a cor da superfície (branco)
+                items: _getAvailableRoles(),
                 onChanged: (value) {
                   if (value != null) {
                     // Se selecionar branch_admin, expandir automaticamente a seleção de branch
@@ -1225,21 +1428,23 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
             const SizedBox(height: 16),
             // Campos condicionais para branchId e ministryId baseados no role
             if (membership.role == 'branch_admin' || membership.role == 'leader' || membership.role == 'volunteer') ...[
-              // Botão para mostrar/ocultar seleção de branch
-              Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _showBranchSelection = !_showBranchSelection;
-                      });
-                    },
-                    icon: Icon(_showBranchSelection ? Icons.visibility_off : Icons.visibility),
-                    label: Text(_showBranchSelection ? 'Ocultar Branch' : 'Selecionar Branch'),
-                  ),
-                ],
-              ),
-              if (_showBranchSelection) ...[
+              // Botão para mostrar/ocultar seleção de branch (não mostrar para líderes)
+              if (_currentUserMembershipRole != 'leader') ...[
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _showBranchSelection = !_showBranchSelection;
+                        });
+                      },
+                      icon: Icon(_showBranchSelection ? Icons.visibility_off : Icons.visibility),
+                      label: Text(_showBranchSelection ? 'Ocultar Branch' : 'Selecionar Branch'),
+                    ),
+                  ],
+                ),
+              ],
+              if (_showBranchSelection && _currentUserMembershipRole != 'leader') ...[
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String?>(
                   decoration: const InputDecoration(
@@ -1247,7 +1452,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                     border: OutlineInputBorder(),
                     helperText: 'Selecione uma branch para filtrar os ministérios',
                   ),
-                  value: _getValidBranchValue(membership.branchId),
+                  initialValue: _getValidBranchValue(membership.branchId),
+                  dropdownColor: context.colors.surface,  // Ajustado para usar a cor da superfície (branco)
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
@@ -1275,7 +1481,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
               const SizedBox(height: 16),
               DropdownButtonFormField<String?>(
                 decoration: InputDecoration(
-                  labelText: 'Ministério *',
+                  labelText: 'Ministério',
                   border: const OutlineInputBorder(),
                   helperText: 'Selecione o ministério para este vínculo',
                   labelStyle: TextStyle(
@@ -1285,10 +1491,11 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                     color: context.colors.onSurface,
                   ),
                 ),
-                value: _getValidMinistryValue(membership.ministryId),
+                initialValue: _getValidMinistryValue(membership.ministryId),
                 style: TextStyle(
                   color: context.colors.onSurface,
                 ),
+                dropdownColor: context.colors.surface,  // Ajustado para usar a cor da superfície (branco)
                 items: [
                   const DropdownMenuItem<String?>(
                     value: null,
@@ -1300,10 +1507,6 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                   )),
                 ],
                 onChanged: (value) {
-                  print('🔄 Ministério selecionado para membership $index:');
-                  print('   - value: $value');
-                  print('   - membership.role: ${membership.role}');
-                  print('   - membership.ministryId atual: ${membership.ministryId}');
                   
                   // Se for líder e tiver ministério, carregar todas as funções
                   if (membership.role == 'leader' && value != null && value.isNotEmpty) {
@@ -1320,17 +1523,11 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                         : [], // Reset functions when ministry changes for volunteers
                   );
                   
-                  print('   - Novo membership criado:');
-                  print('     - role: ${newMembership.role}');
-                  print('     - ministryId: ${newMembership.ministryId}');
-                  print('     - functionIds: ${newMembership.functionIds.length}');
                   
                   _updateMembership(index, newMembership);
                 },
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Ministério é obrigatório para este role';
-                  }
+                  // Ministério agora é opcional para todos os roles
                   return null;
                 },
               ),
@@ -1417,9 +1614,8 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
       await _loadMinistries();
 
     } catch (e) {
-      // print('Erro ao carregar branches e ministries: $e');
       if (mounted) {
-        FeedbackService.showLoadError(context, 'dados iniciais');
+        showLoadError(context, 'dados iniciais');
       }
       // Em caso de erro, usar dados mock como fallback
       _loadMockData();
@@ -1436,16 +1632,19 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
       _tenantId = context['tenantId'];
       _branchId = context['branchId'];
       
-      // print('🔍 Contexto carregado:');
-      // print('   - Tenant ID: $_tenantId');
-      // print('   - Branch ID: $_branchId');
     } catch (e) {
-      // print('Erro ao carregar contexto: $e');
     }
   }
 
   Future<void> _loadUserBranches() async {
     try {
+      // Líderes não podem selecionar branch
+      if (_currentUserMembershipRole == 'leader') {
+        _availableBranches = [];
+        debugPrint('🔐 Líder: Branch selection desabilitada');
+        return;
+      }
+      
       // Por enquanto, vamos usar as branches do contexto do usuário
       // TODO: Implementar endpoint para listar todas as branches do tenant
       if (_tenantId != null) {
@@ -1467,20 +1666,39 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         });
       }
     } catch (e) {
-      // print('Erro ao carregar branches: $e');
     }
   }
 
   Future<void> _loadMinistries() async {
     try {
       if (_tenantId == null) {
-        // print('❌ Tenant ID não encontrado');
         return;
       }
 
-      print('🧹 Limpando cache de ministérios...');
       _availableMinistries = [];
 
+      // Se for líder ou se há restrição para ministério do líder, mostrar apenas o ministério do líder
+      if ((_currentUserMembershipRole == 'leader' || widget.restrictToLeaderMinistry) && _leaderMinistryId != null) {
+        try {
+          final ministry = await _ministryService.getMinistry(
+            tenantId: _tenantId!,
+            branchId: '',
+            ministryId: _leaderMinistryId!,
+          );
+          _availableMinistries.add({
+            'id': ministry.id,
+            'name': ministry.name,
+            'branchId': null, // Ministério do tenant
+          });
+          debugPrint('🔐 Líder: Carregado apenas o ministério "${ministry.name}"');
+          return;
+        } catch (e) {
+          debugPrint('❌ Erro ao carregar ministério do líder: $e');
+          return;
+        }
+      }
+
+      // Para tenant_admin e branch_admin, carregar todos os ministérios
       // Carregar ministérios do tenant (sem branch)
       try {
         final tenantMinistries = await _ministryService.listMinistries(
@@ -1490,7 +1708,6 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         );
 
         for (final ministry in tenantMinistries.items) {
-          print('📋 Ministério carregado: id=${ministry.id}, name=${ministry.name}');
           _availableMinistries.add({
             'id': ministry.id,
             'name': ministry.name,
@@ -1498,7 +1715,6 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
           });
         }
       } catch (e) {
-        // print('Erro ao carregar ministérios do tenant: $e');
       }
 
       // Carregar ministérios da branch atual (se houver)
@@ -1518,19 +1734,15 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
             });
           }
         } catch (e) {
-          // print('Erro ao carregar ministérios da branch: $e');
         }
       }
 
-      // print('✅ Ministérios carregados: ${_availableMinistries.length}');
       // for (final ministry in _availableMinistries) {
-      //   print('   - ${ministry['name']} (Branch: ${ministry['branchId'] ?? 'Tenant'})');
       // }
 
     } catch (e) {
-      // print('Erro ao carregar ministérios: $e');
       if (mounted) {
-        FeedbackService.showLoadError(context, 'ministérios');
+        showLoadError(context, 'ministérios');
       }
     }
   }
@@ -1571,7 +1783,7 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
       }
     } catch (e) {
       if (mounted) {
-        FeedbackService.showLoadError(context, 'ministérios da filial');
+        showLoadError(context, 'ministérios da filial');
       }
     }
   }

@@ -9,7 +9,16 @@ class AppLeaderShell extends StatelessWidget {
   const AppLeaderShell({super.key, required this.child});
 
   bool _isDashboard(String location) {
-    return location.startsWith('/leader/dashboard');
+    return location == '/leader/dashboard';
+  }
+
+  bool _isSettings(String location) {
+    return location.startsWith('/leader/configuracoes');
+  }
+
+  int _getCurrentIndex(String location) {
+    if (_isSettings(location)) return 1;
+    return 0; // Dashboard é o padrão
   }
 
   void _onHomePressed(BuildContext context) {
@@ -24,6 +33,7 @@ class AppLeaderShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     final isDashboard = _isDashboard(location);
+    final currentIndex = _getCurrentIndex(location);
 
     return Scaffold(
         body: child,
@@ -91,7 +101,7 @@ class AppLeaderShell extends StatelessWidget {
           ),
           child: BottomNavigationBar(
             elevation: 0,
-            currentIndex: 0, // Sempre seleciona Home
+            currentIndex: currentIndex,
             type: BottomNavigationBarType.fixed,
             backgroundColor: Colors.transparent,
             selectedItemColor: Theme.of(context).colorScheme.onSurface,

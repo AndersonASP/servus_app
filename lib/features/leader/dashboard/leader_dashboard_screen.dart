@@ -15,20 +15,31 @@ class DashboardLiderScreen extends StatefulWidget {
   State<DashboardLiderScreen> createState() => _DashboardLiderScreenState();
 }
 
-class _DashboardLiderScreenState extends State<DashboardLiderScreen> {
+class _DashboardLiderScreenState extends State<DashboardLiderScreen> with WidgetsBindingObserver {
   late final DashboardLiderController controller;
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final auth = Provider.of<AuthState>(context, listen: false);
     controller = DashboardLiderController(auth: auth);
     controller.init();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Atualiza o dashboard quando o app volta ao foco
+      controller.refreshDashboard();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     controller.dispose();
     super.dispose();
@@ -75,65 +86,67 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> {
               },
               ministerioSelecionado: null, // TODO: Converter MinistryResponse para Ministerio
             ),
-            body: SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Row(
-                      children: [
-                        const DrawerButton(),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Olá, ${controller.usuario.nome.split(' ').first}!',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge
-                                    ?.copyWith(
-                                        fontSize: 25,
-                                        fontWeight: FontWeight.w800,
-                                        color: context.colors.onSurface),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Stack(
-                          alignment: Alignment.topRight,
-                          children: [
-                            const Icon(Icons.notifications_none, size: 30),
-                            Positioned(
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
+            body: RefreshIndicator(
+              onRefresh: () async {
+                await controller.refreshDashboard();
+              },
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          const DrawerButton(),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Olá, ${controller.usuario.nome.split(' ').first}!',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge
+                                      ?.copyWith(
+                                          fontSize: 25,
+                                          fontWeight: FontWeight.w800,
+                                          color: context.colors.onSurface),
                                 ),
-                                child: const Text(
-                                  '15',
-                                  style: TextStyle(
-                                    fontSize: 8,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
+                              ],
+                            ),
+                          ),
+                          Stack(
+                            alignment: Alignment.topRight,
+                            children: [
+                              const Icon(Icons.notifications_none, size: 30),
+                              Positioned(
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Text(
+                                    '15',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                            ],
+                          ),
+                        ],
+                      ),
 
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-                    if (controller.usuario.isAdmin)
-                      // Substituir esta parte no DashboardLiderScreen
                       if (controller.usuario.isAdmin)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -176,25 +189,61 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> {
                             ),
                           ],
                         ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 100,
-                      child: ListView.separated(
-                        controller: _scrollController,
-                        scrollDirection: Axis.horizontal,
-                        itemCount: controller.ministerios.length + 1,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (context, index) {
-                          if (index == controller.ministerios.length) {
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 100,
+                        child: ListView.separated(
+                          controller: _scrollController,
+                          scrollDirection: Axis.horizontal,
+                          itemCount: controller.ministerios.length + 1,
+                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            if (index == controller.ministerios.length) {
+                              return GestureDetector(
+                                onTap: () {
+                                  context.push('/leader/ministerio/form');
+                                },
+                                child: Container(
+                                  width: 140,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: context.colors.surface,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black12,
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Icon(Icons.add_circle_outline,
+                                        size: 36, color: context.colors.primary),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            final ministerio = controller.ministerios[index];
+                            final isSelected =
+                                controller.ministerioSelecionado != null &&
+                                    ministerio.id ==
+                                        controller.ministerioSelecionado!.id;
+
                             return GestureDetector(
                               onTap: () {
-                                context.push('/leader/ministerio/form');
+                                controller.carregarDadosDoMinisterio(ministerio);
+                                _scrollToCard(index);
                               },
-                              child: Container(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
                                 width: 140,
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: context.colors.surface,
+                                  color: isSelected
+                                      ? context.colors.primary
+                                      : context.colors.surface,
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
@@ -204,149 +253,115 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> {
                                     ),
                                   ],
                                 ),
-                                child: Center(
-                                  child: Icon(Icons.add_circle_outline,
-                                      size: 36, color: context.colors.primary),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.groups,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : context.colors.onSurface),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      ministerio.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : context.colors.onSurface,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );
-                          }
+                          },
+                        ),
+                      ),
 
-                          final ministerio = controller.ministerios[index];
-                          final isSelected =
-                              controller.ministerioSelecionado != null &&
-                                  ministerio.id ==
-                                      controller.ministerioSelecionado!.id;
-
-                          return GestureDetector(
-                            onTap: () {
-                              controller.carregarDadosDoMinisterio(ministerio);
-                              _scrollToCard(index);
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              width: 140,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? context.colors.primary
-                                    : context.colors.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black12,
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.groups,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : context.colors.onSurface),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    ministerio.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : context.colors.onSurface,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                      const SizedBox(height: 24),
+                      // Métricas
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _infoCard(
+                              title: 'Voluntários ativos',
+                              value: controller.totalVoluntarios.toString(),
+                              isLoading: controller.isLoadingVoluntarios,
+                              icon: Icons.people,
+                              iconColor: context.colors.primary,
+                              onTap: () {
+                                context.push(
+                                  '/leader/dashboard/voluntarios',
+                                  extra: controller.ministerioSelecionado,
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-                    // Métricas
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _infoCard(
-                            title: 'Voluntários ativos',
-                            value: controller.totalVoluntarios.toString(),
-                            isLoading: controller.isLoadingVoluntarios,
-                            icon: Icons.people,
-                            iconColor: context.colors.primary,
-                            onTap: () {
-                              context.push(
-                                '/leader/dashboard/voluntarios',
-                                extra: controller.ministerioSelecionado,
-                              );
-                            },
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _infoCard(
-                            title: 'Solicitações de troca',
-                            value: controller.totalSolicitacoesPendentes
-                                .toString(),
-                            isLoading: controller.isLoadingSolicitacoes,
-                            icon: Icons.change_circle,
-                            iconColor: context.colors.primary,
-                            onTap: () {
-                              context.push(
-                                '/leader/dashboard/solicitacao-troca',
-                                extra: controller.ministerioSelecionado,
-                              );
-                            },
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _infoCard(
+                              title: 'Solicitações de troca',
+                              value: controller.totalSolicitacoesPendentes
+                                  .toString(),
+                              isLoading: controller.isLoadingSolicitacoes,
+                              icon: Icons.change_circle,
+                              iconColor: context.colors.primary,
+                              onTap: () {
+                                context.push(
+                                  '/leader/dashboard/solicitacao-troca',
+                                  extra: controller.ministerioSelecionado,
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-                    
-                    // Card de Filiais
-                    if (controller.usuario.isAdmin)
-                      _infoCard(
-                        title: 'Filiais',
-                        value: 'Gerenciar',
-                        isLoading: false,
-                        icon: Icons.business,
-                        iconColor: context.colors.primary,
-                        onTap: () {
-                          context.push('/leader/branches');
-                        },
+                        ],
                       ),
 
-                    const EscalasResumoWidget(
-                      ministerioId: '2',
-                    ),
-                    const SizedBox(height: 12),
-                    AniversariantesWidget(
-                      aniversariantes: [
-                        Aniversariante(
-                          nome: 'João Silva',
-                          fotoUrl:
-                              'https://randomuser.me/api/portraits/men/1.jpg',
-                          dia: 12,
+                      const SizedBox(height: 24),
+                      
+                      // Card de Filiais
+                      if (controller.usuario.isAdmin)
+                        _infoCard(
+                          title: 'Filiais',
+                          value: 'Gerenciar',
+                          isLoading: false,
+                          icon: Icons.business,
+                          iconColor: context.colors.primary,
+                          onTap: () {
+                            context.push('/leader/branches');
+                          },
                         ),
-                        Aniversariante(
-                          nome: 'Maria Oliveira',
-                          fotoUrl:
-                              'https://randomuser.me/api/portraits/women/2.jpg',
-                          dia: 18,
-                        ),
-                      ],
-                    ),
-                  ],
+
+                      const SizedBox(height: 12),
+
+                      const EscalasResumoWidget(
+                        ministerioId: '2',
+                      ),
+                      const SizedBox(height: 12),
+                      AniversariantesWidget(
+                        aniversariantes: [
+                          Aniversariante(
+                            nome: 'João Silva',
+                            fotoUrl:
+                                'https://randomuser.me/api/portraits/men/1.jpg',
+                            dia: 12,
+                          ),
+                          Aniversariante(
+                            nome: 'Maria Oliveira',
+                            fotoUrl:
+                                'https://randomuser.me/api/portraits/women/2.jpg',
+                            dia: 18,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
+          ));
         },
       ),
     );

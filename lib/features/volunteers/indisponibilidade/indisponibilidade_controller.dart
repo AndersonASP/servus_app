@@ -68,7 +68,6 @@ class IndisponibilidadeController extends ChangeNotifier {
     required List<String> ministerios,
   }) {
     final dataAjustada = DateTime(dia.year, dia.month, dia.day);
-    // print(
     //     "Registrando bloqueio: $dia, Motivo: $motivo, Ministérios: ${ministerios.join(', ')}");
     if (bloqueios.length >= maxDiasIndisponiveis && !isDiaBloqueado(dia)) {
       return;

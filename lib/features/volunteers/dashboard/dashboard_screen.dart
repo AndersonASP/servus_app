@@ -16,7 +16,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final DashboardController controller;
 
   late final AnimationController _animationController;
@@ -26,6 +26,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final auth = Provider.of<AuthState>(context, listen: false);
     controller = DashboardController(auth: auth);
     controller.init();
@@ -53,13 +54,23 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Atualiza o dashboard quando o app volta ao foco
+      controller.refreshDashboard();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _handleRefresh() async {
-    await controller.refresh();
+    await controller.refreshDashboard();
   }
 
   @override

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/context_extension.dart';
-import '../../../core/services/feedback_service.dart';
+import '../../../shared/widgets/servus_snackbar.dart';
 
 class CreateTenantScreen extends StatefulWidget {
   const CreateTenantScreen({super.key});
@@ -28,6 +29,13 @@ class _CreateTenantScreenState extends State<CreateTenantScreen>
   final _adminNameController = TextEditingController();
   final _adminEmailController = TextEditingController();
   final _adminPhoneController = TextEditingController();
+  
+  // Máscara para telefone brasileiro
+  final _phoneMaskFormatter = MaskTextInputFormatter(
+    mask: '(##) #####-####',
+    filter: {"#": RegExp(r'[0-9]')},
+    type: MaskAutoCompletionType.lazy,
+  );
   
   @override
   void initState() {
@@ -272,6 +280,7 @@ class _CreateTenantScreenState extends State<CreateTenantScreen>
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _adminPhoneController,
+                    inputFormatters: [_phoneMaskFormatter],
                     decoration: const InputDecoration(
                       labelText: 'Número de Telefone *',
                       hintText: 'Ex: (11) 99999-9999',
@@ -282,6 +291,11 @@ class _CreateTenantScreenState extends State<CreateTenantScreen>
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Telefone é obrigatório';
+                      }
+                      // Validar se o telefone tem pelo menos 10 dígitos (DDD + número)
+                      final phoneDigits = value.replaceAll(RegExp(r'[^0-9]'), '');
+                      if (phoneDigits.length < 10) {
+                        return 'Telefone deve ter pelo menos 10 dígitos';
                       }
                       return null;
                     },
@@ -454,18 +468,16 @@ class _CreateTenantScreenState extends State<CreateTenantScreen>
       );
 
       if (mounted) {
-        // Mostrar sucesso
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Igreja "${_tenantNameController.text}" criada com sucesso!\n'
-                'O administrador receberá um e-mail com as credenciais de acesso.'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-
-        // Navegar de volta
+        // Mostrar sucesso com o novo padrão
+        showTenantCreateSuccess(context, _tenantNameController.text);
+        
+        // Navegar de volta primeiro para evitar problemas de contexto
         Navigator.of(context).pop(true);
+        
+        // Mostrar informação sobre email após navegação (se ainda houver contexto válido)
+        Future.delayed(const Duration(milliseconds: 100), () {
+          // Não tentar mostrar SnackBar após navegação para evitar erros de contexto
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -481,7 +493,10 @@ class _CreateTenantScreenState extends State<CreateTenantScreen>
           }
         }
         
-        FeedbackService.showError(context, errorMessage);
+        // Verificar se o contexto ainda está válido antes de mostrar erro
+        if (mounted && context.mounted) {
+          showTenantCreateError(context, _tenantNameController.text, errorMessage);
+        }
       }
     } finally {
       if (mounted) {

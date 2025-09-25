@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class CheckinQrScreen extends StatelessWidget {
   const CheckinQrScreen({super.key});
@@ -13,9 +14,7 @@ class CheckinQrScreen extends StatelessWidget {
           final String? code = result.barcodes.first.rawValue;
           if (code != null) {
             debugPrint('Código lido: $code');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('QR lido: $code')),
-            );
+            showSuccess(context, 'QR lido: $code');
             Navigator.of(context).pop(); // Fecha a tela de QR Code
             // TODO: Chamar sua API de check-in aqui
           }

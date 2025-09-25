@@ -3,6 +3,7 @@ import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerios_detalhes_controller.dart';
 import 'package:servus_app/services/members_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class LinkMemberModal extends StatefulWidget {
   final MinisterioDetalhesController controller;
@@ -77,10 +78,6 @@ class _LinkMemberModalState extends State<LinkMemberModal> {
       );
 
       // Debug: Log da resposta
-      print('🔍 Debug Modal - Resposta da API:');
-      print('   - response type: ${response.runtimeType}');
-      print('   - members type: ${response.members.runtimeType}');
-      print('   - members length: ${response.members.length}');
 
       setState(() {
         _searchResults = response.members;
@@ -177,29 +174,26 @@ class _LinkMemberModalState extends State<LinkMemberModal> {
       
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${member.name} vinculado ao ministério como ${_selectedRole == 'leader' ? 'líder' : 'voluntário'}!'),
-              backgroundColor: Colors.green,
-            ),
+          ServusSnackQueue.addToQueue(
+            context: context,
+            message: '${member.name} vinculado ao ministério como ${_selectedRole == 'leader' ? 'líder' : 'voluntário'}!',
+            type: ServusSnackType.success,
           );
           Navigator.of(context).pop();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Erro ao vincular membro ao ministério'),
-              backgroundColor: Colors.red,
-            ),
+          ServusSnackQueue.addToQueue(
+            context: context,
+            message: 'Erro ao vincular membro ao ministério',
+            type: ServusSnackType.error,
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao vincular membro: $e'),
-            backgroundColor: Colors.red,
-          ),
+        ServusSnackQueue.addToQueue(
+          context: context,
+          message: 'Erro ao vincular membro: $e',
+          type: ServusSnackType.error,
         );
       }
     } finally {

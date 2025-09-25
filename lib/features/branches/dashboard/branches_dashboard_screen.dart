@@ -7,6 +7,7 @@ import 'package:servus_app/shared/widgets/loading_widget.dart';
 import 'package:servus_app/shared/widgets/error_widget.dart';
 import 'package:servus_app/features/branches/create/create_branch_screen.dart';
 import 'package:servus_app/features/branches/details/branch_details_screen.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class BranchesDashboardScreen extends StatefulWidget {
   const BranchesDashboardScreen({super.key});
@@ -76,15 +77,11 @@ class _BranchesDashboardScreenState extends State<BranchesDashboardScreen> {
       await BranchesService.deactivateBranch(branchId);
       if (mounted) {
         _loadBranches();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Filial desativada com sucesso')),
-        );
+        showSuccess(context, 'Filial desativada com sucesso');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao desativar filial: $e')),
-        );
+        showError(context, 'Erro ao desativar filial: $e');
       }
     }
   }
@@ -255,7 +252,7 @@ class _BranchesDashboardScreenState extends State<BranchesDashboardScreen> {
                             labelText: 'Status',
                             border: OutlineInputBorder(),
                           ),
-                          value: _isActive == null
+                          initialValue: _isActive == null
                               ? null
                               : (_isActive! ? 'true' : 'false'),
                           items: const [

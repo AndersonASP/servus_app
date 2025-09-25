@@ -1,16 +1,36 @@
-# servus_app
+# Servus App
 
-A new Flutter project.
+Aplicação móvel e web para gestão de voluntariado.
 
-## Getting Started
+## Tecnologias
 
-This project is a starting point for a Flutter application.
+- Flutter
+- Dart
+- Provider (State Management)
 
-A few resources to get you started if this is your first Flutter project:
+## Instalação
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+flutter pub get
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Execução
+
+```bash
+# Mobile
+flutter run
+
+# Web
+flutter run -d chrome
+
+# Build Web
+flutter build web
+```
+
+## Funcionalidades
+
+- Gestão de voluntários
+- Ministérios e funções
+- Formulários dinâmicos
+- Escalas e eventos
+- Sistema de convites

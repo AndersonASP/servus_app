@@ -4,7 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/core/constants/env.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/core/error/error_handler_service.dart';
 
 class MembersService {
   static const String baseUrl = Env.baseUrl;
@@ -40,15 +41,35 @@ class MembersService {
     try {
       final token = await _getAuthToken();
       if (token == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Token de autenticação não encontrado');
       }
 
       // Obter tenantId do token
       final tenantId = await _getTenantId();
       if (tenantId == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Tenant ID não encontrado no token');
+      }
+
+      // Processar memberships para garantir que leaders tenham funções
+      final processedMemberships = <Map<String, dynamic>>[];
+      
+      for (final membership in request.memberships) {
+        
+        // Se é leader e não tem funções específicas, deixar vazio para o backend atribuir automaticamente
+        if (membership.role == 'leader' && membership.functionIds.isEmpty && membership.ministryId != null) {
+        }
+        
+        final membershipData = {
+          'role': membership.role,
+          if (membership.branchId != null) 'branchId': membership.branchId,
+          if (membership.ministryId != null) 'ministryId': membership.ministryId,
+          if (membership.functionIds.isNotEmpty) 'functionIds': membership.functionIds,
+          'isActive': true,
+        };
+        
+        processedMemberships.add(membershipData);
       }
 
       // Converter para a estrutura esperada pelo backend (CreateMemberDto)
@@ -62,15 +83,7 @@ class MembersService {
         if (request.availability != null) 'availability': request.availability,
         if (request.address != null) 'address': request.address!.toJson(),
         if (request.password != null) 'password': request.password,
-        'memberships': request.memberships.isNotEmpty ? [
-          {
-            'role': request.memberships.first.role,
-            if (request.memberships.first.branchId != null) 'branchId': request.memberships.first.branchId,
-            if (request.memberships.first.ministryId != null) 'ministryId': request.memberships.first.ministryId,
-            if (request.memberships.first.functionIds.isNotEmpty) 'functionIds': request.memberships.first.functionIds,
-            'isActive': true,
-          }
-        ] : [
+        'memberships': processedMemberships.isNotEmpty ? processedMemberships : [
           {
             'role': 'volunteer',
             'isActive': true,
@@ -109,8 +122,9 @@ class MembersService {
         throw Exception(errorMessage);
       }
     } catch (e) {
+      ErrorHandlerService().logError(e, context: 'criação de membro');
       if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
-        throw Exception('Erro de conexão. Verifique sua internet e tente novamente.');
+        throw Exception('Não foi possível criar o membro. Verifique sua conexão com a internet e tente novamente.');
       }
       rethrow;
     }
@@ -121,7 +135,7 @@ class MembersService {
     try {
       final token = await _getAuthToken();
       if (token == null) {
-        if (context != null) FeedbackService.showAuthError(context);
+        if (context != null) showAuthError(context);
         throw Exception('Token de autenticação não encontrado');
       }
       
@@ -129,7 +143,7 @@ class MembersService {
       // Obter tenantId do token
       final tenantId = await _getTenantId();
       if (tenantId == null) {
-        if (context != null) FeedbackService.showAuthError(context);
+        if (context != null) showAuthError(context);
         throw Exception('Tenant ID não encontrado no token');
       }
 
@@ -145,10 +159,7 @@ class MembersService {
       
       try {
         final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: stringQueryParams);
-        print('   - URI criada com sucesso: $uri');
       } catch (e) {
-        print('   - ❌ ERRO ao criar URI: $e');
-        print('   - Stack trace: ${StackTrace.current}');
         rethrow;
       }
       
@@ -167,12 +178,13 @@ class MembersService {
         return MembersResponse.fromJson(jsonDecode(response.body));
       } else {
         final error = jsonDecode(response.body);
-        if (context != null) FeedbackService.showLoadError(context, 'membros');
+        if (context != null) showLoadError(context, 'membros');
         throw Exception(error['message'] ?? 'Erro ao buscar membros');
       }
     } catch (e) {
+      ErrorHandlerService().logError(e, context: 'busca de membros');
       if (context != null && (e.toString().contains('SocketException') || e.toString().contains('TimeoutException'))) {
-        FeedbackService.showNetworkError(context);
+        showNetworkError(context);
       }
       rethrow;
     }
@@ -183,14 +195,14 @@ class MembersService {
     try {
       final token = await _getAuthToken();
       if (token == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Token de autenticação não encontrado');
       }
 
       // Obter tenantId do token
       final tenantId = await _getTenantId();
       if (tenantId == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Tenant ID não encontrado no token');
       }
 
@@ -206,12 +218,12 @@ class MembersService {
         return Member.fromJson(jsonDecode(response.body));
       } else {
         final error = jsonDecode(response.body);
-        FeedbackService.showLoadError(context, 'membro');
+        showLoadError(context, 'membro');
         throw Exception(error['message'] ?? 'Erro ao buscar membro');
       }
     } catch (e) {
       if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
-        FeedbackService.showNetworkError(context);
+        showNetworkError(context);
       }
       rethrow;
     }
@@ -222,14 +234,14 @@ class MembersService {
     try {
       final token = await _getAuthToken();
       if (token == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Token de autenticação não encontrado');
       }
 
       // Obter tenantId do token
       final tenantId = await _getTenantId();
       if (tenantId == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Tenant ID não encontrado no token');
       }
 
@@ -244,16 +256,16 @@ class MembersService {
       );
 
       if (response.statusCode == 200) {
-        FeedbackService.showUpdateSuccess(context, 'Membro');
+        showUpdateSuccess(context, 'Membro');
         return Member.fromJson(jsonDecode(response.body));
       } else {
         final error = jsonDecode(response.body);
-        FeedbackService.showUpdateError(context, 'membro');
+        showUpdateError(context, 'membro');
         throw Exception(error['message'] ?? 'Erro ao atualizar membro');
       }
     } catch (e) {
       if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
-        FeedbackService.showNetworkError(context);
+        showNetworkError(context);
       }
       rethrow;
     }
@@ -264,14 +276,14 @@ class MembersService {
     try {
       final token = await _getAuthToken();
       if (token == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Token de autenticação não encontrado');
       }
 
       // Obter tenantId do token
       final tenantId = await _getTenantId();
       if (tenantId == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Tenant ID não encontrado no token');
       }
 
@@ -284,15 +296,15 @@ class MembersService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        FeedbackService.showDeleteSuccess(context, 'Membro');
+        showDeleteSuccess(context, 'Membro');
       } else {
         final error = jsonDecode(response.body);
-        FeedbackService.showDeleteError(context, 'membro');
+        showDeleteError(context, 'membro');
         throw Exception(error['message'] ?? 'Erro ao deletar membro');
       }
     } catch (e) {
       if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
-        FeedbackService.showNetworkError(context);
+        showNetworkError(context);
       }
       rethrow;
     }
@@ -333,14 +345,14 @@ class MembersService {
     try {
       final token = await _getAuthToken();
       if (token == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Token de autenticação não encontrado');
       }
 
       // Obter tenantId do token
       final tenantId = await _getTenantId();
       if (tenantId == null) {
-        FeedbackService.showAuthError(context);
+        showAuthError(context);
         throw Exception('Tenant ID não encontrado no token');
       }
 
@@ -353,16 +365,16 @@ class MembersService {
       );
 
       if (response.statusCode == 200) {
-        FeedbackService.showUpdateSuccess(context, 'Status do membro');
+        showUpdateSuccess(context, 'Status do membro');
         return Member.fromJson(jsonDecode(response.body));
       } else {
         final error = jsonDecode(response.body);
-        FeedbackService.showUpdateError(context, 'status do membro');
+        showUpdateError(context, 'status do membro');
         throw Exception(error['message'] ?? 'Erro ao alterar status do membro');
       }
     } catch (e) {
       if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
-        FeedbackService.showNetworkError(context);
+        showNetworkError(context);
       }
       rethrow;
     }

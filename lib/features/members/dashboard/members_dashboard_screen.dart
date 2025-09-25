@@ -7,6 +7,7 @@ import 'package:servus_app/shared/widgets/loading_widget.dart';
 import 'package:servus_app/shared/widgets/error_widget.dart';
 import 'package:servus_app/features/members/create/create_member_screen.dart';
 import 'package:servus_app/features/members/details/member_details_screen.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class MembersDashboardScreen extends StatefulWidget {
   const MembersDashboardScreen({super.key});
@@ -81,15 +82,11 @@ class _MembersDashboardScreenState extends State<MembersDashboardScreen> {
       await MembersService.deleteMember(id, context);
       if (mounted) {
         _loadMembers(); // Recarregar lista
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Membro deletado com sucesso')),
-        );
+        showSuccess(context, 'Membro deletado com sucesso');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao deletar membro: $e')),
-        );
+        showError(context, 'Erro ao deletar membro: $e');
       }
     }
   }
@@ -279,7 +276,7 @@ class _MembersDashboardScreenState extends State<MembersDashboardScreen> {
                             labelText: 'Status',
                             border: OutlineInputBorder(),
                           ),
-                          value: _isActive == null
+                          initialValue: _isActive == null
                               ? null
                               : (_isActive! ? 'true' : 'false'),
                           items: const [
@@ -304,7 +301,7 @@ class _MembersDashboardScreenState extends State<MembersDashboardScreen> {
                             labelText: 'Role',
                             border: OutlineInputBorder(),
                           ),
-                          value: _selectedRole,
+                          initialValue: _selectedRole,
                           items: const [
                             DropdownMenuItem(value: null, child: Text('Todos')),
                             DropdownMenuItem(
@@ -590,9 +587,7 @@ class _MembersDashboardScreenState extends State<MembersDashboardScreen> {
         break;
       case 'edit':
         // TODO: Implementar edição
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Edição de membro em desenvolvimento')),
-        );
+        showInfo(context, 'Edição de membro em desenvolvimento');
         break;
       case 'delete':
         _showDeleteConfirmation(member);

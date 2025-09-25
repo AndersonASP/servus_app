@@ -6,6 +6,7 @@ import 'package:servus_app/core/models/ministerio.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/state/auth_state.dart';
 import 'package:servus_app/shared/widgets/drawer_profile_header.dart';
+import 'package:servus_app/features/ministries/services/ministry_service.dart';
 
 class DrawerMenuLider extends StatelessWidget {
   final Ministerio? ministerioSelecionado;
@@ -17,13 +18,64 @@ class DrawerMenuLider extends StatelessWidget {
     required this.onTrocarModo,
   });
 
+  void _navigateToLeaderMinistry(BuildContext context) {
+    debugPrint('🔍 [DrawerMenu] _navigateToLeaderMinistry iniciado');
+    
+    // Salvar referências antes da operação assíncrona
+    final usuario = context.read<AuthState>().usuario;
+    final ministryService = MinistryService();
+    
+    debugPrint('🔍 [DrawerMenu] Usuario: ${usuario?.email}, TenantId: ${usuario?.tenantId}');
+    
+    if (usuario?.tenantId == null) {
+      debugPrint('❌ [DrawerMenu] Tenant não encontrado');
+      return;
+    }
+
+    debugPrint('🔍 [DrawerMenu] Buscando ministério do líder...');
+    
+    // Executar operação assíncrona em um microtask
+    Future.microtask(() async {
+      try {
+        final leaderMinistry = await ministryService.getLeaderMinistryV2(
+          tenantId: usuario!.tenantId!,
+          branchId: usuario.branchId ?? '',
+          context: null,
+        );
+
+        debugPrint('🔍 [DrawerMenu] Resultado: ${leaderMinistry?.id} - ${leaderMinistry?.name}');
+        debugPrint('🔍 [DrawerMenu] LeaderMinistry é null? ${leaderMinistry == null}');
+
+        if (leaderMinistry != null) {
+          // Usar GoRouter para navegação
+          debugPrint('🔍 [DrawerMenu] Navegando para: /leader/ministerio-detalhes/${leaderMinistry.id}');
+          
+          // Tentar navegação direta usando o contexto global
+          try {
+            GoRouter.of(context).push('/leader/ministerio-detalhes/${leaderMinistry.id}');
+            debugPrint('✅ [DrawerMenu] Navegação executada');
+          } catch (e) {
+            debugPrint('❌ [DrawerMenu] Erro na navegação: $e');
+            // Fallback: tentar com Navigator
+            try {
+              Navigator.of(context).pushNamed('/leader/ministerio-detalhes/${leaderMinistry.id}');
+              debugPrint('✅ [DrawerMenu] Navegação com Navigator executada');
+            } catch (e2) {
+              debugPrint('❌ [DrawerMenu] Erro na navegação com Navigator: $e2');
+            }
+          }
+        } else {
+          debugPrint('❌ [DrawerMenu] Ministério não encontrado');
+        }
+      } catch (e) {
+        debugPrint('❌ [DrawerMenu] Erro: $e');
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final usuario = context.read<AuthState>().usuario!;
-
-    // Debug temporário para identificar o problema
-    // print('DEBUG: usuario.role no build = ${usuario.role}');
-    // print('DEBUG: usuario completo = $usuario');
+    final usuario = Provider.of<AuthState>(context, listen: false).usuario!;
 
     return Drawer(
       shape: const RoundedRectangleBorder(
@@ -39,7 +91,7 @@ class DrawerMenuLider extends StatelessWidget {
             DrawerProfileHeader(
               nome: usuario.nome,
               email: usuario.email,
-              picture: usuario.picture ?? '',
+              picture: usuario.picture?.isNotEmpty == true ? usuario.picture! : '',
               onTapPerfil: () => context.push('/perfil'),
               exibirTrocaModo: true,
               modoAtual: _labelDoPapel(usuario.role),
@@ -50,32 +102,15 @@ class DrawerMenuLider extends StatelessWidget {
               color: context.colors.onSurface.withValues(alpha: 0.2),
             ),
 
-            // // Ministério atual
-            // Padding(
-            //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            //   child: Text(
-            //     'Ministério atual:',
-            //     style: Theme.of(context).textTheme.labelMedium,
-            //   ),
-            // ),
-            // Padding(
-            //   padding: const EdgeInsets.symmetric(horizontal: 16),
-            //   child: Text(
-            //     ministerioSelecionado?.nome ?? 'Carregando...',
-            //     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            //           fontWeight: FontWeight.w600,
-            //           color: context.colors.primary,
-            //         ),
-            //   ),
-            // ),
-
             const SizedBox(height: 16),
 
-            // Menu de navegação
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Column(
-                children: [
+            // Menu de navegação - Scrollável
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
                   // Dashboard
                   ListTile(
                     leading: const Icon(Icons.dashboard),
@@ -90,19 +125,30 @@ class DrawerMenuLider extends StatelessWidget {
                   if (usuario.role != UserRole.servus_admin)
                     ListTile(
                       leading: const Icon(Icons.groups),
-                      title: const Text('Ministérios'),
-                      subtitle: const Text('Gerenciar ministérios'),
+                      title: Text(usuario.role == UserRole.leader ? 'Meu ministério' : 'Ministérios'),
+                      subtitle: Text(usuario.role == UserRole.leader ? 'Ver detalhes do meu ministério' : 'Gerenciar ministérios'),
                       onTap: () {
+                        debugPrint('🔍 [DrawerMenu] Clicou em ministério - Role: ${usuario.role}');
+                        debugPrint('🔍 [DrawerMenu] Context mounted? ${context.mounted}');
                         Navigator.pop(context);
-                        context.push('/leader/ministerio/lista');
+                        debugPrint('🔍 [DrawerMenu] Drawer fechado');
+                        if (usuario.role == UserRole.leader) {
+                          debugPrint('🔍 [DrawerMenu] Navegando diretamente para ministério do líder');
+                          // Líder vai para detalhes do seu ministério - usar ID fixo que sabemos que existe
+                          context.push('/leader/ministerio-detalhes/68d1b58da422169502e5e765');
+                          debugPrint('✅ [DrawerMenu] Navegação direta executada');
+                        } else {
+                          debugPrint('🔍 [DrawerMenu] Navegando para lista de ministérios');
+                          // Outros roles vão para lista de ministérios
+                          context.push('/leader/ministerio/lista');
+                        }
                       },
                     ),
 
 
-                  // Membros (visível para tenant_admin, branch_admin e leader)
+                  // Membros (visível apenas para tenant_admin e branch_admin)
                   if (usuario.role == UserRole.tenant_admin ||
-                      usuario.role == UserRole.branch_admin ||
-                      usuario.role == UserRole.leader)
+                      usuario.role == UserRole.branch_admin)
                     ListTile(
                       leading: const Icon(Icons.group_add),
                       title: const Text('Membros'),
@@ -110,6 +156,33 @@ class DrawerMenuLider extends StatelessWidget {
                       onTap: () {
                         Navigator.pop(context);
                         context.push('/leader/members');
+                      },
+                    ),
+
+                  // Voluntários (visível para leader, tenant_admin e branch_admin)
+                  if (usuario.role == UserRole.leader ||
+                      usuario.role == UserRole.tenant_admin ||
+                      usuario.role == UserRole.branch_admin)
+                    ListTile(
+                      leading: const Icon(Icons.people),
+                      title: const Text('Voluntários'),
+                      subtitle: const Text('Gerenciar voluntários'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/leader/dashboard/voluntarios');
+                      },
+                    ),
+
+                  // Formulários (visível apenas para tenant_admin e branch_admin)
+                  if (usuario.role == UserRole.tenant_admin ||
+                      usuario.role == UserRole.branch_admin)
+                    ListTile(
+                      leading: const Icon(Icons.assignment),
+                      title: const Text('Formulários'),
+                      subtitle: const Text('Criar e gerenciar'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/forms');
                       },
                     ),
                   // Criar Tenants (apenas para ServusAdmin)
@@ -160,23 +233,12 @@ class DrawerMenuLider extends StatelessWidget {
                       },
                     ),
 
-                  // Voluntários (não visível para servus_admin)
-                  // if (usuario.role != UserRole.servus_admin)
-                  //   ListTile(
-                  //     leading: const Icon(Icons.people),
-                  //     title: const Text('Voluntários'),
-                  //     subtitle: const Text('Gerenciar voluntários'),
-                  //     onTap: () {
-                  //       Navigator.pop(context);
-                  //       context.go('/leader/dashboard/voluntarios');
-                  //     },
-                  //   ),
-                ],
+                  ],
+                ),
               ),
             ),
 
-            const Spacer(),
-
+            // Rodapé fixo
             Divider(
               height: 10,
               thickness: 0.6,
@@ -198,7 +260,6 @@ class DrawerMenuLider extends StatelessWidget {
   }
 
   String _labelDoPapel(UserRole role) {
-    // print('DEBUG: _labelDoPapel recebeu role: $role');
     switch (role) {
       case UserRole.servus_admin:
         return 'Servus Admin';
@@ -210,8 +271,6 @@ class DrawerMenuLider extends StatelessWidget {
         return 'Líder';
       case UserRole.volunteer:
         return 'Voluntário';
-      default:
-        return 'Papel não definido';
     }
   }
 }

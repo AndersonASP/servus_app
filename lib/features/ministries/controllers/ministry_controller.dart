@@ -92,7 +92,6 @@ class MinistryController extends ChangeNotifier {
       
       notifyListeners();
     } catch (e) {
-      // print('❌ Erro ao carregar ministérios: $e');
       rethrow;
     } finally {
       _setLoading(false);
@@ -133,7 +132,6 @@ class MinistryController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      // print('❌ Erro ao criar ministério: $e');
       rethrow;
     } finally {
       _setCreating(false);
@@ -174,7 +172,6 @@ class MinistryController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      // print('❌ Erro ao atualizar ministério: $e');
       rethrow;
     } finally {
       _setUpdating(false);
@@ -215,7 +212,6 @@ class MinistryController extends ChangeNotifier {
       
       return success;
     } catch (e) {
-      // print('❌ Erro ao deletar ministério: $e');
       rethrow;
     } finally {
       _setDeleting(false);
@@ -254,7 +250,6 @@ class MinistryController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      // print('❌ Erro ao alterar status do ministério: $e');
       rethrow;
     }
   }

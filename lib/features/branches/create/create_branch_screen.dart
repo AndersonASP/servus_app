@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/services/branches_service.dart';
 import 'package:servus_app/services/members_service.dart';
 import 'package:servus_app/core/models/member.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 import 'create_branch_steps.dart';
 
 class CreateBranchScreen extends StatefulWidget {
@@ -88,7 +87,7 @@ class _CreateBranchScreenState extends State<CreateBranchScreen> {
         setState(() {
           _isLoadingMembers = false;
         });
-        FeedbackService.showLoadError(context, 'membros');
+        showLoadError(context, 'membros');
       }
     }
   }
@@ -160,12 +159,12 @@ class _CreateBranchScreenState extends State<CreateBranchScreen> {
       }
 
       if (mounted) {
-        FeedbackService.showCreateSuccess(context, 'Filial');
+        showCreateSuccess(context, 'Filial');
         Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
-        FeedbackService.showCreateError(context, 'filial');
+        showCreateError(context, 'filial');
       }
     } finally {
       if (mounted) {
@@ -397,7 +396,7 @@ class _CreateBranchScreenState extends State<CreateBranchScreen> {
         case 0:
           if (_nameController.text.trim().isEmpty) {
             isValid = false;
-            FeedbackService.showValidationError(context, 'Nome da filial é obrigatório');
+            showValidationError(context, 'Nome da filial é obrigatório');
           }
           break;
         case 1:
@@ -409,12 +408,12 @@ class _CreateBranchScreenState extends State<CreateBranchScreen> {
         case 3:
           if (_adminOption == 'existing' && _selectedMember == null) {
             isValid = false;
-            FeedbackService.showValidationError(context, 'Selecione um membro para ser administrador');
+            showValidationError(context, 'Selecione um membro para ser administrador');
           } else if (_adminOption == 'new') {
             if (_adminNameController.text.trim().isEmpty ||
                 _adminEmailController.text.trim().isEmpty) {
               isValid = false;
-              FeedbackService.showValidationError(context, 'Nome e email do administrador são obrigatórios');
+              showValidationError(context, 'Nome e email do administrador são obrigatórios');
             }
           }
           break;

@@ -253,6 +253,33 @@ class _LoginScreenState extends State<LoginScreen> {
                                             ),
                                     ),
                                   ),
+                                  
+                                  const SizedBox(height: 16),
+                                  
+                                  // Botão código de convite
+                                  OutlinedButton(
+                                    onPressed: () {
+                                      context.go('/invite/code');
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      side: BorderSide(
+                                        color: context.theme.primaryColor,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Tenho código de convite',
+                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                            color: context.theme.primaryColor,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:servus_app/features/ministries/models/ministry_function.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/constants/env.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class MinistryFunctionsService {
   final Dio _dio;
@@ -31,18 +31,18 @@ class MinistryFunctionsService {
 
       if (response.statusCode == 200) {
         if (context != null) {
-          FeedbackService.showCreateSuccess(context, 'Funções do ministério');
+          showCreateSuccess(context, 'Funções do ministério');
         }
         return BulkUpsertResponse.fromJson(response.data);
       } else {
         if (context != null) {
-          FeedbackService.showCreateError(context, 'funções do ministério');
+          showCreateError(context, 'funções do ministério');
         }
         throw Exception('Erro ao criar funções: ${response.statusMessage}');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showCreateError(context, 'funções do ministério');
+        showCreateError(context, 'funções do ministério');
       }
       throw Exception('Erro ao criar funções: $e');
     }
@@ -61,16 +61,12 @@ class MinistryFunctionsService {
         queryParams['active'] = active.toString();
       }
 
-      // print('🔍 Fazendo requisição para: $baseUrl/ministries/$ministryId/functions');
-      // print('🔍 Query params: $queryParams');
 
       final response = await _dio.get(
         '$baseUrl/ministries/$ministryId/functions',
         queryParameters: queryParams,
       );
 
-      // print('✅ Resposta recebida: ${response.statusCode}');
-      // print('✅ Dados: ${response.data}');
 
       if (response.statusCode == 200) {
         return (response.data as List<dynamic>)
@@ -78,19 +74,15 @@ class MinistryFunctionsService {
             .toList();
       } else {
         if (context != null) {
-          FeedbackService.showLoadError(context, 'funções do ministério');
+          showLoadError(context, 'funções do ministério');
         }
         throw Exception('Erro ao listar funções do ministério: ${response.statusMessage}');
       }
     } catch (e) {
-      // print('❌ Erro na requisição: $e');
       if (e is DioException) {
-        // print('❌ Status code: ${e.response?.statusCode}');
-        // print('❌ Response data: ${e.response?.data}');
-        // print('❌ Request URL: ${e.requestOptions.uri}');
       }
       if (context != null) {
-        FeedbackService.showLoadError(context, 'funções do ministério');
+        showLoadError(context, 'funções do ministério');
       }
       throw Exception('Erro ao listar funções do ministério: $e');
     }
@@ -116,16 +108,12 @@ class MinistryFunctionsService {
         queryParams['search'] = search;
       }
 
-      // print('🔍 Fazendo requisição para: $baseUrl/functions');
-      // print('🔍 Query params: $queryParams');
 
       final response = await _dio.get(
         '$baseUrl/functions',
         queryParameters: queryParams,
       );
 
-      // print('✅ Resposta recebida: ${response.statusCode}');
-      // print('✅ Dados: ${response.data}');
 
       if (response.statusCode == 200) {
         return (response.data as List<dynamic>)
@@ -133,19 +121,15 @@ class MinistryFunctionsService {
             .toList();
       } else {
         if (context != null) {
-          FeedbackService.showLoadError(context, 'funções do tenant');
+          showLoadError(context, 'funções do tenant');
         }
         throw Exception('Erro ao listar funções do tenant: ${response.statusMessage}');
       }
     } catch (e) {
-      // print('❌ Erro na requisição: $e');
       if (e is DioException) {
-        // print('❌ Status code: ${e.response?.statusCode}');
-        // print('❌ Response data: ${e.response?.data}');
-        // print('❌ Request URL: ${e.requestOptions.uri}');
       }
       if (context != null) {
-        FeedbackService.showLoadError(context, 'funções do tenant');
+        showLoadError(context, 'funções do tenant');
       }
       throw Exception('Erro ao listar funções do tenant: $e');
     }
@@ -174,18 +158,18 @@ class MinistryFunctionsService {
 
       if (response.statusCode == 200) {
         if (context != null) {
-          FeedbackService.showUpdateSuccess(context, 'Função do ministério');
+          showUpdateSuccess(context, 'Função do ministério');
         }
         return MinistryFunction.fromJson(response.data);
       } else {
         if (context != null) {
-          FeedbackService.showUpdateError(context, 'função do ministério');
+          showUpdateError(context, 'função do ministério');
         }
         throw Exception('Erro ao atualizar função: ${response.statusMessage}');
       }
     } catch (e) {
       if (context != null) {
-        FeedbackService.showUpdateError(context, 'função do ministério');
+        showUpdateError(context, 'função do ministério');
       }
       throw Exception('Erro ao atualizar função: $e');
     }

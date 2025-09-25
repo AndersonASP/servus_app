@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/core/error/error_handler_service.dart';
 
 class AuthInterceptor extends Interceptor {
   final Dio dio;
   bool _isRefreshing = false;
   final List<Function()> _retryQueue = [];
+  int _refreshRetryCount = 0;
+  static const int _maxRefreshRetries = 2; // Máximo de 2 tentativas de refresh
 
   AuthInterceptor(this.dio);
 
@@ -25,20 +28,15 @@ class AuthInterceptor extends Interceptor {
     final context = await TokenService.getContext();
     if (context['tenantId'] != null) {
       options.headers['x-tenant-id'] = context['tenantId'];
-      // print('🔑 Adicionando header x-tenant-id: ${context['tenantId']}');
     } else {
-      // print('⚠️ Tenant ID não encontrado no contexto');
     }
     if (context['branchId'] != null) {
       options.headers['x-branch-id'] = context['branchId'];
-      // print('🔑 Adicionando header x-branch-id: ${context['branchId']}');
     }
     if (context['ministryId'] != null) {
       options.headers['x-ministry-id'] = context['ministryId'];
-      // print('🔑 Adicionando header x-ministry-id: ${context['ministryId']}');
     }
 
-    // print('🌐 Headers finais: ${options.headers}');
     handler.next(options);
   }
 
@@ -50,7 +48,14 @@ class AuthInterceptor extends Interceptor {
     if (isUnauthorized && !isRefreshEndpoint) {
       // Verifica se o token está expirado
       if (await TokenService.isTokenExpired()) {
-        await _handleTokenRefresh(err, handler);
+        // Verifica se ainda temos tentativas de refresh disponíveis
+        if (_refreshRetryCount < _maxRefreshRetries) {
+          await _handleTokenRefresh(err, handler);
+        } else {
+          ErrorHandlerService().logError('Máximo de tentativas de refresh atingido');
+          await _logout();
+          handler.reject(err);
+        }
       } else {
         // Token válido mas servidor retornou 401 - pode ser problema de permissão
         handler.next(err);
@@ -81,10 +86,15 @@ class AuthInterceptor extends Interceptor {
 
     if (!_isRefreshing) {
       _isRefreshing = true;
+      _refreshRetryCount++; // Incrementa contador de tentativas
+      
       final success = await _refreshToken();
       _isRefreshing = false;
 
       if (success) {
+        // Reset contador em caso de sucesso
+        _refreshRetryCount = 0;
+        
         // Executa todas as requisições pendentes
         for (var retry in _retryQueue) {
           retry();
@@ -100,7 +110,11 @@ class AuthInterceptor extends Interceptor {
         }
       } else {
         _retryQueue.clear();
-        await _logout();
+        // Se falhou e atingiu o limite, faz logout
+        if (_refreshRetryCount >= _maxRefreshRetries) {
+          ErrorHandlerService().logError('Refresh falhou após múltiplas tentativas');
+          await _logout();
+        }
         handler.reject(err);
       }
     } else {
@@ -151,7 +165,7 @@ class AuthInterceptor extends Interceptor {
       
       return false;
     } catch (e) {
-      // print('❌ Erro ao renovar token: $e');
+      ErrorHandlerService().logError(e, context: 'renovação de token');
       return false;
     }
   }

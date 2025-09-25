@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/escalas/controllers/evento/evento_controller.dart';
 import 'package:servus_app/features/leader/escalas/models/evento_model.dart';
-import 'package:servus_app/core/services/feedback_service.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class EventoFormScreen extends StatefulWidget {
   final EventoModel? eventoExistente;
@@ -86,9 +86,9 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
 
     // Mostra notificação
     if (isNovo) {
-      FeedbackService.showCreateSuccess(context, 'Evento');
+      showCreateSuccess(context, 'Evento');
     } else {
-      FeedbackService.showUpdateSuccess(context, 'Evento');
+      showUpdateSuccess(context, 'Evento');
     }
 
     context.pop(); // volta à tela anterior
@@ -148,7 +148,7 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: ministerioSelecionado,
+                initialValue: ministerioSelecionado,
                 decoration: InputDecoration(
                   labelText: 'Ministério',
                   // herdando padrão global, mas pode customizar aqui se quiser:
@@ -218,7 +218,7 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<RecorrenciaTipo>(
-                value: recorrenciaSelecionada,
+                initialValue: recorrenciaSelecionada,
                 decoration: const InputDecoration(labelText: 'Recorrência'),
                 style: TextStyle(
                   color: context.colors.onSurface, // valor selecionado
@@ -246,7 +246,7 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
               const SizedBox(height: 16),
               if (recorrenciaSelecionada == RecorrenciaTipo.semanal)
                 DropdownButtonFormField<int>(
-                  value: diaSemanaSelecionado,
+                  initialValue: diaSemanaSelecionado,
                   decoration: const InputDecoration(labelText: 'Dia da semana'),
                   style: TextStyle(
                     color: context.colors.onSurface, // valor selecionado
@@ -281,7 +281,7 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
                 ),
               if (recorrenciaSelecionada == RecorrenciaTipo.mensal)
                 DropdownButtonFormField<int>(
-                  value: semanaDoMesSelecionada,
+                  initialValue: semanaDoMesSelecionada,
                   decoration: const InputDecoration(labelText: 'Semana do mês'),
                   items: List.generate(5, (i) {
                     final texto = '${i + 1}ª semana';

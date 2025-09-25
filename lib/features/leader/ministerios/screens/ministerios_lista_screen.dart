@@ -24,6 +24,16 @@ class _MinisterioListScreenState extends State<MinisterioListScreen> {
     _controller = MinisterioListController();
     _controller.carregarMinisterios();
     _scrollController.addListener(_onScroll);
+    
+    // Verifica se há parâmetro de refresh na URL no initState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final uri = Uri.parse(ModalRoute.of(context)?.settings.name ?? '');
+        if (uri.queryParameters['refresh'] == 'true') {
+          _controller.carregarMinisterios(refresh: true);
+        }
+      }
+    });
   }
 
   @override
@@ -33,6 +43,21 @@ class _MinisterioListScreenState extends State<MinisterioListScreen> {
     final uri = Uri.parse(ModalRoute.of(context)?.settings.name ?? '');
     if (uri.queryParameters['refresh'] == 'true') {
       // Recarrega a lista quando vem da criação/edição
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _controller.carregarMinisterios(refresh: true);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(MinisterioListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Verifica se há parâmetro de refresh na URL quando o widget é atualizado
+    final uri = Uri.parse(ModalRoute.of(context)?.settings.name ?? '');
+    if (uri.queryParameters['refresh'] == 'true') {
+      // Recarrega a lista quando volta da criação/edição
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _controller.carregarMinisterios(refresh: true);
@@ -78,12 +103,22 @@ class _MinisterioListScreenState extends State<MinisterioListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Verifica se há parâmetro de refresh na URL a cada build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final uri = Uri.parse(ModalRoute.of(context)?.settings.name ?? '');
+        if (uri.queryParameters['refresh'] == 'true') {
+          _controller.forceRefresh();
+        }
+      }
+    });
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         return Scaffold(
           appBar: AppBar(
-            backgroundColor: context.theme.scaffoldBackgroundColor,
+            backgroundColor: Colors.transparent,
             surfaceTintColor: Colors.transparent,
             elevation: 0,
             scrolledUnderElevation: 0,
@@ -92,10 +127,13 @@ class _MinisterioListScreenState extends State<MinisterioListScreen> {
               icon: const Icon(Icons.arrow_back),
               onPressed: () => context.go('/leader/dashboard'),
             ),
-            title: Text(
-              'Ministérios',
-              style: context.textStyles.titleLarge
-                  ?.copyWith(color: context.colors.onSurface),
+            title: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: Text(
+                'Ministérios',
+                style: context.textStyles.titleLarge
+                    ?.copyWith(color: context.colors.onSurface),
+              ),
             ),
             actions: [
               // Botão de busca
@@ -296,7 +334,10 @@ class _MinisterioListScreenState extends State<MinisterioListScreen> {
 
                 // Lista de ministérios
                 _controller.isLoading && _controller.ministerios.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
+                    ? SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.6,
+                        child: const Center(child: CircularProgressIndicator()),
+                      )
                     : _controller.ministerios.isEmpty
                         ? SizedBox(
                             height: MediaQuery.of(context).size.height * 0.6,
@@ -602,22 +643,70 @@ class _MinistrySwitchState extends State<_MinistrySwitch> {
       onChanged: widget.controller.isUpdating
           ? null
           : (value) async {
-              setState(() {
-                _isActive = value;
-              });
-              
-              try {
-                await widget.controller.alterarStatus(widget.ministerio.id, value);
-              } catch (e) {
-                // Reverte em caso de erro
+              // Se está ativando, faz diretamente
+              if (value) {
                 setState(() {
-                  _isActive = !value;
+                  _isActive = value;
                 });
+                
+                try {
+                  await widget.controller.alterarStatus(widget.ministerio.id, value);
+                } catch (e) {
+                  // Reverte em caso de erro
+                  setState(() {
+                    _isActive = !value;
+                  });
+                }
+              } else {
+                // Se está desativando, mostra modal de confirmação
+                final confirmed = await _showConfirmationDialog(context);
+                if (confirmed == true) {
+                  setState(() {
+                    _isActive = value;
+                  });
+                  
+                  try {
+                    await widget.controller.alterarStatus(widget.ministerio.id, value);
+                  } catch (e) {
+                    // Reverte em caso de erro
+                    setState(() {
+                      _isActive = !value;
+                    });
+                  }
+                }
               }
             },
       activeThumbColor: ServusColors.success,
       inactiveThumbColor: Colors.red,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
+  Future<bool?> _showConfirmationDialog(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirmar Desativação'),
+          content: Text(
+            'Tem certeza que deseja desativar o ministério "${widget.ministerio.name}"?\n\n'
+            'Esta ação pode afetar as escalas e voluntários associados a este ministério.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Desativar'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

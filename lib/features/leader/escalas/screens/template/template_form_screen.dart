@@ -141,7 +141,7 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
                         ),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
-                          value: funcao.ministerioId.isEmpty ? null : funcao.ministerioId,
+                          initialValue: funcao.ministerioId.isEmpty ? null : funcao.ministerioId,
                           decoration: const InputDecoration(labelText: 'Ministério'),
                           items: ministeriosMock
                               .map((m) => DropdownMenuItem(value: m, child: Text(m)))

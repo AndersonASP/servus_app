@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 
@@ -45,7 +46,6 @@ class MinistryMembershipService {
         throw Exception('Erro ao vincular usuário: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Erro ao vincular usuário ao ministério: $e');
       rethrow;
     }
   }
@@ -56,31 +56,73 @@ class MinistryMembershipService {
     required String ministryId,
   }) async {
     try {
+      debugPrint('🔗 [MinistryMembershipService] Iniciando desvinculação...');
+      debugPrint('   - User ID: $userId');
+      debugPrint('   - Ministry ID: $ministryId');
+      
       final context = await TokenService.getContext();
       final tenantId = context['tenantId'];
       final branchId = context['branchId'];
+      final currentUserId = context['userId'];
 
       if (tenantId == null) {
         throw Exception('Tenant ID não encontrado');
       }
+
+      if (currentUserId == null) {
+        throw Exception('User ID não encontrado no contexto');
+      }
+
+      debugPrint('   - Tenant ID: $tenantId');
+      debugPrint('   - Branch ID: $branchId');
+      debugPrint('   - Current User ID: $currentUserId');
 
       final response = await _dio.delete(
         '/ministry-memberships/user/$userId/ministry/$ministryId',
         options: Options(
           headers: {
             'X-Tenant-ID': tenantId,
+            'X-Current-User-ID': currentUserId,
             if (branchId != null) 'X-Branch-ID': branchId,
           },
         ),
       );
 
+      debugPrint('📡 [MinistryMembershipService] Resposta recebida:');
+      debugPrint('   - Status: ${response.statusCode}');
+      debugPrint('   - Data: ${response.data}');
+
       if (response.statusCode == 200) {
+        debugPrint('✅ [MinistryMembershipService] Usuário desvinculado com sucesso');
         return response.data;
       } else {
         throw Exception('Erro ao desvincular usuário: ${response.statusCode}');
       }
+    } on DioException catch (e) {
+      debugPrint('❌ [MinistryMembershipService] DioException capturada:');
+      debugPrint('   - Tipo: ${e.type}');
+      debugPrint('   - Status: ${e.response?.statusCode}');
+      debugPrint('   - Mensagem: ${e.message}');
+      debugPrint('   - Dados: ${e.response?.data}');
+      
+      if (e.response?.statusCode == 404) {
+        throw Exception('Usuário não está vinculado a este ministério ou vínculo não encontrado');
+      } else if (e.response?.statusCode == 403) {
+        throw Exception('Você não tem permissão para remover este membro');
+      } else if (e.response?.statusCode == 400) {
+        final message = e.response?.data['message'] ?? 'Dados inválidos para desvinculação';
+        throw Exception(message);
+      } else if (e.type == DioExceptionType.connectionTimeout || 
+                 e.type == DioExceptionType.receiveTimeout ||
+                 e.type == DioExceptionType.sendTimeout) {
+        throw Exception('Timeout na conexão. Verifique sua internet e tente novamente.');
+      } else if (e.type == DioExceptionType.connectionError) {
+        throw Exception('Erro de conexão. Verifique sua internet e tente novamente.');
+      } else {
+        throw Exception('Erro ao desvincular usuário: ${e.response?.statusCode}');
+      }
     } catch (e) {
-      print('❌ Erro ao desvincular usuário do ministério: $e');
+      debugPrint('❌ [MinistryMembershipService] Erro geral: $e');
       rethrow;
     }
   }
@@ -127,7 +169,6 @@ class MinistryMembershipService {
         throw Exception('Erro ao buscar membros: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Erro ao buscar membros do ministério: $e');
       rethrow;
     }
   }
@@ -170,7 +211,6 @@ class MinistryMembershipService {
         throw Exception('Erro ao buscar ministérios: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Erro ao buscar ministérios do usuário: $e');
       rethrow;
     }
   }
@@ -212,7 +252,6 @@ class MinistryMembershipService {
         throw Exception('Erro ao atualizar vínculo: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Erro ao atualizar vínculo de ministério: $e');
       rethrow;
     }
   }
@@ -248,7 +287,6 @@ class MinistryMembershipService {
         throw Exception('Erro ao verificar vínculo: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Erro ao verificar vínculo de ministério: $e');
       rethrow;
     }
   }
@@ -282,7 +320,6 @@ class MinistryMembershipService {
         throw Exception('Erro ao buscar estatísticas: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Erro ao buscar estatísticas do ministério: $e');
       rethrow;
     }
   }

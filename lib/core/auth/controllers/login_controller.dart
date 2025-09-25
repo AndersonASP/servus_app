@@ -20,71 +20,57 @@ class LoginController extends ChangeNotifier {
 
   Future<void> fazerLogin(
       String email, String senha, BuildContext context, {String? tenantId}) async {
-    print('🎯 [LOGIN_CONTROLLER] Iniciando processo de login...');
-    print('📧 [LOGIN_CONTROLLER] Email recebido: $email');
-    print('🔑 [LOGIN_CONTROLLER] Senha recebida: ${senha.isNotEmpty ? '***' : 'VAZIA'}');
-    print('🏢 [LOGIN_CONTROLLER] TenantId: $tenantId');
     
     final auth = Provider.of<AuthState>(context, listen: false);
 
     if (email.isEmpty || senha.isEmpty) {
-      print('❌ [LOGIN_CONTROLLER] Email ou senha vazios');
       showServusSnack(context, message: 'Informe e-mail e senha', type: ServusSnackType.error);
       return;
     }
 
-    print('⏳ [LOGIN_CONTROLLER] Definindo loading como true...');
     setLoading(true);
 
     try {
-      print('🚀 [LOGIN_CONTROLLER] Chamando AuthService.loginComEmailESenha...');
       final loginResponse = await _authService.loginComEmailESenha(
         email: email, 
         senha: senha,
         tenantId: tenantId,
       );
-      print('✅ [LOGIN_CONTROLLER] LoginResponse recebido com sucesso');
 
       // 🆕 CORREÇÃO: Primeiro extrai e carrega claims do JWT
-      print('🔐 [LOGIN_CONTROLLER] Extraindo claims do JWT...');
       await TokenService.extractSecurityClaims(loginResponse.accessToken);
       await TokenService.loadSecurityClaims();
-      print('✅ [LOGIN_CONTROLLER] Claims extraídos com sucesso');
       
       // Converte para UsuarioLogado com dados atualizados
-      print('🔄 [LOGIN_CONTROLLER] Convertendo LoginResponse para UsuarioLogado...');
       final usuario = _authService.convertToUsuarioLogado(loginResponse);
-      print('✅ [LOGIN_CONTROLLER] UsuarioLogado criado: ${usuario.nome} (${usuario.email})');
 
       // 🆕 CORREÇÃO: Atualiza o usuário com dados corretos dos claims
-      print('🔄 [LOGIN_CONTROLLER] Atualizando usuário com claims...');
       final usuarioAtualizado = await _atualizarUsuarioComClaims(usuario);
-      print('✅ [LOGIN_CONTROLLER] Usuário atualizado com claims');
       
       // Atualiza estado global com dados corretos
-      print('🔄 [LOGIN_CONTROLLER] Atualizando estado global...');
       auth.login(usuarioAtualizado);
-      print('✅ [LOGIN_CONTROLLER] Estado global atualizado');
 
       // Determina o dashboard usando claims atualizados
-      print('🎯 [LOGIN_CONTROLLER] Determinando dashboard com claims atualizados...');
       
       if (context.mounted) {
         final dashboardRoute = await _determinarDashboardRouteComClaims(usuarioAtualizado);
-        print('🎯 [LOGIN_CONTROLLER] Redirecionando para: $dashboardRoute');
         // Usa post frame callback para evitar problemas de navegação durante dispose
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (context.mounted) {
-            print('🚀 [LOGIN_CONTROLLER] Executando navegação para: $dashboardRoute');
             context.go(dashboardRoute);
           }
         });
       }
     } catch (e) {
-      print('❌ [LOGIN_CONTROLLER] Erro durante login: $e');
-      showServusSnack(context, message: e.toString().replaceAll('Exception: ', ''), type: ServusSnackType.error);
+      String errorMessage = e.toString().replaceAll('Exception: ', '');
+      
+      // Tratamento específico para usuários pendentes
+      if (errorMessage.contains('aguardando aprovação') || errorMessage.contains('aprovação do líder')) {
+        _showPendingApprovalDialog(context, errorMessage);
+      } else {
+        showServusSnack(context, message: errorMessage, type: ServusSnackType.error);
+      }
     } finally {
-      print('⏳ [LOGIN_CONTROLLER] Definindo loading como false...');
       setLoading(false);
     }
   }
@@ -98,7 +84,6 @@ class LoginController extends ChangeNotifier {
       final loginResponse = await _authService.loginComGoogle(tenantId: tenantId);
 
       // 🆕 CORREÇÃO: Primeiro extrai e carrega claims do JWT
-      // print('✅ Login com Google realizado com sucesso. Extraindo claims do JWT...');
       await TokenService.extractSecurityClaims(loginResponse.accessToken);
       await TokenService.loadSecurityClaims();
       
@@ -112,11 +97,9 @@ class LoginController extends ChangeNotifier {
       auth.login(usuarioAtualizado);
 
       // Determina o dashboard usando claims atualizados
-      // print('🎯 Determinando dashboard com claims atualizados...');
       
       if (context.mounted) {
         final dashboardRoute = await _determinarDashboardRouteComClaims(usuarioAtualizado);
-        // print('🎯 Redirecionando para: $dashboardRoute');
         // Usa post frame callback para evitar problemas de navegação durante dispose
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (context.mounted) {
@@ -125,7 +108,14 @@ class LoginController extends ChangeNotifier {
         });
       }
     } catch (e) {
-      showServusSnack(context, message: e.toString().replaceAll('Exception: ', ''), type: ServusSnackType.error);
+      String errorMessage = e.toString().replaceAll('Exception: ', '');
+      
+      // Tratamento específico para usuários pendentes
+      if (errorMessage.contains('aguardando aprovação') || errorMessage.contains('aprovação do líder')) {
+        _showPendingApprovalDialog(context, errorMessage);
+      } else {
+        showServusSnack(context, message: errorMessage, type: ServusSnackType.error);
+      }
     } finally {
       setLoading(false);
     }
@@ -151,7 +141,6 @@ class LoginController extends ChangeNotifier {
   /// 🆕 Atualiza o usuário com dados corretos dos claims do JWT
   Future<UsuarioLogado> _atualizarUsuarioComClaims(UsuarioLogado usuario) async {
     try {
-      // print('🔄 Atualizando usuário com claims do JWT...');
       
       // Obtém dados atualizados dos claims
       final userRole = TokenService.userRole;
@@ -159,26 +148,18 @@ class LoginController extends ChangeNotifier {
       final tenantId = TokenService.tenantId;
       final branchId = TokenService.branchId;
       
-      // print('📋 Claims disponíveis:');
-      // print('   - User Role: $userRole');
-      // print('   - Membership Role: $membershipRole');
-      // print('   - Tenant ID: $tenantId');
-      // print('   - Branch ID: $branchId');
       
       // Determina o role final (mesma lógica do roteamento)
       String? roleFinal;
       if (userRole == 'servus_admin') {
         roleFinal = userRole; // ServusAdmin sempre usa seu role global
-        // print('🎯 ServusAdmin detectado - usando role global: $roleFinal');
       } else {
         // Para outros usuários, membership role tem prioridade sobre user role
         roleFinal = membershipRole ?? userRole;
-        // print('🎯 Role final para usuário: $roleFinal');
       }
       
       // Mapeia o role para enum
       final roleEnum = _mapearRoleParaEnum(roleFinal);
-      // print('🎭 Role mapeado para enum: $roleEnum');
       
       // Retorna usuário atualizado com dados corretos
       return usuario.copyWith(
@@ -189,8 +170,6 @@ class LoginController extends ChangeNotifier {
       );
       
     } catch (e) {
-      // print('❌ Erro ao atualizar usuário com claims: $e');
-      // print('🔄 Retornando usuário original...');
       return usuario;
     }
   }
@@ -209,7 +188,6 @@ class LoginController extends ChangeNotifier {
       case 'volunteer':
         return UserRole.volunteer;
       default:
-        // print('⚠️ Role desconhecido: $role, usando volunteer como padrão');
         return UserRole.volunteer;
     }
   }
@@ -217,54 +195,40 @@ class LoginController extends ChangeNotifier {
   /// 🆕 Determina a rota do dashboard usando claims do JWT (mesma lógica do SplashController)
   Future<String> _determinarDashboardRouteComClaims(UsuarioLogado usuario) async {
     try {
-      // print('🔍 Determinando dashboard usando claims do JWT...');
       
       // 🆕 PRIMEIRO: Tenta extrair claims diretamente do JWT atual
       final accessToken = await TokenService.getAccessToken();
-      // print('🔐 Access token encontrado: ${accessToken != null ? "SIM" : "NÃO"}');
       if (accessToken != null) {
-        // print('🔐 JWT encontrado, extraindo claims diretamente...');
         await TokenService.extractSecurityClaims(accessToken);
       }
       
       // 🆕 SEGUNDO: Carrega claims de segurança (do JWT ou cache)
-      // print('📥 Carregando claims de segurança...');
       await TokenService.loadSecurityClaims();
       
       // 🆕 TERCEIRO: Usa role do JWT (mais seguro e atualizado)
       final userRole = TokenService.userRole;
       final membershipRole = TokenService.membershipRole;
       
-      // print('📋 Claims de segurança carregados:');
-      // print('   - User Role: $userRole');
-      // print('   - Membership Role: $membershipRole');
       
       // 🆕 CORREÇÃO: Para ServusAdmin, sempre usa userRole
       String? roleFinal;
       if (userRole == 'servus_admin') {
         roleFinal = userRole; // ServusAdmin sempre usa seu role global
-        // print('🎯 ServusAdmin detectado - usando role global: $roleFinal');
       } else {
         // Para outros usuários, membership role tem prioridade sobre user role
         roleFinal = membershipRole ?? userRole;
-        // print('🎯 Role final para roteamento: $roleFinal');
       }
       
       if (roleFinal != null) {
-        // print('🎯 Role final para roteamento: $roleFinal');
         
         // Mapeia o role para rota do dashboard
         final dashboardRoute = _mapearRoleParaDashboard(roleFinal);
-        // print('🎭 Role mapeado para dashboard: $dashboardRoute');
         return dashboardRoute;
       } else {
-        // print('⚠️ Nenhum role encontrado, usando fallback para volunteer');
         return '/volunteer/dashboard';
       }
       
     } catch (e) {
-      // print('❌ Erro ao determinar dashboard por claims: $e');
-      // print('🔄 Fallback: usando role do usuário local...');
       
       // Fallback: usa o role do usuário logado
       return _determinarDashboardRoute(usuario.role);
@@ -282,7 +246,6 @@ class LoginController extends ChangeNotifier {
       case 'volunteer':
         return '/volunteer/dashboard';
       default:
-        // print('⚠️ Role desconhecido: $role, usando volunteer como padrão');
         return '/volunteer/dashboard';
     }
   }
@@ -298,6 +261,105 @@ class LoginController extends ChangeNotifier {
       case UserRole.volunteer:
         return '/volunteer/dashboard';
     }
+  }
+
+  /// Mostra dialog específico para usuários pendentes de aprovação
+  void _showPendingApprovalDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.schedule,
+              color: Colors.orange,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Aguardando Aprovação',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sua conta foi criada com sucesso!',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.orange,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Status: Pendente',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '• O líder do ministério precisa aprovar sua participação\n'
+                    '• Você receberá um email quando for aprovado\n'
+                    '• Entre em contato com o líder se necessário',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Entendi',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

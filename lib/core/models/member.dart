@@ -394,27 +394,18 @@ class MembersResponse {
   factory MembersResponse.fromJson(Map<String, dynamic> json) {
     List<Member> members = [];
     
-    print('🔍 Debug MembersResponse.fromJson:');
-    print('   - json keys: ${json.keys.toList()}');
-    print('   - members type: ${json['members']?.runtimeType}');
-    print('   - members value: ${json['members']}');
     
     if (json['members'] != null) {
       if (json['members'] is List) {
         try {
           members = List<Member>.from(json['members'].map((x) => Member.fromJson(x)));
-          print('✅ Members processados: ${members.length}');
         } catch (e) {
-          print('❌ Erro ao processar members: $e');
           members = [];
         }
       } else {
-        print('❌ Erro: members não é uma lista, é ${json['members'].runtimeType}');
-        print('❌ Valor: ${json['members']}');
         members = [];
       }
     } else {
-      print('⚠️ members é null');
     }
     
     return MembersResponse(

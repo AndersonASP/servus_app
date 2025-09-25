@@ -1,19 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/core/enums/user_role.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerios_detalhes_controller.dart';
 import 'package:servus_app/features/leader/ministerios/widgets/ministry_members_tab.dart';
 import 'package:servus_app/features/ministries/widgets/ministry_functions_tab.dart';
 import 'package:servus_app/features/ministries/controllers/ministry_functions_controller.dart';
 import 'package:servus_app/features/ministries/services/ministry_functions_service.dart';
+import 'package:servus_app/state/auth_state.dart';
 import 'package:go_router/go_router.dart';
 
 class MinisterioDetalhesScreen extends StatelessWidget {
   final String ministerioId;
   const MinisterioDetalhesScreen({super.key, required this.ministerioId});
 
+  /// Determina para onde o usuário deve voltar baseado no seu role
+  String _getBackRoute(BuildContext context) {
+    final usuario = context.read<AuthState>().usuario;
+    if (usuario?.role == UserRole.leader) {
+      // Líder volta para o dashboard
+      return '/leader/dashboard';
+    } else {
+      // Outros roles voltam para a lista de ministérios
+      return '/leader/ministerio/lista';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    debugPrint('🔍 [MinisterioDetalhesScreen] Construindo tela para ministério: $ministerioId');
+    debugPrint('🔍 [MinisterioDetalhesScreen] Context mounted? ${context.mounted}');
+    
     return ChangeNotifierProvider(
       create: (_) => MinisterioDetalhesController(ministerioId: ministerioId)..carregarDados(),
       child: Consumer<MinisterioDetalhesController>(
@@ -24,7 +41,7 @@ class MinisterioDetalhesScreen extends StatelessWidget {
                 centerTitle: false,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.go('/leader/ministerio/lista'),
+                  onPressed: () => context.go(_getBackRoute(context)),
                 ),
                 title: Text('Carregando...', style: context.textStyles.titleLarge
                   ?.copyWith(color: context.colors.onSurface)),
@@ -39,7 +56,7 @@ class MinisterioDetalhesScreen extends StatelessWidget {
                 centerTitle: false,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.go('/leader/ministerio/lista'),
+                  onPressed: () => context.go(_getBackRoute(context)),
                 ),
                 title: Text('Erro', style: context.textStyles.titleLarge
                   ?.copyWith(color: context.colors.onSurface)),
@@ -91,7 +108,7 @@ class MinisterioDetalhesScreen extends StatelessWidget {
                 centerTitle: false,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.go('/leader/ministerio/lista'),
+                  onPressed: () => context.go(_getBackRoute(context)),
                 ),
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,7 +540,7 @@ class MinisterioDetalhesScreen extends StatelessWidget {
                     backgroundColor: Colors.green,
                   ),
                 );
-                context.go('/leader/ministerio/lista');
+                context.go(_getBackRoute(context));
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

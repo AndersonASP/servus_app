@@ -1,18 +1,27 @@
 {
   "project_info": {
-    "project_number": "1489810637",
-    "project_id": "appservus-b02bd",
-    "storage_bucket": "appservus-b02bd.firebasestorage.app"
+    "project_number": "44996683041",
+    "project_id": "future-footing-468100-k9",
+    "storage_bucket": "future-footing-468100-k9.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1489810637:android:95c199d8b6d102aa582584",
+        "mobilesdk_app_id": "1:44996683041:android:e782aqcnb4mrdj0gul2cha2g803gddnh",
         "android_client_info": {
           "package_name": "com.servus.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "44996683041-e782aqcnb4mrdj0gul2cha2g803gddnh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.servus.app",
+            "certificate_hash": "b50c9153fcec120e4885e291f3d19b9aa430230f"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA3A7l4UwKr18xmTyzeeFbeuam86MpwsLE"
