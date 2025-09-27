@@ -1,15 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:servus_app/core/models/member.dart';
-import 'package:servus_app/core/constants/env.dart';
+import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 import 'package:servus_app/core/error/error_handler_service.dart';
 
 class MembersService {
-  static const String baseUrl = Env.baseUrl;
-  static const String endpoint = '/members';
+  static const String endpoint = '/users/filter';
 
   // Obter token de autenticação
   static Future<String?> _getAuthToken() async {
@@ -91,21 +89,18 @@ class MembersService {
         ],
       };
 
+      final dio = DioClient.instance;
+      
       // Usar o endpoint correto do backend
-      final response = await http.post(
-        Uri.parse('$baseUrl/members'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-          'x-tenant-id': tenantId, // ObjectId como string
-        },
-        body: jsonEncode(requestData),
+      final response = await dio.post(
+        '/members',
+        data: requestData,
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        return Member.fromJson(jsonDecode(response.body));
+        return Member.fromJson(response.data);
       } else {
-        final error = jsonDecode(response.body);
+        final error = response.data;
         String errorMessage = error['message'] ?? 'Erro ao criar membro';
         
         // Tratar erros específicos
@@ -133,55 +128,39 @@ class MembersService {
   // Listar membros com filtros
   static Future<MembersResponse> getMembers({MemberFilter? filter, BuildContext? context}) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) {
-        if (context != null) showAuthError(context);
-        throw Exception('Token de autenticação não encontrado');
-      }
+      print('🔍 [MembersService] ===== INICIANDO getMembers =====');
+      print('   - Endpoint: $endpoint');
+      print('   - Filter: ${filter?.toJson()}');
       
-
-      // Obter tenantId do token
-      final tenantId = await _getTenantId();
-      if (tenantId == null) {
-        if (context != null) showAuthError(context);
-        throw Exception('Tenant ID não encontrado no token');
-      }
-
+      final dio = DioClient.instance;
       final queryParams = filter?.toJson() ?? {};
       
-      // Converter Map<String, dynamic> para Map<String, String>
-      final Map<String, String> stringQueryParams = {};
-      queryParams.forEach((key, value) {
-        if (value != null) {
-          stringQueryParams[key] = value.toString();
-        }
-      });
+      print('🔍 [MembersService] Query parameters: $queryParams');
       
-      try {
-        final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: stringQueryParams);
-      } catch (e) {
-        rethrow;
-      }
-      
-      final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: stringQueryParams);
-
-      final response = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'x-tenant-id': tenantId, // ObjectId como string
-        },
+      final response = await dio.get(
+        endpoint,
+        queryParameters: queryParams,
       );
 
+      print('🔍 [MembersService] Resposta recebida:');
+      print('   - Status Code: ${response.statusCode}');
+      print('   - Data type: ${response.data.runtimeType}');
+      print('   - Data: ${response.data}');
 
       if (response.statusCode == 200) {
-        return MembersResponse.fromJson(jsonDecode(response.body));
+        final result = MembersResponse.fromJson(response.data);
+        print('🔍 [MembersService] ===== SUCESSO =====');
+        print('   - Total de membros: ${result.members.length}');
+        return result;
       } else {
-        final error = jsonDecode(response.body);
+        print('❌ [MembersService] Erro na resposta:');
+        print('   - Status: ${response.statusCode}');
+        print('   - Error: ${response.data}');
         if (context != null) showLoadError(context, 'membros');
-        throw Exception(error['message'] ?? 'Erro ao buscar membros');
+        throw Exception(response.data['message'] ?? 'Erro ao buscar membros');
       }
     } catch (e) {
+      print('❌ [MembersService] Exceção capturada: $e');
       ErrorHandlerService().logError(e, context: 'busca de membros');
       if (context != null && (e.toString().contains('SocketException') || e.toString().contains('TimeoutException'))) {
         showNetworkError(context);
@@ -206,18 +185,14 @@ class MembersService {
         throw Exception('Tenant ID não encontrado no token');
       }
 
-      final response = await http.get(
-        Uri.parse('$baseUrl$endpoint/$id'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'x-tenant-id': tenantId,
-        },
-      );
+      final dio = DioClient.instance;
+      
+      final response = await dio.get('/users/$id');
 
       if (response.statusCode == 200) {
-        return Member.fromJson(jsonDecode(response.body));
+        return Member.fromJson(response.data);
       } else {
-        final error = jsonDecode(response.body);
+        final error = response.data;
         showLoadError(context, 'membro');
         throw Exception(error['message'] ?? 'Erro ao buscar membro');
       }
@@ -245,21 +220,18 @@ class MembersService {
         throw Exception('Tenant ID não encontrado no token');
       }
 
-      final response = await http.put(
-        Uri.parse('$baseUrl$endpoint/$id'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-          'x-tenant-id': tenantId,
-        },
-        body: jsonEncode(request.toJson()),
+      final dio = DioClient.instance;
+      
+      final response = await dio.put(
+        '/users/$id',
+        data: request.toJson(),
       );
 
       if (response.statusCode == 200) {
         showUpdateSuccess(context, 'Membro');
-        return Member.fromJson(jsonDecode(response.body));
+        return Member.fromJson(response.data);
       } else {
-        final error = jsonDecode(response.body);
+        final error = response.data;
         showUpdateError(context, 'membro');
         throw Exception(error['message'] ?? 'Erro ao atualizar membro');
       }
@@ -287,18 +259,14 @@ class MembersService {
         throw Exception('Tenant ID não encontrado no token');
       }
 
-      final response = await http.delete(
-        Uri.parse('$baseUrl$endpoint/$id'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'x-tenant-id': tenantId,
-        },
-      );
+      final dio = DioClient.instance;
+      
+      final response = await dio.delete('/users/$id');
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         showDeleteSuccess(context, 'Membro');
       } else {
-        final error = jsonDecode(response.body);
+        final error = response.data;
         showDeleteError(context, 'membro');
         throw Exception(error['message'] ?? 'Erro ao deletar membro');
       }
@@ -332,7 +300,17 @@ class MembersService {
 
   // Buscar membros ativos
   static Future<MembersResponse> getActiveMembers(BuildContext context) async {
-    return getMembers(filter: MemberFilter(isActive: true), context: context);
+    print('🔍 [MembersService] ===== getActiveMembers CHAMADO =====');
+    print('   - Context: ${context.runtimeType}');
+    
+    final filter = MemberFilter(isActive: true);
+    print('   - Filter criado: ${filter.toJson()}');
+    
+    final result = await getMembers(filter: filter, context: context);
+    print('🔍 [MembersService] ===== getActiveMembers FINALIZADO =====');
+    print('   - Resultado: ${result.members.length} membros');
+    
+    return result;
   }
 
   // Buscar membros inativos
@@ -343,34 +321,18 @@ class MembersService {
   // Toggle status do membro (ativar/inativar)
   static Future<Member> toggleMemberStatus(String id, BuildContext context) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) {
-        showAuthError(context);
-        throw Exception('Token de autenticação não encontrado');
-      }
-
-      // Obter tenantId do token
-      final tenantId = await _getTenantId();
-      if (tenantId == null) {
-        showAuthError(context);
-        throw Exception('Tenant ID não encontrado no token');
-      }
-
-      final response = await http.patch(
-        Uri.parse('$baseUrl$endpoint/$id/toggle-status'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'x-tenant-id': tenantId,
-        },
+      final dio = DioClient.instance;
+      
+      final response = await dio.patch(
+        '/users/$id/toggle-status',
       );
 
       if (response.statusCode == 200) {
         showUpdateSuccess(context, 'Status do membro');
-        return Member.fromJson(jsonDecode(response.body));
+        return Member.fromJson(response.data);
       } else {
-        final error = jsonDecode(response.body);
         showUpdateError(context, 'status do membro');
-        throw Exception(error['message'] ?? 'Erro ao alterar status do membro');
+        throw Exception(response.data['message'] ?? 'Erro ao alterar status do membro');
       }
     } catch (e) {
       if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {

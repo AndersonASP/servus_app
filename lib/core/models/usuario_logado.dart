@@ -11,6 +11,8 @@ class UsuarioLogado {
   final String? tenantId;
   final String? branchId;
   final String? picture;
+  final String? primaryMinistryId; // 🆕 ID do ministério principal
+  final String? primaryMinistryName; // 🆕 Nome do ministério principal
 
   UsuarioLogado({
     required this.nome,
@@ -22,6 +24,8 @@ class UsuarioLogado {
     this.branchId,
     this.picture,
     this.ministerios = const [],
+    this.primaryMinistryId,
+    this.primaryMinistryName,
   });
 
   bool get isAdmin => role == UserRole.servus_admin || role == UserRole.tenant_admin || role == UserRole.branch_admin;
@@ -38,7 +42,9 @@ class UsuarioLogado {
     List<Ministerio>? ministerios,
     String? tenantId,
     String? branchId,
-    String? picture
+    String? picture,
+    String? primaryMinistryId,
+    String? primaryMinistryName,
   }) {
     return UsuarioLogado(
       nome: nome ?? this.nome,
@@ -49,7 +55,9 @@ class UsuarioLogado {
       ministerios: ministerios ?? this.ministerios,
       tenantId: tenantId ?? this.tenantId,
       branchId: branchId ?? this.branchId,
-      picture: picture ?? this.picture
+      picture: picture ?? this.picture,
+      primaryMinistryId: primaryMinistryId ?? this.primaryMinistryId,
+      primaryMinistryName: primaryMinistryName ?? this.primaryMinistryName,
     );
   }
 }

@@ -11,8 +11,20 @@ class LocalStorageService {
   static const _keyBranchId = 'branchId';
   static const _keyBranchName = 'branchName';
   static const _keyPicture = 'picture';
+  static const _keyPrimaryMinistryId = 'primaryMinistryId';
+  static const _keyPrimaryMinistryName = 'primaryMinistryName';
 
   static Future<void> salvarUsuario(UsuarioLogado usuario) async {
+    print('🔍 [LocalStorage] ===== SALVANDO USUÁRIO =====');
+    print('🔍 [LocalStorage] Dados do usuário:');
+    print('   - Nome: ${usuario.nome}');
+    print('   - Email: ${usuario.email}');
+    print('   - Role: ${usuario.role}');
+    print('   - PrimaryMinistryId: ${usuario.primaryMinistryId}');
+    print('   - PrimaryMinistryName: ${usuario.primaryMinistryName}');
+    print('   - TenantId: ${usuario.tenantId}');
+    print('   - BranchId: ${usuario.branchId}');
+    
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyNome, usuario.nome);
     await prefs.setString(_keyEmail, usuario.email);
@@ -22,9 +34,30 @@ class LocalStorageService {
     await prefs.setString(_keyRole, mapRoleToString(usuario.role));
     await prefs.setString(_keyTenantId, usuario.tenantId ?? '');
     await prefs.setString(_keyBranchId, usuario.branchId ?? '');
+    
+    // 🆕 CORREÇÃO: Salvar primaryMinistryId apenas se não for null
+    if (usuario.primaryMinistryId != null && usuario.primaryMinistryId!.isNotEmpty) {
+      await prefs.setString(_keyPrimaryMinistryId, usuario.primaryMinistryId!);
+      print('✅ [LocalStorage] PrimaryMinistryId salvo: ${usuario.primaryMinistryId}');
+    } else {
+      await prefs.remove(_keyPrimaryMinistryId); // Remove se for null/vazio
+      print('⚠️ [LocalStorage] PrimaryMinistryId é null/vazio, removendo do storage');
+    }
+    
+    if (usuario.primaryMinistryName != null && usuario.primaryMinistryName!.isNotEmpty) {
+      await prefs.setString(_keyPrimaryMinistryName, usuario.primaryMinistryName!);
+      print('✅ [LocalStorage] PrimaryMinistryName salvo: ${usuario.primaryMinistryName}');
+    } else {
+      await prefs.remove(_keyPrimaryMinistryName); // Remove se for null/vazio
+      print('⚠️ [LocalStorage] PrimaryMinistryName é null/vazio, removendo do storage');
+    }
+    
+    print('🔍 [LocalStorage] ===== USUÁRIO SALVO COM SUCESSO =====');
   }
 
   static Future<UsuarioLogado?> carregarUsuario() async {
+    print('🔍 [LocalStorage] ===== CARREGANDO USUÁRIO =====');
+    
     final prefs = await SharedPreferences.getInstance();
     final nome = prefs.getString(_keyNome);
     final email = prefs.getString(_keyEmail);
@@ -34,9 +67,27 @@ class LocalStorageService {
     final branchId = prefs.getString(_keyBranchId);
     final branchName = prefs.getString(_keyBranchName);
     final picture = prefs.getString(_keyPicture);
+    final primaryMinistryId = prefs.getString(_keyPrimaryMinistryId);
+    final primaryMinistryName = prefs.getString(_keyPrimaryMinistryName);
+
+    print('🔍 [LocalStorage] Dados carregados do storage:');
+    print('   - Nome: $nome');
+    print('   - Email: $email');
+    print('   - Role: $role');
+    print('   - PrimaryMinistryId (raw): $primaryMinistryId');
+    print('   - PrimaryMinistryName (raw): $primaryMinistryName');
+    print('   - TenantId: $tenantId');
+    print('   - BranchId: $branchId');
 
     if (nome != null && email != null && role != null) {
-      return UsuarioLogado(
+      final processedPrimaryMinistryId = primaryMinistryId?.isNotEmpty == true ? primaryMinistryId : null;
+      final processedPrimaryMinistryName = primaryMinistryName?.isNotEmpty == true ? primaryMinistryName : null;
+      
+      print('🔍 [LocalStorage] Dados processados:');
+      print('   - PrimaryMinistryId (processado): $processedPrimaryMinistryId');
+      print('   - PrimaryMinistryName (processado): $processedPrimaryMinistryName');
+      
+      final usuario = UsuarioLogado(
         nome: nome,
         email: email,
         tenantName: tenantName ?? '',
@@ -46,9 +97,17 @@ class LocalStorageService {
         branchId: branchId,
         picture: picture,
         ministerios: [], // TODO: Implementar quando disponível
+        primaryMinistryId: processedPrimaryMinistryId,
+        primaryMinistryName: processedPrimaryMinistryName,
       );
+      
+      print('✅ [LocalStorage] Usuário carregado com sucesso');
+      print('🔍 [LocalStorage] ===== FIM DO CARREGAMENTO =====');
+      return usuario;
     }
 
+    print('❌ [LocalStorage] Dados insuficientes para carregar usuário');
+    print('🔍 [LocalStorage] ===== FIM DO CARREGAMENTO =====');
     return null;
   }
 

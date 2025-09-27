@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/state/auth_state.dart';
 import 'package:servus_app/services/volunteers_service.dart';
+import 'package:servus_app/core/enums/user_role.dart';
 
 class VolunteersController extends ChangeNotifier {
   final AuthState auth;
@@ -25,6 +26,55 @@ class VolunteersController extends ChangeNotifier {
   int get pendingApprovalsCount => _pendingApprovalsCount;
 
   VolunteersController({required this.auth});
+
+  /// 🧪 TESTE: Testar endpoint manualmente
+  Future<void> testEndpoint() async {
+    try {
+      final tenantId = auth.usuario?.tenantId;
+      final ministryId = auth.usuario?.primaryMinistryId;
+      
+      debugPrint('🧪 [TESTE] Testando endpoint manualmente...');
+      debugPrint('   - TenantId: $tenantId');
+      debugPrint('   - MinistryId: $ministryId');
+      
+      // Teste 1: Sem filtro
+      debugPrint('🧪 [TESTE] Teste 1: Sem filtro por ministério');
+      final response1 = await _dio.get('/tenants/$tenantId/volunteers/pending', queryParameters: {
+        'page': '1',
+        'pageSize': '50',
+      });
+      debugPrint('🧪 [TESTE] Resposta 1: ${response1.statusCode}');
+      debugPrint('🧪 [TESTE] Dados 1: ${response1.data}');
+      
+      // Teste 2: Com filtro
+      debugPrint('🧪 [TESTE] Teste 2: Com filtro por ministério');
+      final response2 = await _dio.get('/tenants/$tenantId/volunteers/pending', queryParameters: {
+        'page': '1',
+        'pageSize': '50',
+        'ministryId': ministryId,
+      });
+      debugPrint('🧪 [TESTE] Resposta 2: ${response2.statusCode}');
+      debugPrint('🧪 [TESTE] Dados 2: ${response2.data}');
+      
+    } catch (e) {
+      debugPrint('🧪 [TESTE] Erro no teste: $e');
+    }
+  }
+
+  /// 🔍 DEBUG: Verificar estado do usuário logado
+  void debugUserState() {
+    debugPrint('🔍 [VolunteersController] ===== DEBUG USUÁRIO LOGADO =====');
+    debugPrint('   - Nome: ${auth.usuario?.nome}');
+    debugPrint('   - Email: ${auth.usuario?.email}');
+    debugPrint('   - Role: ${auth.usuario?.role}');
+    debugPrint('   - TenantId: ${auth.usuario?.tenantId}');
+    debugPrint('   - BranchId: ${auth.usuario?.branchId}');
+    debugPrint('   - PrimaryMinistryId: ${auth.usuario?.primaryMinistryId}');
+    debugPrint('   - PrimaryMinistryName: ${auth.usuario?.primaryMinistryName}');
+    debugPrint('   - PrimaryMinistryId é null: ${auth.usuario?.primaryMinistryId == null}');
+    debugPrint('   - PrimaryMinistryId é vazio: ${auth.usuario?.primaryMinistryId?.isEmpty ?? true}');
+    debugPrint('🔍 [VolunteersController] ===== FIM DEBUG USUÁRIO =====');
+  }
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -67,30 +117,70 @@ class VolunteersController extends ChangeNotifier {
   Future<void> _loadVolunteers() async {
     try {
       final tenantId = auth.usuario?.tenantId;
+      final ministryId = auth.usuario?.primaryMinistryId;
+      
+      debugPrint('🔍 [VolunteersController] ===== DEBUG CARREGAMENTO VOLUNTÁRIOS =====');
+      debugPrint('🔍 [VolunteersController] Usuário atual:');
+      debugPrint('   - Nome: ${auth.usuario?.nome}');
+      debugPrint('   - Email: ${auth.usuario?.email}');
+      debugPrint('   - Role: ${auth.usuario?.role}');
+      debugPrint('   - TenantId: $tenantId');
+      debugPrint('   - PrimaryMinistryId: $ministryId');
+      debugPrint('   - PrimaryMinistryName: ${auth.usuario?.primaryMinistryName}');
+      debugPrint('🔍 [VolunteersController] ===========================================');
+      
       if (tenantId == null) {
-        debugPrint('❌ [VolunteersController] TenantId é null');
+        debugPrint('❌ [VolunteersController] TenantId é null - não é possível carregar voluntários');
+        return;
+      }
+      
+      // 🆕 CORREÇÃO: Para tenant_admin, não requer ministryId específico
+      if (ministryId == null && auth.usuario?.role != UserRole.tenant_admin) {
+        debugPrint('❌ [VolunteersController] MinistryId é null e usuário não é tenant_admin - não é possível carregar voluntários');
+        debugPrint('❌ [VolunteersController] Isso pode indicar que o usuário não tem um ministério principal definido');
         return;
       }
 
-      debugPrint('🔍 [VolunteersController] Carregando voluntários para tenant: $tenantId');
+      debugPrint('🔍 [VolunteersController] Carregando voluntários para tenant: $tenantId, ministry: $ministryId');
 
-      // Buscar voluntários usando endpoint existente
-      final response = await _dio.get('/tenants/$tenantId/volunteers', queryParameters: {
+      // 🔍 DEBUG: Chamar método de debug primeiro
+      await debugVolunteers();
+
+      // 🆕 CORREÇÃO: Para tenant_admin sem ministryId específico, usar endpoint geral
+      final String endpoint;
+      final Map<String, dynamic> queryParams = {
         'page': '1',
-        'pageSize': '100',
-      });
+        'limit': '100',
+      };
+      
+      if (ministryId != null && ministryId.isNotEmpty) {
+        // Usuário com ministério específico
+        endpoint = '/users/tenants/$tenantId/ministries/$ministryId/volunteers';
+        debugPrint('🔍 [VolunteersController] Usando endpoint específico do ministério');
+      } else if (auth.usuario?.role == UserRole.tenant_admin) {
+        // Tenant admin - buscar todos os voluntários do tenant
+        endpoint = '/tenants/$tenantId/volunteers';
+        debugPrint('🔍 [VolunteersController] Usando endpoint geral do tenant (tenant_admin)');
+      } else {
+        debugPrint('❌ [VolunteersController] Não é possível determinar endpoint para carregar voluntários');
+        return;
+      }
+
+      final response = await _dio.get(endpoint, queryParameters: queryParams);
 
       debugPrint('🔍 [VolunteersController] Resposta recebida: ${response.statusCode}');
       debugPrint('🔍 [VolunteersController] Dados brutos: ${response.data}');
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        final volunteers = data['data'] as List<dynamic>? ?? [];
+        final volunteers = data['users'] as List<dynamic>? ?? [];
         
         debugPrint('🔍 [VolunteersController] Voluntários encontrados: ${volunteers.length}');
         
         _volunteers = volunteers.map((volunteer) {
           debugPrint('🔍 [VolunteersController] Processando voluntário: ${volunteer['name']}');
+          debugPrint('🔍 [VolunteersController] Source raw: ${volunteer['source']}');
+          debugPrint('🔍 [VolunteersController] Source type: ${volunteer['source'].runtimeType}');
           debugPrint('🔍 [VolunteersController] Functions raw: ${volunteer['functions']}');
           debugPrint('🔍 [VolunteersController] Functions type: ${volunteer['functions'].runtimeType}');
           
@@ -108,24 +198,37 @@ class VolunteersController extends ChangeNotifier {
             }
           }
           
+          // 🆕 CORREÇÃO: Mapear source corretamente
+          String source = 'manual'; // Default
+          if (volunteer['source'] != null) {
+            source = volunteer['source'].toString();
+          }
+          
+          debugPrint('🔍 [VolunteersController] Source mapeado: $source');
+          
           return {
-            'id': volunteer['id'], // ID do membership (prioridade)
-            'userId': volunteer['userId'], // ID do usuário (para compatibilidade)
+            'id': volunteer['_id'], // ID do membership (prioridade)
+            'userId': volunteer['_id'], // ID do usuário (para compatibilidade)
             'name': volunteer['name'] ?? 'Nome não informado',
             'email': volunteer['email'] ?? '',
             'phone': volunteer['phone'] ?? '',
-            'ministry': volunteer['ministry'],
+            'ministry': volunteer['ministry'], // O backend agora retorna ministry diretamente
             'functions': volunteer['functions'] ?? [],
             'status': 'approved',
             'createdAt': volunteer['createdAt'],
             'approvedAt': volunteer['approvedAt'],
-            'source': volunteer['source'] ?? 'membership',
+            'source': source, // 🆕 CORREÇÃO: Usar source mapeado
           };
         }).toList();
 
         _totalVolunteers = _volunteers.length;
         
         debugPrint('🔍 [VolunteersController] Total de voluntários processados: $_totalVolunteers');
+        debugPrint('🔍 [VolunteersController] Lista final de voluntários:');
+        for (int i = 0; i < _volunteers.length; i++) {
+          final volunteer = _volunteers[i];
+          debugPrint('   ${i + 1}. ${volunteer['name']} (${volunteer['email']}) - Status: ${volunteer['status']}');
+        }
       }
     } catch (e) {
       debugPrint('❌ [VolunteersController] Erro ao carregar voluntários: $e');
@@ -136,16 +239,38 @@ class VolunteersController extends ChangeNotifier {
 
   Future<void> _loadPendingApprovals() async {
     try {
+      // 🧪 TESTE: Testar endpoint manualmente
+      await testEndpoint();
+      
+      // 🔍 DEBUG: Verificar estado do usuário
+      debugUserState();
+      
       final tenantId = auth.usuario?.tenantId;
+      final ministryId = auth.usuario?.primaryMinistryId;
       if (tenantId == null) return;
 
       debugPrint('🔍 [VolunteersController] Carregando submissões pendentes para tenant: $tenantId');
+      debugPrint('🔍 [VolunteersController] Filtrando por ministério: $ministryId');
+      debugPrint('🔍 [VolunteersController] MinistryId é null: ${ministryId == null}');
+      debugPrint('🔍 [VolunteersController] MinistryId é vazio: ${ministryId?.isEmpty ?? true}');
 
-      // Buscar submissões pendentes usando o novo endpoint
-      final response = await _dio.get('/tenants/$tenantId/volunteers/pending', queryParameters: {
+      // Buscar submissões pendentes usando o novo endpoint com filtro por ministério
+      final queryParams = <String, dynamic>{
         'page': '1',
         'pageSize': '50',
-      });
+      };
+      
+      // Adicionar ministryId apenas se não for null e não for vazio
+      if (ministryId != null && ministryId.isNotEmpty) {
+        queryParams['ministryId'] = ministryId;
+        debugPrint('🔍 [VolunteersController] Adicionando filtro por ministério: $ministryId');
+      } else {
+        debugPrint('🔍 [VolunteersController] NÃO adicionando filtro por ministério (ministryId é null ou vazio)');
+      }
+      
+      debugPrint('🔍 [VolunteersController] Query parameters: $queryParams');
+      
+      final response = await _dio.get('/tenants/$tenantId/volunteers/pending', queryParameters: queryParams);
 
       debugPrint('🔍 [VolunteersController] Resposta pendentes: ${response.statusCode}');
       debugPrint('🔍 [VolunteersController] Dados pendentes: ${response.data}');
@@ -225,7 +350,15 @@ class VolunteersController extends ChangeNotifier {
         // Recarregar voluntários para incluir o novo aprovado
         await _loadVolunteers();
         
+        // 🔄 FORÇAR ATUALIZAÇÃO COMPLETA DO ESTADO
+        debugPrint('🔄 [VolunteersController] Forçando atualização completa do estado...');
+        debugPrint('   - Total de voluntários antes: $_totalVolunteers');
+        debugPrint('   - Total de pendentes antes: $_pendingApprovalsCount');
+        
+        // Notificar mudanças
         notifyListeners();
+        
+        debugPrint('✅ [VolunteersController] Estado atualizado e notificado');
         return true;
       }
       return false;
@@ -263,11 +396,18 @@ class VolunteersController extends ChangeNotifier {
   Future<void> debugVolunteers() async {
     try {
       final tenantId = auth.usuario?.tenantId;
-      if (tenantId == null) return;
+      final ministryId = auth.usuario?.primaryMinistryId;
+      
+      if (tenantId == null || ministryId == null) {
+        debugPrint('❌ [DEBUG] TenantId ou MinistryId é null');
+        return;
+      }
 
       debugPrint('🔍 [DEBUG] Chamando endpoint de debug...');
+      debugPrint('   - TenantId: $tenantId');
+      debugPrint('   - MinistryId: $ministryId');
 
-      final response = await _dio.get('/tenants/$tenantId/volunteers/debug');
+      final response = await _dio.get('/users/debug/tenants/$tenantId/ministries/$ministryId/volunteers');
 
       if (response.statusCode == 200) {
         debugPrint('🔍 [DEBUG] Resposta do debug: ${response.data}');

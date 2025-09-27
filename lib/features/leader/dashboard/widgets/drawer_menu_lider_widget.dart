@@ -6,7 +6,6 @@ import 'package:servus_app/core/models/ministerio.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/state/auth_state.dart';
 import 'package:servus_app/shared/widgets/drawer_profile_header.dart';
-import 'package:servus_app/features/ministries/services/ministry_service.dart';
 
 class DrawerMenuLider extends StatelessWidget {
   final Ministerio? ministerioSelecionado;
@@ -18,60 +17,6 @@ class DrawerMenuLider extends StatelessWidget {
     required this.onTrocarModo,
   });
 
-  void _navigateToLeaderMinistry(BuildContext context) {
-    debugPrint('🔍 [DrawerMenu] _navigateToLeaderMinistry iniciado');
-    
-    // Salvar referências antes da operação assíncrona
-    final usuario = context.read<AuthState>().usuario;
-    final ministryService = MinistryService();
-    
-    debugPrint('🔍 [DrawerMenu] Usuario: ${usuario?.email}, TenantId: ${usuario?.tenantId}');
-    
-    if (usuario?.tenantId == null) {
-      debugPrint('❌ [DrawerMenu] Tenant não encontrado');
-      return;
-    }
-
-    debugPrint('🔍 [DrawerMenu] Buscando ministério do líder...');
-    
-    // Executar operação assíncrona em um microtask
-    Future.microtask(() async {
-      try {
-        final leaderMinistry = await ministryService.getLeaderMinistryV2(
-          tenantId: usuario!.tenantId!,
-          branchId: usuario.branchId ?? '',
-          context: null,
-        );
-
-        debugPrint('🔍 [DrawerMenu] Resultado: ${leaderMinistry?.id} - ${leaderMinistry?.name}');
-        debugPrint('🔍 [DrawerMenu] LeaderMinistry é null? ${leaderMinistry == null}');
-
-        if (leaderMinistry != null) {
-          // Usar GoRouter para navegação
-          debugPrint('🔍 [DrawerMenu] Navegando para: /leader/ministerio-detalhes/${leaderMinistry.id}');
-          
-          // Tentar navegação direta usando o contexto global
-          try {
-            GoRouter.of(context).push('/leader/ministerio-detalhes/${leaderMinistry.id}');
-            debugPrint('✅ [DrawerMenu] Navegação executada');
-          } catch (e) {
-            debugPrint('❌ [DrawerMenu] Erro na navegação: $e');
-            // Fallback: tentar com Navigator
-            try {
-              Navigator.of(context).pushNamed('/leader/ministerio-detalhes/${leaderMinistry.id}');
-              debugPrint('✅ [DrawerMenu] Navegação com Navigator executada');
-            } catch (e2) {
-              debugPrint('❌ [DrawerMenu] Erro na navegação com Navigator: $e2');
-            }
-          }
-        } else {
-          debugPrint('❌ [DrawerMenu] Ministério não encontrado');
-        }
-      } catch (e) {
-        debugPrint('❌ [DrawerMenu] Erro: $e');
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,20 +73,56 @@ class DrawerMenuLider extends StatelessWidget {
                       title: Text(usuario.role == UserRole.leader ? 'Meu ministério' : 'Ministérios'),
                       subtitle: Text(usuario.role == UserRole.leader ? 'Ver detalhes do meu ministério' : 'Gerenciar ministérios'),
                       onTap: () {
-                        debugPrint('🔍 [DrawerMenu] Clicou em ministério - Role: ${usuario.role}');
+                        // 🔍 LOGS DETALHADOS PARA DEBUG DO MENU "MEU MINISTÉRIO"
+                        debugPrint('🎯 [DrawerMenu] ===== CLIQUE NO MENU MINISTÉRIO =====');
+                        debugPrint('🔍 [DrawerMenu] Usuário logado:');
+                        debugPrint('   - Nome: ${usuario.nome}');
+                        debugPrint('   - Email: ${usuario.email}');
+                        debugPrint('   - Role: ${usuario.role}');
+                        debugPrint('   - É líder: ${usuario.isLider}');
+                        debugPrint('   - É voluntário: ${usuario.isVoluntario}');
+                        debugPrint('   - Ministério principal ID: ${usuario.primaryMinistryId}');
+                        debugPrint('   - Ministério principal nome: ${usuario.primaryMinistryName}');
+                        debugPrint('   - Tenant ID: ${usuario.tenantId}');
+                        debugPrint('   - Branch ID: ${usuario.branchId}');
                         debugPrint('🔍 [DrawerMenu] Context mounted? ${context.mounted}');
+                        
                         Navigator.pop(context);
                         debugPrint('🔍 [DrawerMenu] Drawer fechado');
+                        
                         if (usuario.role == UserRole.leader) {
-                          debugPrint('🔍 [DrawerMenu] Navegando diretamente para ministério do líder');
-                          // Líder vai para detalhes do seu ministério - usar ID fixo que sabemos que existe
-                          context.push('/leader/ministerio-detalhes/68d1b58da422169502e5e765');
-                          debugPrint('✅ [DrawerMenu] Navegação direta executada');
+                          debugPrint('🎯 [DrawerMenu] USUÁRIO É LÍDER - Navegando para ministério do líder');
+                          
+                          // 🆕 Usar o ministério principal do usuário
+                          if (usuario.primaryMinistryId != null) {
+                            final ministryId = usuario.primaryMinistryId!;
+                            final route = '/leader/ministerio-detalhes/$ministryId';
+                            debugPrint('✅ [DrawerMenu] Ministério principal encontrado:');
+                            debugPrint('   - ID: $ministryId');
+                            debugPrint('   - Nome: ${usuario.primaryMinistryName}');
+                            debugPrint('   - Rota: $route');
+                            context.push(route);
+                            debugPrint('✅ [DrawerMenu] Navegação executada para ministério principal');
+                          } else {
+                            // Fallback para ID fixo se não houver ministério principal
+                            const fallbackId = '68d1b58da422169502e5e765';
+                            const fallbackRoute = '/leader/ministerio-detalhes/$fallbackId';
+                            debugPrint('⚠️ [DrawerMenu] PROBLEMA: Ministério principal não encontrado!');
+                            debugPrint('   - primaryMinistryId é null');
+                            debugPrint('   - Usando fallback ID: $fallbackId');
+                            debugPrint('   - Rota fallback: $fallbackRoute');
+                            context.push(fallbackRoute);
+                            debugPrint('⚠️ [DrawerMenu] Navegação executada com fallback');
+                          }
                         } else {
-                          debugPrint('🔍 [DrawerMenu] Navegando para lista de ministérios');
-                          // Outros roles vão para lista de ministérios
+                          debugPrint('🔍 [DrawerMenu] Usuário não é líder, navegando para lista de ministérios');
+                          debugPrint('   - Role atual: ${usuario.role}');
+                          debugPrint('   - Rota: /leader/ministerio/lista');
                           context.push('/leader/ministerio/lista');
+                          debugPrint('✅ [DrawerMenu] Navegação para lista executada');
                         }
+                        
+                        debugPrint('🎯 [DrawerMenu] ===== FIM DO CLIQUE NO MENU MINISTÉRIO =====');
                       },
                     ),
 

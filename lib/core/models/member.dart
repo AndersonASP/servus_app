@@ -181,7 +181,7 @@ class Member {
 
   factory Member.fromJson(Map<String, dynamic> json) {
     return Member(
-      id: json['id'] ?? '',
+      id: json['id'] ?? json['_id'] ?? '', // ✅ CORREÇÃO: Verificar tanto 'id' quanto '_id'
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       phone: json['phone'],
@@ -394,18 +394,21 @@ class MembersResponse {
   factory MembersResponse.fromJson(Map<String, dynamic> json) {
     List<Member> members = [];
     
-    
-    if (json['members'] != null) {
-      if (json['members'] is List) {
+    // ✅ CORREÇÃO: Backend retorna 'data', não 'members'
+    if (json['data'] != null) {
+      if (json['data'] is List) {
         try {
-          members = List<Member>.from(json['members'].map((x) => Member.fromJson(x)));
+          members = List<Member>.from(json['data'].map((x) => Member.fromJson(x)));
         } catch (e) {
+          print('❌ [MembersResponse] Erro ao converter membros: $e');
           members = [];
         }
       } else {
+        print('❌ [MembersResponse] Campo data não é uma lista: ${json['data'].runtimeType}');
         members = [];
       }
     } else {
+      print('❌ [MembersResponse] Campo data é null');
     }
     
     return MembersResponse(

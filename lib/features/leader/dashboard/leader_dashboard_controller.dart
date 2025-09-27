@@ -32,16 +32,126 @@ class DashboardLiderController extends ChangeNotifier {
   Future<void> init() async {
     usuario = auth.usuario!;
     
-    // Carrega ministérios da matriz
-    await carregarMinisterios();
-
-    if (ministerios.isNotEmpty) {
-      ministerioSelecionado = ministerios.first;
-      await carregarDadosDoMinisterio(ministerioSelecionado!, notify: false);
+    // 🔍 LOGS DETALHADOS PARA DEBUG DO DASHBOARD
+    print('🎯 [LeaderDashboard] ===== INICIALIZAÇÃO DO DASHBOARD =====');
+    print('🔍 [LeaderDashboard] Usuário logado:');
+    print('   - Nome: ${usuario.nome}');
+    print('   - Email: ${usuario.email}');
+    print('   - Role: ${usuario.role}');
+    print('   - É líder: ${usuario.isLider}');
+    print('   - É voluntário: ${usuario.isVoluntario}');
+    print('   - Ministério principal ID: ${usuario.primaryMinistryId}');
+    print('   - Ministério principal nome: ${usuario.primaryMinistryName}');
+    print('   - Tenant ID: ${usuario.tenantId}');
+    print('   - Branch ID: ${usuario.branchId}');
+    print('🔍 [LeaderDashboard] Total de ministérios: ${usuario.ministerios.length}');
+    
+    // 🆕 Para líderes, carrega o ministério principal diretamente
+    if (usuario.isLider && usuario.primaryMinistryId != null) {
+      print('🎯 [LeaderDashboard] USUÁRIO É LÍDER COM MINISTÉRIO PRINCIPAL');
+      print('   - Ministério principal ID: ${usuario.primaryMinistryId}');
+      print('   - Ministério principal nome: ${usuario.primaryMinistryName}');
+      
+      try {
+        // Carrega o ministério principal diretamente
+        print('🔍 [LeaderDashboard] Iniciando carregamento do ministério principal...');
+        final primaryMinistry = await _carregarMinisterioPrincipal();
+        if (primaryMinistry != null) {
+          ministerioSelecionado = primaryMinistry;
+          print('✅ [LeaderDashboard] Ministério principal carregado com sucesso:');
+          print('   - ID: ${primaryMinistry.id}');
+          print('   - Nome: ${primaryMinistry.name}');
+          print('   - Descrição: ${primaryMinistry.description}');
+          print('🔍 [LeaderDashboard] Carregando dados do ministério...');
+          await carregarDadosDoMinisterio(ministerioSelecionado!, notify: false);
+          print('✅ [LeaderDashboard] Dados do ministério carregados');
+        } else {
+          print('⚠️ [LeaderDashboard] PROBLEMA: Ministério principal não encontrado!');
+          print('   - primaryMinistryId: ${usuario.primaryMinistryId}');
+          print('   - Tentando fallback...');
+          // Fallback: carrega ministérios da matriz
+          await carregarMinisterios();
+          if (ministerios.isNotEmpty) {
+            ministerioSelecionado = ministerios.first;
+            print('⚠️ [LeaderDashboard] Usando primeiro ministério da lista como fallback: ${ministerioSelecionado!.name}');
+            await carregarDadosDoMinisterio(ministerioSelecionado!, notify: false);
+          }
+        }
+      } catch (e) {
+        print('❌ [LeaderDashboard] ERRO ao carregar ministério principal: $e');
+        print('🔍 [LeaderDashboard] Tentando fallback...');
+        // Fallback: carrega ministérios da matriz
+        await carregarMinisterios();
+        if (ministerios.isNotEmpty) {
+          ministerioSelecionado = ministerios.first;
+          print('⚠️ [LeaderDashboard] Fallback: usando primeiro ministério: ${ministerioSelecionado!.name}');
+          await carregarDadosDoMinisterio(ministerioSelecionado!, notify: false);
+        }
+      }
+    } else {
+      print('🔍 [LeaderDashboard] Usuário não é líder ou não tem ministério principal');
+      print('   - É líder: ${usuario.isLider}');
+      print('   - Tem primaryMinistryId: ${usuario.primaryMinistryId != null}');
+      print('🔍 [LeaderDashboard] Carregando lista normal de ministérios...');
+      // Para outros roles, carrega ministérios da matriz normalmente
+      await carregarMinisterios();
+      if (ministerios.isNotEmpty) {
+        ministerioSelecionado = ministerios.first;
+        print('🔍 [LeaderDashboard] Usando primeiro ministério da lista: ${ministerioSelecionado!.name}');
+        await carregarDadosDoMinisterio(ministerioSelecionado!, notify: false);
+      }
     }
+    
+    print('🎯 [LeaderDashboard] ===== FIM DA INICIALIZAÇÃO DO DASHBOARD =====');
 
     isLoading = false;
     notifyListeners();
+  }
+
+  /// 🆕 Carrega o ministério principal do usuário líder
+  Future<MinistryResponse?> _carregarMinisterioPrincipal() async {
+    try {
+      final context = await TokenService.getContext();
+      final tenantId = context['tenantId'];
+      
+      if (tenantId == null || usuario.primaryMinistryId == null) {
+        return null;
+      }
+
+      print('🔍 [LeaderDashboard] Carregando ministério principal: ${usuario.primaryMinistryId}');
+      
+      // Primeiro tenta carregar como ministério da matriz (sem branchId)
+      try {
+        final response = await _ministryService.getMinistry(
+          tenantId: tenantId,
+          branchId: '', // Ministério da matriz
+          ministryId: usuario.primaryMinistryId!,
+        );
+        
+        print('✅ [LeaderDashboard] Ministério principal encontrado na matriz: ${response.name}');
+        return response;
+      } catch (e) {
+        print('🔍 [LeaderDashboard] Ministério não encontrado na matriz, tentando filiais...');
+        
+        // Se não encontrou na matriz, tenta nas filiais
+        // Por enquanto, vamos usar o método getLeaderMinistryV2 que já funciona
+        final leaderMinistry = await _ministryService.getLeaderMinistryV2(
+          tenantId: tenantId,
+          branchId: '', // Vai buscar em todas as filiais
+        );
+        
+        if (leaderMinistry != null) {
+          print('✅ [LeaderDashboard] Ministério principal encontrado via getLeaderMinistryV2: ${leaderMinistry.name}');
+          return leaderMinistry;
+        } else {
+          print('❌ [LeaderDashboard] Ministério principal não encontrado');
+          return null;
+        }
+      }
+    } catch (e) {
+      print('❌ [LeaderDashboard] Erro ao carregar ministério principal: $e');
+      return null;
+    }
   }
 
   Future<void> carregarMinisterios() async {
@@ -103,37 +213,39 @@ class DashboardLiderController extends ChangeNotifier {
   Future<void> _loadVolunteersData() async {
     try {
       final tenantId = usuario.tenantId;
-      if (tenantId == null) {
+      final ministryId = usuario.primaryMinistryId;
+      
+      if (tenantId == null || ministryId == null) {
         totalVoluntarios = 0;
         return;
       }
 
-      // Buscar voluntários aprovados através das submissões de formulários
-      final response = await _dio.get('/forms/submissions', queryParameters: {
-        'tenantId': tenantId,
-        'status': 'approved',
+      print('🔍 [LeaderDashboard] Carregando dados de voluntários...');
+      print('   - TenantId: $tenantId');
+      print('   - MinistryId: $ministryId');
+
+      // 🆕 CORREÇÃO: Usar o endpoint correto de voluntários
+      final response = await _dio.get('/users/tenants/$tenantId/ministries/$ministryId/volunteers', queryParameters: {
+        'page': '1',
         'limit': '1000', // Buscar todos para contar
       });
 
+      print('🔍 [LeaderDashboard] Resposta recebida: ${response.statusCode}');
+      print('🔍 [LeaderDashboard] Dados: ${response.data}');
+
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        final submissions = data['data'] as List<dynamic>? ?? [];
+        final pagination = data['pagination'] as Map<String, dynamic>?;
+        final total = pagination?['total'] ?? 0;
         
-        // Filtrar apenas submissões do ministério selecionado se houver
-        final filteredSubmissions = ministerioSelecionado != null
-            ? submissions.where((submission) {
-                final preferredMinistry = submission['preferredMinistry'];
-                return preferredMinistry != null && 
-                       preferredMinistry['_id'] == ministerioSelecionado!.id;
-              }).toList()
-            : submissions;
-        
-        totalVoluntarios = filteredSubmissions.length;
+        print('🔍 [LeaderDashboard] Total de voluntários encontrados: $total');
+        totalVoluntarios = total;
       } else {
+        print('❌ [LeaderDashboard] Erro na resposta: ${response.statusCode}');
         totalVoluntarios = 0;
       }
     } catch (e) {
-      debugPrint('Erro ao carregar voluntários: $e');
+      print('❌ [LeaderDashboard] Erro ao carregar voluntários: $e');
       totalVoluntarios = 0;
     }
   }

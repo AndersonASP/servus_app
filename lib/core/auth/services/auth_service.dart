@@ -4,7 +4,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:servus_app/core/models/login_response.dart';
 import 'package:servus_app/core/models/usuario_logado.dart';
 import 'package:servus_app/core/network/dio_client.dart';
-import 'package:servus_app/core/utils/role_util.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/services/local_storage_service.dart';
 import 'package:servus_app/core/enums/user_role.dart';
@@ -585,10 +584,11 @@ class AuthService {
               .toList();
           
           if (activeMemberships.isNotEmpty) {
-            final membership = activeMemberships.first;
-            // Para outros usuários, membership role tem prioridade sobre user role
-            rolePrincipal = membership.role;
-            print('🔍 [AuthService] Usando membership ATIVO: ${membership.role}');
+            // 🆕 USAR MEMBERSHIP COM MAIOR PRIORIDADE DE ROLE
+            final primaryMembership = _findHighestPriorityMembership(activeMemberships);
+            rolePrincipal = primaryMembership.role;
+            print('🔍 [AuthService] Usando membership com maior prioridade: ${primaryMembership.role}');
+            print('🔍 [AuthService] Membership principal: ${primaryMembership.id}');
           } else {
             // Sem memberships ativos, usar role do usuário
             rolePrincipal = loginResponse.user.role;
@@ -598,6 +598,95 @@ class AuthService {
           // Sem memberships, usar role do usuário
           rolePrincipal = loginResponse.user.role;
           print('🔍 [AuthService] Sem memberships, usando user role: ${loginResponse.user.role}');
+        }
+
+        // 🆕 Extrair informações do ministério principal
+        String? primaryMinistryId;
+        String? primaryMinistryName;
+        
+        if (loginResponse.memberships?.isNotEmpty == true) {
+          print('🔍 [AuthService] Total de memberships: ${loginResponse.memberships!.length}');
+          
+          // Debug: mostrar dados brutos dos memberships
+          for (int i = 0; i < loginResponse.memberships!.length; i++) {
+            final membership = loginResponse.memberships![i];
+            print('🔍 [AuthService] Membership $i (raw):');
+            print('   - ID: ${membership.id}');
+            print('   - Role: ${membership.role}');
+            print('   - IsActive: ${membership.isActive}');
+            print('   - Ministry: ${membership.ministry}');
+            print('   - Ministry ID: ${membership.ministry?.id}');
+            print('   - Ministry Name: ${membership.ministry?.name}');
+            print('   - Branch: ${membership.branch}');
+          }
+          
+          final activeMemberships = loginResponse.memberships!
+              .where((m) => m.isActive == true)
+              .toList();
+          
+          print('🔍 [AuthService] Memberships ativos: ${activeMemberships.length}');
+          
+          if (activeMemberships.isNotEmpty) {
+            // Debug: mostrar todos os memberships ativos
+            for (int i = 0; i < activeMemberships.length; i++) {
+              final membership = activeMemberships[i];
+              print('🔍 [AuthService] Membership ativo $i: role=${membership.role}, ministry=${membership.ministry?.name} (${membership.ministry?.id})');
+            }
+            
+        // 🆕 CORREÇÃO: Para determinar o ministério principal, usar lógica específica
+        MembershipData? primaryMembership;
+        
+        // 🆕 CORREÇÃO: Para tenant_admin, não definir ministério principal específico
+        if (rolePrincipal == 'tenant_admin') {
+          print('🔍 [AuthService] Usuário é tenant_admin - não definindo ministério principal específico');
+          primaryMinistryId = null;
+          primaryMinistryName = null;
+        } else if (rolePrincipal == 'leader') {
+          // Se o role principal é "leader", priorizar o membership de líder
+          final leaderMemberships = activeMemberships
+              .where((m) => m.role == 'leader')
+              .toList();
+          
+          if (leaderMemberships.isNotEmpty) {
+            // 🆕 CORREÇÃO: Se há múltiplos memberships de líder, usar o de maior prioridade
+            if (leaderMemberships.length == 1) {
+              primaryMembership = leaderMemberships.first;
+              print('🔍 [AuthService] Usando único membership de líder');
+            } else {
+              // Múltiplos memberships de líder - usar lógica de prioridade
+              primaryMembership = _findHighestPriorityMembership(leaderMemberships);
+              print('🔍 [AuthService] Múltiplos memberships de líder encontrados, usando o de maior prioridade');
+              print('🔍 [AuthService] Total de memberships de líder: ${leaderMemberships.length}');
+              for (int i = 0; i < leaderMemberships.length; i++) {
+                final membership = leaderMemberships[i];
+                print('🔍 [AuthService] Membership de líder $i: ministry=${membership.ministry?.name} (${membership.ministry?.id})');
+              }
+            }
+          } else {
+            // Fallback: usar o membership com maior prioridade
+            primaryMembership = _findHighestPriorityMembership(activeMemberships);
+            print('🔍 [AuthService] Nenhum membership de líder encontrado, usando maior prioridade');
+          }
+        } else {
+          // Para outros roles, usar a lógica de prioridade normal
+          primaryMembership = _findHighestPriorityMembership(activeMemberships);
+          print('🔍 [AuthService] Usando lógica de prioridade normal');
+        }
+        
+        // 🆕 CORREÇÃO: Só definir primaryMinistryId se não for tenant_admin
+        if (rolePrincipal != 'tenant_admin' && primaryMembership != null) {
+          primaryMinistryId = primaryMembership.ministry?.id;
+          primaryMinistryName = primaryMembership.ministry?.name;
+          print('🔍 [AuthService] Ministério principal selecionado: $primaryMinistryName (ID: $primaryMinistryId)');
+          print('🔍 [AuthService] Role do membership principal: ${primaryMembership.role}');
+        } else {
+          print('🔍 [AuthService] Tenant admin - sem ministério principal específico');
+        }
+          } else {
+            print('🔍 [AuthService] Nenhum membership ativo encontrado');
+          }
+        } else {
+          print('🔍 [AuthService] Nenhum membership encontrado');
         }
 
         // Cria objeto UsuarioLogado
@@ -613,6 +702,8 @@ class AuthService {
               : null,
           picture: loginResponse.user.picture,
           ministerios: [], // TODO: Implementar quando disponível
+          primaryMinistryId: primaryMinistryId,
+          primaryMinistryName: primaryMinistryName,
         );
 
         // Salva no LocalStorage
@@ -786,18 +877,95 @@ class AuthService {
 
   /// Converte LoginResponse para UsuarioLogado
   UsuarioLogado convertToUsuarioLogado(LoginResponse loginResponse) {
+    print('🔍 [AuthService] ===== CONVERTENDO LOGIN RESPONSE =====');
+    print('🔍 [AuthService] Total de memberships: ${loginResponse.memberships?.length ?? 0}');
     
-    // Tenta usar o role do membership primeiro, depois do user
-    String? roleToUse;
-    if (loginResponse.memberships != null && loginResponse.memberships!.isNotEmpty) {
-      roleToUse = loginResponse.memberships!.first.role;
-    } else if (loginResponse.user.role.isNotEmpty) {
-      roleToUse = loginResponse.user.role;
+    // 🆕 CORREÇÃO: Usar a mesma lógica de priorização que implementamos
+    String rolePrincipal = loginResponse.user.role;
+    if (loginResponse.user.role == 'servus_admin') {
+      // ServusAdmin sempre usa seu role global, não o do membership
+      rolePrincipal = loginResponse.user.role;
+    } else if (loginResponse.memberships?.isNotEmpty == true) {
+      // Filtrar apenas memberships ATIVOS
+      final activeMemberships = loginResponse.memberships!
+          .where((m) => m.isActive == true)
+          .toList();
+      
+      if (activeMemberships.isNotEmpty) {
+        // 🆕 USAR MEMBERSHIP COM MAIOR PRIORIDADE DE ROLE
+        final primaryMembership = _findHighestPriorityMembership(activeMemberships);
+        rolePrincipal = primaryMembership.role;
+        print('🔍 [AuthService] Usando membership com maior prioridade: ${primaryMembership.role}');
+      } else {
+        // Sem memberships ativos, usar role do usuário
+        rolePrincipal = loginResponse.user.role;
+        print('🔍 [AuthService] Sem memberships ativos, usando user role: ${loginResponse.user.role}');
+      }
+    } else {
+      // Sem memberships, usar role do usuário
+      rolePrincipal = loginResponse.user.role;
+      print('🔍 [AuthService] Sem memberships, usando user role: ${loginResponse.user.role}');
+    }
+
+    // 🆕 CORREÇÃO: Extrair informações do ministério principal usando a mesma lógica
+    String? primaryMinistryId;
+    String? primaryMinistryName;
+    
+    if (loginResponse.memberships?.isNotEmpty == true) {
+      final activeMemberships = loginResponse.memberships!
+          .where((m) => m.isActive == true)
+          .toList();
+      
+      if (activeMemberships.isNotEmpty) {
+        // 🆕 CORREÇÃO: Para determinar o ministério principal, usar lógica específica
+        MembershipData? primaryMembership;
+        
+        // 🆕 CORREÇÃO: Para tenant_admin, não definir ministério principal específico
+        if (rolePrincipal == 'tenant_admin') {
+          print('🔍 [AuthService] Usuário é tenant_admin - não definindo ministério principal específico');
+          primaryMinistryId = null;
+          primaryMinistryName = null;
+        } else if (rolePrincipal == 'leader') {
+          // Se o role principal é "leader", priorizar o membership de líder
+          final leaderMemberships = activeMemberships
+              .where((m) => m.role == 'leader')
+              .toList();
+          
+          if (leaderMemberships.isNotEmpty) {
+            // 🆕 CORREÇÃO: Se há múltiplos memberships de líder, usar o de maior prioridade
+            if (leaderMemberships.length == 1) {
+              primaryMembership = leaderMemberships.first;
+              print('🔍 [AuthService] Usando único membership de líder');
+            } else {
+              // Múltiplos memberships de líder - usar lógica de prioridade
+              primaryMembership = _findHighestPriorityMembership(leaderMemberships);
+              print('🔍 [AuthService] Múltiplos memberships de líder encontrados, usando o de maior prioridade');
+            }
+          } else {
+            // Fallback: usar o membership com maior prioridade
+            primaryMembership = _findHighestPriorityMembership(activeMemberships);
+            print('🔍 [AuthService] Nenhum membership de líder encontrado, usando maior prioridade');
+          }
+        } else {
+          // Para outros roles, usar a lógica de prioridade normal
+          primaryMembership = _findHighestPriorityMembership(activeMemberships);
+          print('🔍 [AuthService] Usando lógica de prioridade normal');
+        }
+        
+        // 🆕 CORREÇÃO: Só definir primaryMinistryId se não for tenant_admin
+        if (rolePrincipal != 'tenant_admin' && primaryMembership != null) {
+          primaryMinistryId = primaryMembership.ministry?.id;
+          primaryMinistryName = primaryMembership.ministry?.name;
+          print('🔍 [AuthService] Ministério principal selecionado: $primaryMinistryName (ID: $primaryMinistryId)');
+        } else {
+          print('🔍 [AuthService] Tenant admin - sem ministério principal específico');
+        }
+      }
     }
     
-    final userRole = mapRoleToEnum(roleToUse);
+    final userRole = _mapearRoleStringParaEnum(rolePrincipal);
     
-    return UsuarioLogado(
+    final usuario = UsuarioLogado(
       nome: loginResponse.user.name,
       email: loginResponse.user.email,
       tenantName: loginResponse.tenant?.name,
@@ -811,9 +979,76 @@ class AuthService {
       picture: loginResponse.user.picture,
       role: userRole,
       ministerios: [], // TODO: Implementar quando disponível
+      primaryMinistryId: primaryMinistryId,
+      primaryMinistryName: primaryMinistryName,
     );
+    
+    print('🔍 [AuthService] Usuário convertido:');
+    print('   - Role: ${usuario.role}');
+    print('   - PrimaryMinistryId: ${usuario.primaryMinistryId}');
+    print('   - PrimaryMinistryName: ${usuario.primaryMinistryName}');
+    print('🔍 [AuthService] ===== FIM DA CONVERSÃO =====');
+    
+    return usuario;
   }
 
+  /// 🆕 Encontra o membership com maior prioridade de role
+  MembershipData _findHighestPriorityMembership(List<MembershipData> memberships) {
+    print('🔍 [RolePriority] ===== INICIANDO SELEÇÃO POR PRIORIDADE =====');
+    print('🔍 [RolePriority] Total de memberships para analisar: ${memberships.length}');
+    
+    if (memberships.isEmpty) {
+      throw Exception('Lista de memberships vazia');
+    }
+    
+    if (memberships.length == 1) {
+      final membership = memberships.first;
+      print('🔍 [RolePriority] Apenas um membership, usando ele:');
+      print('   - Role: ${membership.role}');
+      print('   - Ministry: ${membership.ministry?.name} (${membership.ministry?.id})');
+      return membership;
+    }
+    
+    // Mapa de prioridades (maior número = maior prioridade)
+    const rolePriorities = {
+      'servus_admin': 5,
+      'tenant_admin': 4,
+      'branch_admin': 3,
+      'leader': 2,
+      'volunteer': 1,
+    };
+    
+    // Debug: mostrar todos os memberships antes da ordenação
+    print('🔍 [RolePriority] Memberships antes da ordenação:');
+    for (int i = 0; i < memberships.length; i++) {
+      final membership = memberships[i];
+      final priority = rolePriorities[membership.role] ?? 0;
+      print('   ${i + 1}. Role: ${membership.role} (prioridade: $priority) - Ministry: ${membership.ministry?.name} (${membership.ministry?.id})');
+    }
+    
+    // Ordenar por prioridade (maior primeiro)
+    final sortedMemberships = List<MembershipData>.from(memberships);
+    sortedMemberships.sort((a, b) {
+      final priorityA = rolePriorities[a.role] ?? 0;
+      final priorityB = rolePriorities[b.role] ?? 0;
+      return priorityB.compareTo(priorityA); // Descendente
+    });
+    
+    print('🔍 [RolePriority] Memberships ordenados por prioridade:');
+    for (int i = 0; i < sortedMemberships.length; i++) {
+      final membership = sortedMemberships[i];
+      final priority = rolePriorities[membership.role] ?? 0;
+      print('   ${i + 1}. Role: ${membership.role} (prioridade: $priority) - Ministry: ${membership.ministry?.name} (${membership.ministry?.id})');
+    }
+    
+    final selectedMembership = sortedMemberships.first;
+    print('✅ [RolePriority] Membership selecionado:');
+    print('   - Role: ${selectedMembership.role}');
+    print('   - Ministry: ${selectedMembership.ministry?.name} (${selectedMembership.ministry?.id})');
+    print('🔍 [RolePriority] ===== FIM DA SELEÇÃO POR PRIORIDADE =====');
+    
+    return selectedMembership;
+  }
 
   /// Testa a conectividade do Google Sign-In
   Future<bool> testGoogleSignInConnection() async {

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/volunteers/controllers/volunteers_controller.dart';
-import 'package:servus_app/state/auth_state.dart';
 
 class VolunteerApprovalsScreen extends StatefulWidget {
   const VolunteerApprovalsScreen({super.key});
@@ -12,29 +11,27 @@ class VolunteerApprovalsScreen extends StatefulWidget {
 }
 
 class _VolunteerApprovalsScreenState extends State<VolunteerApprovalsScreen> {
-  late final VolunteersController controller;
+  VolunteersController? controller;
 
   @override
   void initState() {
     super.initState();
-    final auth = Provider.of<AuthState>(context, listen: false);
-    controller = VolunteersController(auth: auth);
-    controller.init();
+    // Não criar controller aqui - será passado pelo Provider
   }
 
   @override
   void dispose() {
-    controller.dispose();
+    // Não dispose do controller aqui - será gerenciado pelo Provider pai
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: controller,
-      child: Consumer<VolunteersController>(
-        builder: (context, controller, _) {
-          return Scaffold(
+    return Consumer<VolunteersController>(
+      builder: (context, controller, _) {
+        this.controller = controller; // Armazenar referência
+        
+        return Scaffold(
             backgroundColor: context.theme.scaffoldBackgroundColor,
             appBar: AppBar(
               title: Column(
@@ -89,8 +86,7 @@ class _VolunteerApprovalsScreenState extends State<VolunteerApprovalsScreen> {
                       ),
           );
         },
-      ),
-    );
+      );
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -123,7 +119,7 @@ class _VolunteerApprovalsScreenState extends State<VolunteerApprovalsScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () => controller.refreshVolunteers(),
+              onPressed: () => controller!.refreshVolunteers(),
               icon: const Icon(Icons.refresh),
               label: const Text('Atualizar'),
               style: ElevatedButton.styleFrom(
@@ -560,7 +556,7 @@ class _VolunteerApprovalsScreenState extends State<VolunteerApprovalsScreen> {
       }
       
       // Para formulários, aprovar diretamente
-      final success = await controller.approveVolunteer(
+      final success = await controller!.approveVolunteer(
         volunteer['id'],
         notes: notes.isNotEmpty ? notes : null,
       );
@@ -598,7 +594,7 @@ class _VolunteerApprovalsScreenState extends State<VolunteerApprovalsScreen> {
 
   Future<void> _rejectVolunteer(BuildContext context, Map<String, dynamic> volunteer, String notes) async {
     try {
-      final success = await controller.rejectVolunteer(
+      final success = await controller!.rejectVolunteer(
         volunteer['id'],
         notes: notes.isNotEmpty ? notes : null,
       );
@@ -686,7 +682,7 @@ class _VolunteerApprovalsScreenState extends State<VolunteerApprovalsScreen> {
 
     debugPrint('🔍 [FunctionDialog] Buscando funções do ministério: $ministryId');
     // Buscar funções do ministério
-    final functions = await controller.getMinistryFunctions(ministryId);
+    final functions = await controller!.getMinistryFunctions(ministryId);
     debugPrint('🔍 [FunctionDialog] Funções encontradas: ${functions.length}');
     debugPrint('🔍 [FunctionDialog] Primeira função (raw): ${functions.isNotEmpty ? functions.first : 'Nenhuma'}');
 
@@ -772,7 +768,7 @@ class _VolunteerApprovalsScreenState extends State<VolunteerApprovalsScreen> {
                 Navigator.of(context).pop();
                 
                 // Aprovar com funções selecionadas
-                final success = await controller.approveVolunteer(
+                final success = await controller!.approveVolunteer(
                   volunteer['id'], 
                   functionIds: selectedFunctionIds,
                   notes: notes,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/services/members_service.dart';
@@ -12,6 +13,7 @@ import 'package:servus_app/features/ministries/services/member_function_service.
 import 'package:servus_app/features/ministries/services/ministry_functions_service.dart';
 import 'package:servus_app/features/ministries/models/ministry_function.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/state/auth_state.dart';
 
 class CreateMemberScreen extends StatefulWidget {
   final bool restrictToVolunteer;
@@ -85,10 +87,13 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
       
       // Se for líder, buscar o ministério do líder
       if (_currentUserMembershipRole == 'leader') {
-        // TODO: Implementar busca do ministério do líder
-        // Por enquanto, vamos usar um valor mock
-        _leaderMinistryId = '68d1b58da422169502e5e765'; // ID do ministério "Estacionamento"
-        debugPrint('   - Leader Ministry ID: $_leaderMinistryId');
+        // ✅ CORREÇÃO: Usar o primaryMinistryId do usuário logado
+        final authState = Provider.of<AuthState>(context, listen: false);
+        _leaderMinistryId = authState.usuario?.primaryMinistryId;
+        
+        debugPrint('🔐 Ministério do líder:');
+        debugPrint('   - PrimaryMinistryId: $_leaderMinistryId');
+        debugPrint('   - PrimaryMinistryName: ${authState.usuario?.primaryMinistryName}');
       }
     } catch (e) {
       debugPrint('❌ Erro ao carregar dados do usuário: $e');
@@ -1698,42 +1703,109 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
         }
       }
 
-      // Para tenant_admin e branch_admin, carregar todos os ministérios
-      // Carregar ministérios do tenant (sem branch)
-      try {
-        final tenantMinistries = await _ministryService.listMinistries(
-          tenantId: _tenantId!,
-          branchId: '', // Branch vazio para ministérios do tenant
-          filters: ListMinistryDto(limit: 100), // Buscar todos
-        );
-
-        for (final ministry in tenantMinistries.items) {
-          _availableMinistries.add({
-            'id': ministry.id,
-            'name': ministry.name,
-            'branchId': null, // Ministério do tenant
-          });
-        }
-      } catch (e) {
-      }
-
-      // Carregar ministérios da branch atual (se houver)
-      if (_branchId != null && _branchId!.isNotEmpty) {
+      // ✅ CORREÇÃO: Lógica baseada no role do usuário
+      if (_currentUserMembershipRole == 'tenant_admin') {
+        // Tenant Admin: Carregar TODOS os ministérios do tenant
+        debugPrint('🔐 Tenant Admin: Carregando todos os ministérios do tenant');
+        
         try {
-          final branchMinistries = await _ministryService.listMinistries(
+          final tenantMinistries = await _ministryService.listMinistries(
             tenantId: _tenantId!,
-            branchId: _branchId!,
+            branchId: '', // Branch vazio para ministérios do tenant
             filters: ListMinistryDto(limit: 100), // Buscar todos
           );
 
-          for (final ministry in branchMinistries.items) {
+          for (final ministry in tenantMinistries.items) {
             _availableMinistries.add({
               'id': ministry.id,
               'name': ministry.name,
-              'branchId': _branchId, // Ministério da branch
+              'branchId': null, // Ministério do tenant
+            });
+          }
+          
+          // Carregar ministérios de todas as branches
+          if (_branchId != null && _branchId!.isNotEmpty) {
+            final branchMinistries = await _ministryService.listMinistries(
+              tenantId: _tenantId!,
+              branchId: _branchId!,
+              filters: ListMinistryDto(limit: 100),
+            );
+
+            for (final ministry in branchMinistries.items) {
+              _availableMinistries.add({
+                'id': ministry.id,
+                'name': ministry.name,
+                'branchId': _branchId,
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('❌ Erro ao carregar ministérios para tenant_admin: $e');
+        }
+        
+      } else if (_currentUserMembershipRole == 'branch_admin') {
+        // Branch Admin: Carregar apenas ministérios da sua branch
+        debugPrint('🔐 Branch Admin: Carregando ministérios da branch');
+        
+        if (_branchId != null && _branchId!.isNotEmpty) {
+          try {
+            final branchMinistries = await _ministryService.listMinistries(
+              tenantId: _tenantId!,
+              branchId: _branchId!,
+              filters: ListMinistryDto(limit: 100),
+            );
+
+            for (final ministry in branchMinistries.items) {
+              _availableMinistries.add({
+                'id': ministry.id,
+                'name': ministry.name,
+                'branchId': _branchId,
+              });
+            }
+          } catch (e) {
+            debugPrint('❌ Erro ao carregar ministérios para branch_admin: $e');
+          }
+        }
+        
+      } else {
+        // Outros roles: Carregar todos os ministérios (comportamento padrão)
+        debugPrint('🔐 Outros roles: Carregando todos os ministérios');
+        
+        try {
+          final tenantMinistries = await _ministryService.listMinistries(
+            tenantId: _tenantId!,
+            branchId: '', // Branch vazio para ministérios do tenant
+            filters: ListMinistryDto(limit: 100), // Buscar todos
+          );
+
+          for (final ministry in tenantMinistries.items) {
+            _availableMinistries.add({
+              'id': ministry.id,
+              'name': ministry.name,
+              'branchId': null, // Ministério do tenant
             });
           }
         } catch (e) {
+        }
+
+        // Carregar ministérios da branch atual (se houver)
+        if (_branchId != null && _branchId!.isNotEmpty) {
+          try {
+            final branchMinistries = await _ministryService.listMinistries(
+              tenantId: _tenantId!,
+              branchId: _branchId!,
+              filters: ListMinistryDto(limit: 100), // Buscar todos
+            );
+
+            for (final ministry in branchMinistries.items) {
+              _availableMinistries.add({
+                'id': ministry.id,
+                'name': ministry.name,
+                'branchId': _branchId, // Ministério da branch
+              });
+            }
+          } catch (e) {
+          }
         }
       }
 

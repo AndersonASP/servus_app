@@ -19,12 +19,26 @@ class AuthState extends ChangeNotifier {
   bool get isVoluntario => _usuario?.role == UserRole.volunteer;
 
   void login(UsuarioLogado usuario) async {
+    print('🔍 [AuthState] ===== LOGIN NO AUTHSTATE =====');
+    print('🔍 [AuthState] Usuário recebido:');
+    print('   - Nome: ${usuario.nome}');
+    print('   - Email: ${usuario.email}');
+    print('   - Role: ${usuario.role}');
+    print('   - PrimaryMinistryId: ${usuario.primaryMinistryId}');
+    print('   - PrimaryMinistryName: ${usuario.primaryMinistryName}');
+    print('   - TenantId: ${usuario.tenantId}');
+    print('   - BranchId: ${usuario.branchId}');
+    
     _usuario = usuario;
+    
+    print('🔍 [AuthState] Salvando usuário no LocalStorage...');
     await LocalStorageService.salvarUsuario(usuario);
+    print('✅ [AuthState] Usuário salvo no LocalStorage');
     
     // Integrar contexto de autenticação
     AuthIntegrationService.instance.integrateWithUsuarioLogado(usuario);
     
+    print('🔍 [AuthState] ===== FIM DO LOGIN NO AUTHSTATE =====');
     notifyListeners();
   }
 

@@ -19,10 +19,9 @@ class DioClient {
       dio.interceptors.add(RetryInterceptor(
         dio: dio,
         logPrint: print,
-        retries: 2,
+        retries: 1, // ✅ CORREÇÃO: Reduzido para 1 retry apenas
         retryDelays: const [
-          Duration(seconds: 2),
-          Duration(seconds: 5),
+          Duration(seconds: 2), // ✅ CORREÇÃO: Apenas 1 delay
         ],
       ));
 

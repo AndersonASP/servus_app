@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/core/error/error_handler_service.dart';
 
@@ -14,6 +15,13 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    // 🔍 DEBUG: Log da requisição
+    debugPrint('🔍 [AuthInterceptor] Requisição sendo enviada:');
+    debugPrint('   - URL: ${options.uri}');
+    debugPrint('   - Method: ${options.method}');
+    debugPrint('   - Query Parameters: ${options.queryParameters}');
+    debugPrint('   - Headers: ${options.headers}');
+    
     // Adiciona device-id em todas as requisições
     final deviceId = await TokenService.getDeviceId();
     options.headers['device-id'] = deviceId;

@@ -141,6 +141,13 @@ class LoginController extends ChangeNotifier {
   /// 🆕 Atualiza o usuário com dados corretos dos claims do JWT
   Future<UsuarioLogado> _atualizarUsuarioComClaims(UsuarioLogado usuario) async {
     try {
+      print('🔍 [LoginController] ===== ATUALIZANDO USUÁRIO COM CLAIMS =====');
+      print('🔍 [LoginController] Usuário antes da atualização:');
+      print('   - Role: ${usuario.role}');
+      print('   - PrimaryMinistryId: ${usuario.primaryMinistryId}');
+      print('   - PrimaryMinistryName: ${usuario.primaryMinistryName}');
+      print('   - TenantId: ${usuario.tenantId}');
+      print('   - BranchId: ${usuario.branchId}');
       
       // Obtém dados atualizados dos claims
       final userRole = TokenService.userRole;
@@ -148,6 +155,11 @@ class LoginController extends ChangeNotifier {
       final tenantId = TokenService.tenantId;
       final branchId = TokenService.branchId;
       
+      print('🔍 [LoginController] Dados dos claims:');
+      print('   - UserRole: $userRole');
+      print('   - MembershipRole: $membershipRole');
+      print('   - TenantId: $tenantId');
+      print('   - BranchId: $branchId');
       
       // Determina o role final (mesma lógica do roteamento)
       String? roleFinal;
@@ -161,15 +173,31 @@ class LoginController extends ChangeNotifier {
       // Mapeia o role para enum
       final roleEnum = _mapearRoleParaEnum(roleFinal);
       
-      // Retorna usuário atualizado com dados corretos
-      return usuario.copyWith(
+      print('🔍 [LoginController] Role final determinado: $roleFinal -> $roleEnum');
+      
+      // 🆕 CORREÇÃO: Preservar TODOS os dados do usuário, incluindo primaryMinistryId
+      final usuarioAtualizado = usuario.copyWith(
         papeis: roleEnum,
         papelSelecionado: roleEnum,
         tenantId: tenantId,
         branchId: branchId,
+        // 🆕 IMPORTANTE: Preservar os dados do ministério principal
+        primaryMinistryId: usuario.primaryMinistryId,
+        primaryMinistryName: usuario.primaryMinistryName,
       );
       
+      print('🔍 [LoginController] Usuário após atualização:');
+      print('   - Role: ${usuarioAtualizado.role}');
+      print('   - PrimaryMinistryId: ${usuarioAtualizado.primaryMinistryId}');
+      print('   - PrimaryMinistryName: ${usuarioAtualizado.primaryMinistryName}');
+      print('   - TenantId: ${usuarioAtualizado.tenantId}');
+      print('   - BranchId: ${usuarioAtualizado.branchId}');
+      print('🔍 [LoginController] ===== FIM DA ATUALIZAÇÃO COM CLAIMS =====');
+      
+      return usuarioAtualizado;
+      
     } catch (e) {
+      print('❌ [LoginController] Erro ao atualizar usuário com claims: $e');
       return usuario;
     }
   }

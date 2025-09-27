@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerios_detalhes_controller.dart';
-import 'package:servus_app/services/members_service.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:dio/dio.dart';
@@ -11,6 +10,7 @@ import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 import 'package:servus_app/core/enums/user_role.dart';
 import 'package:servus_app/state/auth_state.dart';
 import 'package:provider/provider.dart';
+import 'package:servus_app/services/members_service.dart';
 
 class AutocompleteLinkMemberModal extends StatefulWidget {
   final MinisterioDetalhesController controller;
@@ -28,9 +28,7 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
   final TextEditingController _searchController = TextEditingController();
   
   // Estados
-  List<Member> _allMembers = [];
-  List<Member> _availableMembers = []; // Membros disponíveis para vínculo
-  List<String> _linkedMemberIds = []; // IDs dos membros já vinculados
+  List<Member> _availableMembers = []; // Membros ativos do tenant
   bool _isLoading = false;
   String _errorMessage = '';
   String _selectedRole = 'volunteer';
@@ -72,6 +70,13 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
     _loadMinistryFunctions();
   }
 
+  // ✅ CORREÇÃO: Método para recarregar dados quando necessário
+  Future<void> _refreshData() async {
+    print('🔄 [AutocompleteLinkMemberModal] Recarregando dados...');
+    await _loadAllMembers();
+    await _loadMinistryFunctions();
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -101,39 +106,72 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
   Future<void> _loadAllMembers() async {
     if (_isLoading) return;
     
+    print('🔍 [AutocompleteLinkMemberModal] ===== INICIANDO _loadAllMembers =====');
+    
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
 
     try {
-      final response = await MembersService.getMembers(
-        filter: MemberFilter(
-          page: 1,
-          limit: 100,
-        ),
-        context: context,
-      );
-
-      // Membros carregados com sucesso
-      print('📊 [AutocompleteLinkMemberModal] Resposta do MembersService:');
-      print('   - Total de membros: ${response.members.length}');
-      print('   - Primeiros 3 membros:');
-      for (int i = 0; i < response.members.length && i < 3; i++) {
-        final member = response.members[i];
-        print('     ${i + 1}. ${member.name} (${member.id}) - Role: ${member.role}');
+      print('🔍 [AutocompleteLinkMemberModal] Carregando membros do tenant...');
+      
+      // ✅ CORREÇÃO: Usar a mesma API que funciona na lista de membros
+      // Buscar membros através do MembershipService (que funciona)
+      final context = await TokenService.getContext();
+      final tenantId = context['tenantId'];
+      final branchId = context['branchId'];
+      
+      if (tenantId == null) {
+        throw Exception('Tenant ID não encontrado');
       }
       
-      // Carregar membros já vinculados ao ministério
-      await _loadLinkedMembers();
+      print('🔍 [AutocompleteLinkMemberModal] Usando MembershipService...');
+      print('   - Tenant ID: $tenantId');
+      print('   - Branch ID: $branchId');
       
-      // Aguardar um pouco para garantir que os dados foram processados
-      await Future.delayed(const Duration(milliseconds: 100));
+      // 🆕 CORREÇÃO: Usar endpoint correto para buscar todos os membros do tenant
+      // Como não existe endpoint específico para todos os membros do tenant,
+      // vamos usar o MembersService que já funciona
+      final membersResponse = await MembersService.getMembers(
+        filter: MemberFilter(isActive: true),
+        context: null,
+      );
       
-      // Filtrar membros disponíveis (não vinculados)
-      _filterAvailableMembers(response.members);
+      print('🔍 [AutocompleteLinkMemberModal] MembersService retornou:');
+      print('   - Total de membros: ${membersResponse.members.length}');
+      
+      // 🆕 CORREÇÃO: Usar diretamente a resposta do MembersService
+      final response = membersResponse;
+
+      print('🔍 [AutocompleteLinkMemberModal] ===== RESPOSTA RECEBIDA =====');
+      print('   - Status da resposta: OK');
+      print('   - Total de membros ativos: ${response.members.length}');
+      
+      if (response.members.isEmpty) {
+        print('⚠️ [AutocompleteLinkMemberModal] ATENÇÃO: Lista de membros está VAZIA!');
+        print('   - Isso pode indicar problema na API ou filtro');
+      } else {
+        print('   - Primeiros 3 membros:');
+        for (int i = 0; i < response.members.length && i < 3; i++) {
+          final member = response.members[i];
+          print('     ${i + 1}. ${member.name} (${member.id}) - Role: ${member.role} - Ativo: ${member.isActive}');
+        }
+      }
+      
+      // ✅ CORREÇÃO: Mostrar TODOS os membros ativos (sem filtrar por vinculação)
+      print('🔍 [AutocompleteLinkMemberModal] Definindo membros disponíveis...');
+      print('   - Total de membros ativos: ${response.members.length}');
+      
+      setState(() {
+        _availableMembers = response.members; // Todos os membros ativos estão disponíveis
+      });
+      
+      print('🔍 [AutocompleteLinkMemberModal] Membros definidos:');
+      print('   - _availableMembers.length: ${_availableMembers.length}');
       
     } catch (e) {
+      print('❌ [AutocompleteLinkMemberModal] Erro ao carregar membros: $e');
       setState(() {
         _errorMessage = 'Erro ao carregar membros: $e';
       });
@@ -144,122 +182,8 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
     }
   }
 
-  // Carregar membros já vinculados ao ministério diretamente da API
-  Future<void> _loadLinkedMembers() async {
-    try {
-      // Carregando membros vinculados da API
-      
-      final context = await TokenService.getContext();
-      final tenantId = context['tenantId'];
-      
-      if (tenantId == null) {
-        throw Exception('Tenant ID não encontrado');
-      }
-      
-      final dio = DioClient.instance;
-      final token = await TokenService.getAccessToken();
-      
-      final response = await dio.get(
-        '/ministry-memberships/ministry/${widget.controller.ministerioId}',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'X-Tenant-ID': tenantId,
-          },
-        ),
-      );
-      
-      if (response.statusCode == 200) {
-        // Resposta recebida com sucesso
-        
-        // Tratar diferentes formatos de resposta
-        List<dynamic> ministryMembers = [];
-        
-        if (response.data is Map<String, dynamic>) {
-          // Se é um Map, tentar acessar 'members'
-          ministryMembers = response.data['members'] ?? [];
-        } else if (response.data is List) {
-          // Se é uma List diretamente
-          ministryMembers = response.data;
-        }
-        
-        // Membros vinculados encontrados
-        
-        setState(() {
-          _linkedMemberIds = ministryMembers.map((member) {
-            if (member is Map<String, dynamic>) {
-              // Tentar diferentes chaves possíveis para o ID do usuário
-              final userId = member['userId'] ?? member['user']?['_id'] ?? member['_id'] ?? '';
-              final userIdString = userId.toString();
-              
-              print('   - Membro vinculado: ${member['user']?['name'] ?? 'N/A'}');
-              print('     - userId: ${member['userId']} (tipo: ${member['userId'].runtimeType})');
-              print('     - user._id: ${member['user']?['_id']} (tipo: ${member['user']?['_id'].runtimeType})');
-              print('     - _id: ${member['_id']} (tipo: ${member['_id'].runtimeType})');
-              print('     - ID final: "$userIdString" (tipo: ${userIdString.runtimeType})');
-              print('     ---');
-              
-              return userIdString;
-            }
-            return '';
-          }).where((id) => id.isNotEmpty).toList();
-        });
-        
-        print('🔍 [AutocompleteLinkMemberModal] Membros já vinculados da API: $_linkedMemberIds');
-        print('🔍 [AutocompleteLinkMemberModal] Total de IDs vinculados: ${_linkedMemberIds.length}');
-      } else {
-        throw Exception('Erro ao carregar membros vinculados: ${response.statusCode}');
-      }
-      
-    } catch (e) {
-      print('❌ [AutocompleteLinkMemberModal] Erro ao carregar membros vinculados: $e');
-      // Em caso de erro, não filtrar nenhum membro (mostrar todos)
-      setState(() {
-        _linkedMemberIds = [];
-      });
-    }
-  }
-
-  // Filtrar membros disponíveis (não vinculados)
-  void _filterAvailableMembers(List<Member> allMembers) {
-    try {
-      print('🔍 [AutocompleteLinkMemberModal] Filtrando membros disponíveis...');
-      print('   - Total de membros recebidos: ${allMembers.length}');
-      print('   - IDs já vinculados: $_linkedMemberIds');
-      print('   - Quantidade de IDs vinculados: ${_linkedMemberIds.length}');
-      
-      final availableMembers = allMembers.where((member) {
-        // Garantir que ambos sejam String para comparação correta
-        final memberIdString = member.id.toString();
-        final isLinked = _linkedMemberIds.contains(memberIdString);
-        
-        print('   - Membro ${member.name}');
-        print('     - ID do membro: "$memberIdString" (tipo: ${memberIdString.runtimeType})');
-        print('     - IDs vinculados: $_linkedMemberIds');
-        print('     - Tipos dos IDs vinculados: ${_linkedMemberIds.map((id) => '${id.runtimeType}').toList()}');
-        print('     - Contém? ${_linkedMemberIds.contains(memberIdString)}');
-        print('     - Resultado: ${isLinked ? "JÁ VINCULADO" : "DISPONÍVEL"}');
-        print('     ---');
-        
-        return !isLinked;
-      }).toList();
-      
-      print('   - Membros disponíveis após filtro: ${availableMembers.length}');
-      
-      setState(() {
-        _allMembers = allMembers;
-        _availableMembers = availableMembers;
-      });
-      
-    } catch (e) {
-      print('❌ [AutocompleteLinkMemberModal] Erro ao filtrar membros: $e');
-      // Em caso de erro, mostrar todos os membros
-      setState(() {
-        _allMembers = allMembers;
-        _availableMembers = allMembers;
-      });
-    }
-  }
+  // ✅ REMOVIDO: Não precisamos mais carregar membros vinculados
+  // O autocomplete agora mostra TODOS os membros ativos do tenant
 
   Future<void> _loadMinistryFunctions() async {
     if (widget.controller.ministerioId.isEmpty) {
@@ -378,6 +302,10 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
         _isLoading = true;
       });
 
+      // ✅ CORREÇÃO: Validar se o membro está ativo antes de vincular
+      if (_selectedMember!.isActive != true) {
+        throw Exception('Não é possível vincular ${_selectedMember!.name} pois o usuário está inativo');
+      }
       
       // PASSO 1: Vincular membro ao ministério (membership)
       final membershipSuccess = await widget.controller.vincularMembro(
@@ -501,7 +429,7 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
             Text(_errorMessage, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadAllMembers,
+              onPressed: _refreshData,
               child: const Text('Tentar Novamente'),
             ),
           ],
@@ -519,11 +447,11 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
               return const Iterable<Member>.empty();
             }
             
-            // Usar _availableMembers (membros não vinculados) como fallback para _allMembers
-            final membersToSearch = _availableMembers.isNotEmpty ? _availableMembers : _allMembers;
+            // ✅ CORREÇÃO: Usar sempre _availableMembers (já filtrados corretamente)
+            final membersToSearch = _availableMembers;
             
             print('🔍 [AutocompleteLinkMemberModal] Buscando membros para: "${textEditingValue.text}"');
-            print('   - Usando lista: ${_availableMembers.isNotEmpty ? "disponíveis" : "todos"}');
+            print('   - Usando lista: membros ativos do tenant');
             print('   - Total na lista: ${membersToSearch.length}');
             
             final results = membersToSearch.where((member) {
@@ -693,8 +621,38 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
         ),
         const SizedBox(height: 16),
         
-        // Mensagem informativa sobre membros já vinculados
-        if (_availableMembers.isNotEmpty && _linkedMemberIds.isNotEmpty)
+        // ✅ CORREÇÃO: Mensagem informativa atualizada
+        if (_availableMembers.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.orange,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Nenhum membro ativo encontrado no tenant.',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -714,7 +672,7 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Membros já vinculados a este ministério não aparecem na lista.',
+                    'Todos os membros ativos do tenant estão disponíveis para vinculação.',
                     style: TextStyle(
                       color: context.colors.onSurface.withOpacity(0.8),
                       fontSize: 12,
@@ -725,8 +683,7 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
             ),
           ),
         
-        if (_availableMembers.isNotEmpty && _linkedMemberIds.isNotEmpty)
-          const SizedBox(height: 16),
+        const SizedBox(height: 16),
         
         // Membro selecionado
         if (_selectedMember != null) _buildSelectedMember(),
@@ -742,7 +699,7 @@ class _AutocompleteLinkMemberModalState extends State<AutocompleteLinkMemberModa
           const SizedBox(height: 16),
           _buildFunctionsSection(),
         ],
-      ],
+        ],
       ),
     );
   }
