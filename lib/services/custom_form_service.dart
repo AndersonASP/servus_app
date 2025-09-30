@@ -12,12 +12,16 @@ class CustomFormService {
     
     // Adicionar interceptor para headers de autenticação específicos do formulário
     _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
+      onRequest: (options, handler) async {
         
         if (_authContext.hasContext) {
-          final headers = _authContext.headers;
-          options.headers.addAll(headers);
-        } else {
+          try {
+            final headers = await _authContext.headers;
+            options.headers.addAll(headers);
+          } catch (e) {
+            // Log do erro mas continua a requisição
+            print('Erro ao obter headers de autenticação: $e');
+          }
         }
         
         handler.next(options);
@@ -47,7 +51,7 @@ class CustomFormService {
       }
       
       
-      final headers = _authContext.headers;
+      final headers = await _authContext.headers;
       
       
       final response = await _dio.get('/forms', 
@@ -110,7 +114,7 @@ class CustomFormService {
       }
       
       final response = await _dio.get('/forms/$formId',
-        options: Options(headers: _authContext.headers),
+        options: Options(headers: await _authContext.headers),
       );
       
       
@@ -144,7 +148,7 @@ class CustomFormService {
       
       final response = await _dio.post('/forms', 
         data: form.toMap(),
-        options: Options(headers: _authContext.headers),
+        options: Options(headers: await _authContext.headers),
       );
       
       
@@ -165,7 +169,7 @@ class CustomFormService {
       
       final response = await _dio.put('/forms/$formId', 
         data: updateData,
-        options: Options(headers: _authContext.headers),
+        options: Options(headers: await _authContext.headers),
       );
       
       
@@ -213,7 +217,7 @@ class CustomFormService {
       
       final response = await _dio.get('/forms/$formId/submissions', 
         queryParameters: queryParams,
-        options: Options(headers: _authContext.headers),
+        options: Options(headers: await _authContext.headers),
       );
       
       
@@ -246,7 +250,7 @@ class CustomFormService {
           'status': status,
           'reviewNotes': reviewNotes,
         },
-        options: Options(headers: _authContext.headers),
+        options: Options(headers: await _authContext.headers),
       );
       
       
@@ -275,7 +279,7 @@ class CustomFormService {
           'status': status,
           'reviewNotes': reviewNotes,
         },
-        options: Options(headers: _authContext.headers),
+        options: Options(headers: await _authContext.headers),
       );
       
       
@@ -294,8 +298,9 @@ class CustomFormService {
         throw Exception('Contexto de autenticação não encontrado');
       }
       
+      final headers = await _authContext.headers;
       final response = await _dio.post('/forms/$formId/process',
-        options: Options(headers: _authContext.headers),
+        options: Options(headers: headers),
       );
       
       
@@ -314,8 +319,9 @@ class CustomFormService {
         throw Exception('Contexto de autenticação não encontrado');
       }
       
+      final headers = await _authContext.headers;
       await _dio.delete('/forms/$formId',
-        options: Options(headers: _authContext.headers),
+        options: Options(headers: headers),
       );
       
     } catch (e) {

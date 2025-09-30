@@ -11,20 +11,29 @@ class AuthIntegrationService {
 
   /// Integra com o estado de autenticação real usando UsuarioLogado
   void integrateWithUsuarioLogado(UsuarioLogado? usuario) {
+    print('🔗 [AuthIntegrationService] Integrando com UsuarioLogado...');
     
     if (usuario != null) {
+      print('👤 [AuthIntegrationService] Usuário encontrado:');
+      print('   - Nome: ${usuario.nome}');
+      print('   - Email: ${usuario.email}');
+      print('   - TenantId: ${usuario.tenantId}');
+      print('   - BranchId: ${usuario.branchId}');
       
       if (usuario.tenantId != null) {
+        print('✅ [AuthIntegrationService] Configurando contexto...');
         _authContext.setContext(
           tenantId: usuario.tenantId!,
           branchId: usuario.branchId,
           userId: usuario.email,
         );
-        
+        print('✅ [AuthIntegrationService] Contexto configurado');
       } else {
+        print('❌ [AuthIntegrationService] TenantId é null, limpando contexto');
         _authContext.clearContext();
       }
     } else {
+      print('❌ [AuthIntegrationService] Usuário é null, limpando contexto');
       _authContext.clearContext();
     }
   }
@@ -71,10 +80,10 @@ class AuthIntegrationService {
   bool get hasValidContext => _authContext.hasContext;
 
   /// Obtém headers para requisições autenticadas
-  Map<String, String> getAuthHeaders() {
+  Future<Map<String, dynamic>> getAuthHeaders() async {
     if (!hasValidContext) {
       throw Exception('Contexto de autenticação não disponível');
     }
-    return _authContext.headers;
+    return await _authContext.headers;
   }
 }

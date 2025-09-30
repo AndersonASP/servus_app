@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/core/widgets/shimmer_widget.dart';
 import 'package:servus_app/features/leader/dashboard/leader_dashboard_controller.dart';
 import 'package:servus_app/features/leader/dashboard/widgets/aniversariantes_widget.dart';
 import 'package:servus_app/features/leader/dashboard/widgets/drawer_menu_lider_widget.dart';
@@ -15,9 +16,14 @@ class DashboardLiderScreen extends StatefulWidget {
   State<DashboardLiderScreen> createState() => _DashboardLiderScreenState();
 }
 
-class _DashboardLiderScreenState extends State<DashboardLiderScreen> with WidgetsBindingObserver {
+class _DashboardLiderScreenState extends State<DashboardLiderScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   late final DashboardLiderController controller;
   final ScrollController _scrollController = ScrollController();
+  
+  // Controllers para animações
+  late final AnimationController _animationController;
+  late final AnimationController _staggerController;
+  List<Animation<double>> _cardAnimations = [];
 
   @override
   void initState() {
@@ -25,7 +31,40 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> with Widget
     WidgetsBinding.instance.addObserver(this);
     final auth = Provider.of<AuthState>(context, listen: false);
     controller = DashboardLiderController(auth: auth);
-    controller.init();
+    
+    // Inicializar animações
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    
+    _staggerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    
+    _cardAnimations = List.generate(4, (index) {
+      return Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(CurvedAnimation(
+        parent: _staggerController,
+        curve: Interval(
+          index * 0.15,
+          0.6 + (index * 0.15),
+          curve: Curves.easeOutCubic,
+        ),
+      ));
+    });
+    
+    controller.init().then((_) {
+      _animationController.forward();
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _staggerController.forward();
+        }
+      });
+    });
   }
 
   @override
@@ -41,6 +80,8 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> with Widget
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
+    _animationController.dispose();
+    _staggerController.dispose();
     controller.dispose();
     super.dispose();
   }
@@ -73,8 +114,9 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> with Widget
       child: Consumer<DashboardLiderController>(
         builder: (context, controller, _) {
           if (controller.isLoading) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+            return Scaffold(
+              backgroundColor: context.theme.scaffoldBackgroundColor,
+              body: const ShimmerDashboard(),
             );
           }
 
@@ -286,36 +328,87 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> with Widget
                       Row(
                         children: [
                           Expanded(
-                            child: _infoCard(
-                              title: 'Voluntários ativos',
-                              value: controller.totalVoluntarios.toString(),
-                              isLoading: controller.isLoadingVoluntarios,
-                              icon: Icons.people,
-                              iconColor: context.colors.primary,
-                              onTap: () {
-                                context.push(
-                                  '/leader/dashboard/voluntarios',
-                                  extra: controller.ministerioSelecionado,
-                                );
-                              },
-                            ),
+                            child: _cardAnimations.isNotEmpty
+                                ? AnimatedBuilder(
+                                    animation: _cardAnimations[0],
+                                    builder: (context, child) {
+                                      return Transform.translate(
+                                        offset: Offset(0, 20 * (1 - _cardAnimations[0].value)),
+                                        child: Opacity(
+                                          opacity: _cardAnimations[0].value,
+                                          child: _infoCard(
+                                            title: 'Voluntários ativos',
+                                            value: controller.totalVoluntarios.toString(),
+                                            isLoading: controller.isLoadingVoluntarios,
+                                            icon: Icons.people,
+                                            iconColor: context.colors.primary,
+                                            onTap: () {
+                                              context.push(
+                                                '/leader/dashboard/voluntarios',
+                                                extra: controller.ministerioSelecionado,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : _infoCard(
+                                    title: 'Voluntários ativos',
+                                    value: controller.totalVoluntarios.toString(),
+                                    isLoading: controller.isLoadingVoluntarios,
+                                    icon: Icons.people,
+                                    iconColor: context.colors.primary,
+                                    onTap: () {
+                                      context.push(
+                                        '/leader/dashboard/voluntarios',
+                                        extra: controller.ministerioSelecionado,
+                                      );
+                                    },
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _infoCard(
-                              title: 'Solicitações de troca',
-                              value: controller.totalSolicitacoesPendentes
-                                  .toString(),
-                              isLoading: controller.isLoadingSolicitacoes,
-                              icon: Icons.change_circle,
-                              iconColor: context.colors.primary,
-                              onTap: () {
-                                context.push(
-                                  '/leader/dashboard/solicitacao-troca',
-                                  extra: controller.ministerioSelecionado,
-                                );
-                              },
-                            ),
+                            child: _cardAnimations.length > 1
+                                ? AnimatedBuilder(
+                                    animation: _cardAnimations[1],
+                                    builder: (context, child) {
+                                      return Transform.translate(
+                                        offset: Offset(0, 20 * (1 - _cardAnimations[1].value)),
+                                        child: Opacity(
+                                          opacity: _cardAnimations[1].value,
+                                          child: _infoCard(
+                                            title: 'Solicitações de troca',
+                                            value: controller.totalSolicitacoesPendentes
+                                                .toString(),
+                                            isLoading: controller.isLoadingSolicitacoes,
+                                            icon: Icons.change_circle,
+                                            iconColor: context.colors.primary,
+                                            onTap: () {
+                                              context.push(
+                                                '/leader/dashboard/solicitacao-troca',
+                                                extra: controller.ministerioSelecionado,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : _infoCard(
+                                    title: 'Solicitações de troca',
+                                    value: controller.totalSolicitacoesPendentes
+                                        .toString(),
+                                    isLoading: controller.isLoadingSolicitacoes,
+                                    icon: Icons.change_circle,
+                                    iconColor: context.colors.primary,
+                                    onTap: () {
+                                      context.push(
+                                        '/leader/dashboard/solicitacao-troca',
+                                        extra: controller.ministerioSelecionado,
+                                      );
+                                    },
+                                  ),
                           ),
                         ],
                       ),
@@ -324,16 +417,38 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> with Widget
                       
                       // Card de Filiais
                       if (controller.usuario.isAdmin)
-                        _infoCard(
-                          title: 'Filiais',
-                          value: 'Gerenciar',
-                          isLoading: false,
-                          icon: Icons.business,
-                          iconColor: context.colors.primary,
-                          onTap: () {
-                            context.push('/leader/branches');
-                          },
-                        ),
+                        _cardAnimations.length > 2
+                            ? AnimatedBuilder(
+                                animation: _cardAnimations[2],
+                                builder: (context, child) {
+                                  return Transform.translate(
+                                    offset: Offset(0, 20 * (1 - _cardAnimations[2].value)),
+                                    child: Opacity(
+                                      opacity: _cardAnimations[2].value,
+                                      child: _infoCard(
+                                        title: 'Filiais',
+                                        value: 'Gerenciar',
+                                        isLoading: false,
+                                        icon: Icons.business,
+                                        iconColor: context.colors.primary,
+                                        onTap: () {
+                                          context.push('/leader/branches');
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : _infoCard(
+                                title: 'Filiais',
+                                value: 'Gerenciar',
+                                isLoading: false,
+                                icon: Icons.business,
+                                iconColor: context.colors.primary,
+                                onTap: () {
+                                  context.push('/leader/branches');
+                                },
+                              ),
 
                       const SizedBox(height: 12),
 
@@ -424,6 +539,94 @@ class _DashboardLiderScreenState extends State<DashboardLiderScreen> with Widget
           ],
         ),
         child: cardContent,
+      ),
+    );
+  }
+
+  Widget _buildLoadingScreen(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header shimmer
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 200,
+                        height: 25,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 150,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Cards shimmer
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Single card shimmer
+            Container(
+              width: double.infinity,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

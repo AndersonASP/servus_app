@@ -6,8 +6,50 @@ import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/core/theme/design_tokens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateMixin {
+  late final AnimationController _buttonAnimationController;
+  late final Animation<double> _buttonScaleAnimation;
+  late final Animation<double> _buttonElevationAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Inicializar animações para micro-interações
+    _buttonAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    
+    _buttonScaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _buttonElevationAnimation = Tween<double>(
+      begin: 2.0,
+      end: 8.0,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _buttonAnimationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,25 +122,37 @@ class WelcomeScreen extends StatelessWidget {
                   horizontal: DesignTokens.spacingMd),
               child: Column(
                 children: [
-                  // Botão principal - Entrar
+                  // Botão principal - Entrar com micro-interações
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: context.theme.colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(DesignTokens.radiusMd),
-                        ),
-                      ),
-                      onPressed: () async{
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('viu_welcome', true);
-                        if (!context.mounted) return;
-                        // Redireciona para a tela de login
-                        context.go('/login');
-                      },
+                    child: AnimatedBuilder(
+                      animation: _buttonAnimationController,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _buttonScaleAnimation.value,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: context.theme.colorScheme.primary,
+                              elevation: _buttonElevationAnimation.value,
+                              shadowColor: context.theme.colorScheme.primary.withOpacity(0.3),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(DesignTokens.radiusMd),
+                              ),
+                            ),
+                            onPressed: () async{
+                              // Animação de press
+                              _buttonAnimationController.forward().then((_) {
+                                _buttonAnimationController.reverse();
+                              });
+                              
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setBool('viu_welcome', true);
+                              if (!context.mounted) return;
+                              // Redireciona para a tela de login
+                              context.go('/login');
+                            },
                       child: Text(
                         'Entrar',
                         style: GoogleFonts.poppins(
@@ -106,7 +160,10 @@ class WelcomeScreen extends StatelessWidget {
                           fontSize: 18,
                           color: context.theme.colorScheme.onPrimary,
                         ),
-                      ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   

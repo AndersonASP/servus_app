@@ -3,6 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/core/widgets/scroll_reveal_animation.dart';
+import 'package:servus_app/core/widgets/shimmer_widget.dart';
+import 'package:servus_app/core/widgets/responsive_animation.dart';
 import 'package:servus_app/features/volunteers/dashboard/escala/escala_card/escala_card_screen.dart';
 import 'package:servus_app/features/volunteers/dashboard/widgets/drawer_menu_voluntario.dart';
 import 'package:servus_app/state/auth_state.dart';
@@ -22,6 +25,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
+  
+  // Controllers para staggered animations
 
   @override
   void initState() {
@@ -30,6 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final auth = Provider.of<AuthState>(context, listen: false);
     controller = DashboardController(auth: auth);
     controller.init();
+    
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -47,6 +53,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       parent: _animationController,
       curve: Curves.easeOut,
     ));
+
+    // Staggered animations para os cards
 
     controller.init().then((_) {
       _animationController.forward();
@@ -80,8 +88,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Consumer<DashboardController>(
         builder: (context, controller, _) {
           return controller.isLoading && !controller.isInitialized
-              ? const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
+              ? Scaffold(
+                  backgroundColor: context.theme.scaffoldBackgroundColor,
+                  body: const ShimmerDashboard(),
                 )
               : Stack(
                   children: [
@@ -228,52 +237,61 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         ),
                                       ),
                                     ] else ...[
-                                      Text('sua próxima escala',
-                                          style: context.textStyles.bodyLarge
-                                              ?.copyWith(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w700,
-                                            color: context.colors.onSurface,
-                                          )),
+                                      SlideFromLeft(
+                                        delay: const Duration(milliseconds: 200),
+                                        child: Text('sua próxima escala',
+                                            style: context.textStyles.bodyLarge
+                                                ?.copyWith(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w700,
+                                              color: context.colors.onSurface,
+                                            )),
+                                      ),
                                       const SizedBox(height: 12),
-                                      EscalaCardWidget(
-                                        index:
-                                            controller.escalas.first['index'] ??
-                                                0,
-                                        diasRestantes: controller
-                                            .escalas.first['diasRestantes'],
-                                        dia: controller.escalas.first['dia'],
-                                        mes: controller.escalas.first['mes'],
-                                        horario:
-                                            controller.escalas.first['horario'],
-                                        diaSemana: controller
-                                            .escalas.first['diaSemana'],
-                                        nomeEvento: controller
-                                            .escalas.first['nomeEvento'],
-                                        funcoes: List<String>.from(controller
-                                            .escalas.first['funcoes']),
-                                        statusLabel:
-                                            controller.escalas.first['status'],
-                                        statusColor:
-                                            controller.escalas.first['cor'],
-                                        controller: controller,
+                                      FadeInUp(
+                                        delay: const Duration(milliseconds: 400),
+                                        child: EscalaCardWidget(
+                                          index:
+                                              controller.escalas.first['index'] ??
+                                                  0,
+                                          diasRestantes: controller
+                                              .escalas.first['diasRestantes'],
+                                          dia: controller.escalas.first['dia'],
+                                          mes: controller.escalas.first['mes'],
+                                          horario:
+                                              controller.escalas.first['horario'],
+                                          diaSemana: controller
+                                              .escalas.first['diaSemana'],
+                                          nomeEvento: controller
+                                              .escalas.first['nomeEvento'],
+                                          funcoes: List<String>.from(controller
+                                              .escalas.first['funcoes']),
+                                          statusLabel:
+                                              controller.escalas.first['status'],
+                                          statusColor:
+                                              controller.escalas.first['cor'],
+                                          controller: controller,
+                                        ),
                                       ),
                                       const SizedBox(height: 24),
                                       if (controller.escalas.length > 1) ...[
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text('o que vem por aí',
-                                                style: context
-                                                    .textStyles.bodyLarge
-                                                    ?.copyWith(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.w700,
-                                                  color:
-                                                      context.colors.onSurface,
-                                                )),
-                                          ],
+                                        SlideFromRight(
+                                          delay: const Duration(milliseconds: 600),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text('o que vem por aí',
+                                                  style: context
+                                                      .textStyles.bodyLarge
+                                                      ?.copyWith(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w700,
+                                                    color:
+                                                        context.colors.onSurface,
+                                                  )),
+                                            ],
+                                          ),
                                         ),
                                         const SizedBox(height: 12),
                                         Column(
@@ -282,22 +300,25 @@ class _DashboardScreenState extends State<DashboardScreen>
                                             (index) {
                                               final escala =
                                                   controller.escalas[index + 1];
-                                              return EscalaCardWidget(
-                                                index: escala['index'] ??
-                                                    index + 1,
-                                                diasRestantes:
-                                                    escala['diasRestantes'],
-                                                dia: escala['dia'],
-                                                mes: escala['mes'],
-                                                nomeEvento:
-                                                    escala['nomeEvento'],
-                                                horario: escala['horario'],
-                                                diaSemana: escala['diaSemana'],
-                                                funcoes: List<String>.from(
-                                                    escala['funcoes']),
-                                                statusLabel: escala['status'],
-                                                statusColor: escala['cor'],
-                                                controller: controller,
+                                              return SlideFromBottom(
+                                                delay: Duration(milliseconds: 800 + (index * 100)),
+                                                child: EscalaCardWidget(
+                                                  index: escala['index'] ??
+                                                      index + 1,
+                                                  diasRestantes:
+                                                      escala['diasRestantes'],
+                                                  dia: escala['dia'],
+                                                  mes: escala['mes'],
+                                                  nomeEvento:
+                                                      escala['nomeEvento'],
+                                                  horario: escala['horario'],
+                                                  diaSemana: escala['diaSemana'],
+                                                  funcoes: List<String>.from(
+                                                      escala['funcoes']),
+                                                  statusLabel: escala['status'],
+                                                  statusColor: escala['cor'],
+                                                  controller: controller,
+                                                ),
                                               );
                                             },
                                           ),
@@ -316,6 +337,101 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ],
                 );
         },
+      ),
+    );
+  }
+
+  Widget _buildLoadingScreen(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header shimmer
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 200,
+                        height: 25,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 150,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Card shimmer
+            Container(
+              width: double.infinity,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Title shimmer
+            Container(
+              width: 150,
+              height: 18,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Cards shimmer
+            ...List.generate(2, (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                width: double.infinity,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            )),
+          ],
+        ),
       ),
     );
   }

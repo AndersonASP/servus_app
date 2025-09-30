@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:servus_app/core/models/member.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/core/widgets/scroll_reveal_animation.dart';
+import 'package:servus_app/core/widgets/shimmer_widget.dart';
 import 'package:servus_app/services/members_service.dart';
 import 'package:servus_app/shared/widgets/loading_widget.dart';
 import 'package:servus_app/shared/widgets/error_widget.dart';
@@ -27,16 +29,22 @@ class _MembersDashboardScreenState extends State<MembersDashboardScreen> {
   bool? _isActive;
   bool _isSearchVisible = false;
   
+  // Controllers para animações
+  
 
   @override
   void initState() {
     super.initState();
+    
+    // Inicializar animações
+    
+    
+    
     _loadMembers();
   }
 
   @override
   void dispose() {
-    // Cancelar qualquer operação pendente se necessário
     super.dispose();
   }
 
@@ -385,7 +393,10 @@ class _MembersDashboardScreenState extends State<MembersDashboardScreen> {
 
   Widget _buildMembersList() {
     if (_isLoading) {
-      return const LoadingWidget();
+      return const ShimmerList(
+        itemCount: 8,
+        itemHeight: 100,
+      );
     }
 
     if (_error != null) {
@@ -407,14 +418,17 @@ class _MembersDashboardScreenState extends State<MembersDashboardScreen> {
         itemCount: _members.length,
         itemBuilder: (context, index) {
           final member = _members[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: InkWell(
-              onTap: () => _navigateToMemberDetails(member),
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
+          
+          return FadeInUp(
+            delay: Duration(milliseconds: index * 100),
+            child: Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: InkWell(
+                      onTap: () => _navigateToMemberDetails(member),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -530,8 +544,9 @@ class _MembersDashboardScreenState extends State<MembersDashboardScreen> {
                     ),
                   ],
                 ),
-              ),
-            ),
+                      ),
+                    ),
+                  ),
           );
         },
       ),

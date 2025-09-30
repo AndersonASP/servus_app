@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:servus_app/core/navigation/custom_transitions.dart';
 import 'package:servus_app/features/forms/screens/public_form_web_screen.dart';
 
 class WebRoutes {
@@ -12,9 +13,13 @@ class WebRoutes {
       // Rota para formulários públicos na web
       GoRoute(
         path: '/forms/public/:formId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final formId = state.pathParameters['formId']!;
-          return PublicFormWebScreen(formId: formId);
+          return CustomTransitions.fade(
+            context,
+            state,
+            PublicFormWebScreen(formId: formId),
+          );
         },
       ),
     ];

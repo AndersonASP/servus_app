@@ -13,10 +13,15 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController emailController;
   late TextEditingController passwordController;
+  
+  // Controllers para micro-interações
+  late final AnimationController _buttonAnimationController;
+  late final Animation<double> _buttonScaleAnimation;
+  late final Animation<double> _buttonElevationAnimation;
 
   @override
   void initState() {
@@ -24,6 +29,34 @@ class _LoginScreenState extends State<LoginScreen> {
     final controller = context.read<LoginController>();
     emailController = controller.emailController;
     passwordController = controller.passwordController;
+    
+    // Inicializar animações para micro-interações
+    _buttonAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    
+    _buttonScaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _buttonElevationAnimation = Tween<double>(
+      begin: 2.0,
+      end: 8.0,
+    ).animate(CurvedAnimation(
+      parent: _buttonAnimationController,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _buttonAnimationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -212,26 +245,38 @@ class _LoginScreenState extends State<LoginScreen> {
 
                                   const SizedBox(height: 16),
 
-                                  // Botão login
+                                  // Botão login com micro-interações
                                   Consumer<LoginController>(
-                                    builder: (context, controller, _) => ElevatedButton(
-                                      onPressed: controller.isLoading ? null : () async {
-                                        if (_formKey.currentState?.validate() ?? false) {
-                                          await controller.fazerLogin(
-                                            emailController.text,
-                                            passwordController.text,
-                                            context,
-                                          );
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: context.theme.primaryColor,
-                                        foregroundColor: context.theme.scaffoldBackgroundColor,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        minimumSize: const Size(double.infinity, 48),
-                                      ),
+                                    builder: (context, controller, _) => AnimatedBuilder(
+                                      animation: _buttonAnimationController,
+                                      builder: (context, child) {
+                                        return Transform.scale(
+                                          scale: _buttonScaleAnimation.value,
+                                          child: ElevatedButton(
+                                            onPressed: controller.isLoading ? null : () async {
+                                              // Animação de press
+                                              _buttonAnimationController.forward().then((_) {
+                                                _buttonAnimationController.reverse();
+                                              });
+                                              
+                                              if (_formKey.currentState?.validate() ?? false) {
+                                                await controller.fazerLogin(
+                                                  emailController.text,
+                                                  passwordController.text,
+                                                  context,
+                                                );
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: context.theme.primaryColor,
+                                              foregroundColor: context.theme.scaffoldBackgroundColor,
+                                              elevation: _buttonElevationAnimation.value,
+                                              shadowColor: context.theme.primaryColor.withOpacity(0.3),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              minimumSize: const Size(double.infinity, 48),
+                                            ),
                                       child: controller.isLoading
                                           ? SizedBox(
                                               height: 20,
@@ -251,6 +296,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                             ),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
                                   

@@ -53,16 +53,23 @@ class RetryInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
+    print('🔄 [RetryInterceptor] Erro detectado: ${err.response?.statusCode}');
+    print('🔄 [RetryInterceptor] URL: ${err.requestOptions.uri}');
+    
     final extra = RetryOptions.fromExtra(err.requestOptions) ??
         RetryOptions(retries: retries, retryDelays: retryDelays);
 
     final shouldRetry = extra.retries > 0 && _shouldRetry(err);
+    print('🔄 [RetryInterceptor] Deve fazer retry: $shouldRetry (${extra.retries} retries left)');
+    
     if (!shouldRetry) {
+      print('🔄 [RetryInterceptor] Não fazendo retry, passando erro adiante');
       return handler.next(err);
     }
 
     extra.retries--;
     final delay = retryDelays[retries - extra.retries - 1];
+    print('🔄 [RetryInterceptor] Fazendo retry em ${delay.inSeconds}s');
     logPrint?.call(
       '🔄 Retrying request ${err.requestOptions.path} in ${delay.inSeconds}s (${extra.retries} retries left)',
     );
@@ -70,9 +77,12 @@ class RetryInterceptor extends Interceptor {
     await Future.delayed(delay);
 
     try {
+      print('🔄 [RetryInterceptor] Executando retry...');
       final response = await dio.fetch(err.requestOptions);
+      print('🔄 [RetryInterceptor] Retry bem-sucedido: ${response.statusCode}');
       handler.resolve(response);
     } catch (e) {
+      print('🔄 [RetryInterceptor] Retry falhou: $e');
       if (e is DioException) {
         err.requestOptions.extra[RetryOptions.extraKey] = extra;
         return onError(e, handler);

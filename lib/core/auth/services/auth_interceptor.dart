@@ -25,31 +25,64 @@ class AuthInterceptor extends Interceptor {
     // Adiciona device-id em todas as requisições
     final deviceId = await TokenService.getDeviceId();
     options.headers['device-id'] = deviceId;
+    debugPrint('📱 [AuthInterceptor] Device ID adicionado: $deviceId');
 
     // Adiciona token de autorização se disponível
     final token = await TokenService.getAccessToken();
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
+      debugPrint('🔑 [AuthInterceptor] Token adicionado: ${token.substring(0, 20)}...');
+    } else {
+      debugPrint('❌ [AuthInterceptor] Token não encontrado');
     }
 
     // Adiciona headers de contexto se disponível
     final context = await TokenService.getContext();
+    debugPrint('🏢 [AuthInterceptor] Contexto do TokenService: $context');
+    
     if (context['tenantId'] != null) {
       options.headers['x-tenant-id'] = context['tenantId'];
+      debugPrint('🏢 [AuthInterceptor] X-Tenant-ID adicionado: ${context['tenantId']}');
     } else {
+      debugPrint('❌ [AuthInterceptor] TenantId é null no TokenService');
     }
     if (context['branchId'] != null) {
       options.headers['x-branch-id'] = context['branchId'];
+      debugPrint('🏢 [AuthInterceptor] X-Branch-ID adicionado: ${context['branchId']}');
     }
     if (context['ministryId'] != null) {
       options.headers['x-ministry-id'] = context['ministryId'];
+      debugPrint('🏢 [AuthInterceptor] X-Ministry-ID adicionado: ${context['ministryId']}');
     }
 
+    debugPrint('📦 [AuthInterceptor] Headers finais: ${options.headers}');
     handler.next(options);
   }
 
   @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) async {
+    debugPrint('📥 [AuthInterceptor] Resposta recebida:');
+    debugPrint('   - Status: ${response.statusCode}');
+    debugPrint('   - URL: ${response.requestOptions.uri}');
+    debugPrint('   - Headers: ${response.headers}');
+    debugPrint('   - Data: ${response.data}');
+    handler.next(response);
+  }
+
+  @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
+    debugPrint('❌ [AuthInterceptor] Erro na requisição:');
+    debugPrint('   - Status: ${err.response?.statusCode}');
+    debugPrint('   - URL: ${err.requestOptions.uri}');
+    
+    // Capturar apenas a mensagem de validação do servidor
+    String? serverMessage;
+    if (err.response?.data is Map) {
+      final data = err.response!.data as Map;
+      serverMessage = data['message']?.toString();
+    }
+    debugPrint('   - Mensagem do servidor: $serverMessage');
+    
     final isUnauthorized = err.response?.statusCode == 401;
     final isRefreshEndpoint = err.requestOptions.path.contains('/auth/refresh');
 

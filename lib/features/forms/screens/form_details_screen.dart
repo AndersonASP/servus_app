@@ -398,15 +398,29 @@ ${_form!.description.isNotEmpty ? _form!.description : 'Formulário de cadastro 
                           style: ElevatedButton.styleFrom(
                             backgroundColor: context.colors.primary,
                             foregroundColor: context.colors.onPrimary,
+                            elevation: 2,
+                            shadowColor: context.colors.primary.withOpacity(0.3),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: ElevatedButton.icon(
                           onPressed: _copyLink,
                           icon: const Icon(Icons.copy),
                           label: const Text('Copiar Link'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.colors.surface,
+                            foregroundColor: context.colors.onSurface,
+                            elevation: 2,
+                            shadowColor: context.colors.shadow.withOpacity(0.2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -414,10 +428,19 @@ ${_form!.description.isNotEmpty ? _form!.description : 'Formulário de cadastro 
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton.icon(
+                    child: ElevatedButton.icon(
                       onPressed: _showQRCode,
                       icon: const Icon(Icons.qr_code),
                       label: const Text('Mostrar QR Code'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.colors.surface,
+                        foregroundColor: context.colors.onSurface,
+                        elevation: 2,
+                        shadowColor: context.colors.shadow.withOpacity(0.2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ),
                 ],

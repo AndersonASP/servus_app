@@ -11,10 +11,14 @@ class MinistryFunctionsService {
     
     // Adicionar interceptor para headers de autenticação
     _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
+      onRequest: (options, handler) async {
         if (_authContext.hasContext) {
-          final headers = _authContext.headers;
-          options.headers.addAll(headers);
+          try {
+            final headers = await _authContext.headers;
+            options.headers.addAll(headers);
+          } catch (e) {
+            print('Erro ao obter headers de autenticação: $e');
+          }
         }
         handler.next(options);
       },

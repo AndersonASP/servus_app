@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:servus_app/core/constants/env.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/core/widgets/shimmer_widget.dart';
 import 'package:servus_app/core/models/custom_form.dart';
 import 'package:servus_app/services/custom_form_service.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
@@ -152,7 +153,10 @@ class _FormsListScreenState extends State<FormsListScreen> {
       body: RefreshIndicator(
         onRefresh: () => _loadForms(refresh: true),
         child: _isLoading && _forms.isEmpty
-            ? const Center(child: CircularProgressIndicator())
+            ? const ShimmerList(
+                itemCount: 6,
+                itemHeight: 120,
+              )
             : _forms.isEmpty
                 ? _buildEmptyState()
                 : _buildFormsList(),

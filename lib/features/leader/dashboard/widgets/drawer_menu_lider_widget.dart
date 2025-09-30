@@ -41,10 +41,21 @@ class DrawerMenuLider extends StatelessWidget {
               exibirTrocaModo: true,
               modoAtual: _labelDoPapel(usuario.role),
             ),
-            Divider(
-              height: 10,
-              thickness: 0.6,
-              color: context.colors.onSurface.withValues(alpha: 0.2),
+            Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    context.colors.outline.withValues(alpha: 0.1),
+                    context.colors.outline.withValues(alpha: 0.2),
+                    context.colors.outline.withValues(alpha: 0.1),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.2, 0.5, 0.8, 1.0],
+                ),
+              ),
             ),
 
             const SizedBox(height: 16),
@@ -56,163 +67,198 @@ class DrawerMenuLider extends StatelessWidget {
                 physics: const BouncingScrollPhysics(),
                 child: Column(
                   children: [
-                  // Dashboard
-                  ListTile(
-                    leading: const Icon(Icons.dashboard),
-                    title: const Text('Dashboard'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.go('/leader/dashboard');
-                    },
-                  ),
-
-                  // Ministérios (não visível para servus_admin)
-                  if (usuario.role != UserRole.servus_admin)
-                    ListTile(
-                      leading: const Icon(Icons.groups),
-                      title: Text(usuario.role == UserRole.leader ? 'Meu ministério' : 'Ministérios'),
-                      subtitle: Text(usuario.role == UserRole.leader ? 'Ver detalhes do meu ministério' : 'Gerenciar ministérios'),
-                      onTap: () {
-                        // 🔍 LOGS DETALHADOS PARA DEBUG DO MENU "MEU MINISTÉRIO"
-                        debugPrint('🎯 [DrawerMenu] ===== CLIQUE NO MENU MINISTÉRIO =====');
-                        debugPrint('🔍 [DrawerMenu] Usuário logado:');
-                        debugPrint('   - Nome: ${usuario.nome}');
-                        debugPrint('   - Email: ${usuario.email}');
-                        debugPrint('   - Role: ${usuario.role}');
-                        debugPrint('   - É líder: ${usuario.isLider}');
-                        debugPrint('   - É voluntário: ${usuario.isVoluntario}');
-                        debugPrint('   - Ministério principal ID: ${usuario.primaryMinistryId}');
-                        debugPrint('   - Ministério principal nome: ${usuario.primaryMinistryName}');
-                        debugPrint('   - Tenant ID: ${usuario.tenantId}');
-                        debugPrint('   - Branch ID: ${usuario.branchId}');
-                        debugPrint('🔍 [DrawerMenu] Context mounted? ${context.mounted}');
-                        
-                        Navigator.pop(context);
-                        debugPrint('🔍 [DrawerMenu] Drawer fechado');
-                        
-                        if (usuario.role == UserRole.leader) {
-                          debugPrint('🎯 [DrawerMenu] USUÁRIO É LÍDER - Navegando para ministério do líder');
-                          
-                          // 🆕 Usar o ministério principal do usuário
-                          if (usuario.primaryMinistryId != null) {
-                            final ministryId = usuario.primaryMinistryId!;
-                            final route = '/leader/ministerio-detalhes/$ministryId';
-                            debugPrint('✅ [DrawerMenu] Ministério principal encontrado:');
-                            debugPrint('   - ID: $ministryId');
-                            debugPrint('   - Nome: ${usuario.primaryMinistryName}');
-                            debugPrint('   - Rota: $route');
-                            context.push(route);
-                            debugPrint('✅ [DrawerMenu] Navegação executada para ministério principal');
-                          } else {
-                            // Fallback para ID fixo se não houver ministério principal
-                            const fallbackId = '68d1b58da422169502e5e765';
-                            const fallbackRoute = '/leader/ministerio-detalhes/$fallbackId';
-                            debugPrint('⚠️ [DrawerMenu] PROBLEMA: Ministério principal não encontrado!');
-                            debugPrint('   - primaryMinistryId é null');
-                            debugPrint('   - Usando fallback ID: $fallbackId');
-                            debugPrint('   - Rota fallback: $fallbackRoute');
-                            context.push(fallbackRoute);
-                            debugPrint('⚠️ [DrawerMenu] Navegação executada com fallback');
-                          }
-                        } else {
-                          debugPrint('🔍 [DrawerMenu] Usuário não é líder, navegando para lista de ministérios');
-                          debugPrint('   - Role atual: ${usuario.role}');
-                          debugPrint('   - Rota: /leader/ministerio/lista');
-                          context.push('/leader/ministerio/lista');
-                          debugPrint('✅ [DrawerMenu] Navegação para lista executada');
-                        }
-                        
-                        debugPrint('🎯 [DrawerMenu] ===== FIM DO CLIQUE NO MENU MINISTÉRIO =====');
-                      },
+                    // 🏠 PRINCIPAL
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        dividerColor: Colors.transparent,
+                      ),
+                      child: ExpansionTile(
+                        leading: const Icon(Icons.home_outlined),
+                        title: const Text('Principal'),
+                        children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16),
+                          child: ListTile(
+                            leading: const Icon(Icons.dashboard_outlined),
+                            title: const Text('Dashboard'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              context.go('/leader/dashboard');
+                            },
+                          ),
+                        ),
+                        // Ministérios (não visível para servus_admin)
+                        if (usuario.role != UserRole.servus_admin)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: ListTile(
+                              leading: const Icon(Icons.groups_outlined),
+                              title: Text(usuario.role == UserRole.leader ? 'Meu ministério' : 'Ministérios'),
+                              subtitle: Text(usuario.role == UserRole.leader ? 'Ver detalhes do meu ministério' : 'Gerenciar ministérios'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                
+                                if (usuario.role == UserRole.leader) {
+                                  // Usar o ministério principal do usuário
+                                  if (usuario.primaryMinistryId != null) {
+                                    final ministryId = usuario.primaryMinistryId!;
+                                    final route = '/leader/ministerio-detalhes/$ministryId';
+                                    context.push(route);
+                                  } else {
+                                    // Fallback para ID fixo se não houver ministério principal
+                                    const fallbackId = '68d1b58da422169502e5e765';
+                                    const fallbackRoute = '/leader/ministerio-detalhes/$fallbackId';
+                                    context.push(fallbackRoute);
+                                  }
+                                } else {
+                                  context.push('/leader/ministerio/lista');
+                                }
+                              },
+                            ),
+                          ),
+                      ],
+                      ),
                     ),
 
-
-                  // Membros (visível apenas para tenant_admin e branch_admin)
-                  if (usuario.role == UserRole.tenant_admin ||
-                      usuario.role == UserRole.branch_admin)
-                    ListTile(
-                      leading: const Icon(Icons.group_add),
-                      title: const Text('Membros'),
-                      subtitle: const Text('Gerenciar membros'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/leader/members');
-                      },
+                    // 👥 PESSOAS
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        dividerColor: Colors.transparent,
+                      ),
+                      child: ExpansionTile(
+                      leading: const Icon(Icons.people_outlined),
+                      title: const Text('Pessoas'),
+                      children: [
+                        // Membros (visível apenas para tenant_admin e branch_admin)
+                        if (usuario.role == UserRole.tenant_admin ||
+                            usuario.role == UserRole.branch_admin)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: ListTile(
+                              leading: const Icon(Icons.group_add_outlined),
+                              title: const Text('Membros'),
+                              subtitle: const Text('Gerenciar membros'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.push('/leader/members');
+                              },
+                            ),
+                          ),
+                        // Voluntários (visível para leader, tenant_admin e branch_admin)
+                        if (usuario.role == UserRole.leader ||
+                            usuario.role == UserRole.tenant_admin ||
+                            usuario.role == UserRole.branch_admin)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: ListTile(
+                              leading: const Icon(Icons.people_outlined),
+                              title: const Text('Voluntários'),
+                              subtitle: const Text('Gerenciar voluntários'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.go('/leader/dashboard/voluntarios');
+                              },
+                            ),
+                          ),
+                      ],
+                      ),
                     ),
 
-                  // Voluntários (visível para leader, tenant_admin e branch_admin)
-                  if (usuario.role == UserRole.leader ||
-                      usuario.role == UserRole.tenant_admin ||
-                      usuario.role == UserRole.branch_admin)
-                    ListTile(
-                      leading: const Icon(Icons.people),
-                      title: const Text('Voluntários'),
-                      subtitle: const Text('Gerenciar voluntários'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.go('/leader/dashboard/voluntarios');
-                      },
+                    // 📋 GERENCIAR
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        dividerColor: Colors.transparent,
+                      ),
+                      child: ExpansionTile(
+                      leading: const Icon(Icons.description_outlined),
+                      title: const Text('Gerenciar'),
+                      children: [
+                        // 1. ESCALAS - Mais importante (funcionalidade core)
+                        if (usuario.role != UserRole.servus_admin)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: ListTile(
+                              leading: const Icon(Icons.schedule_outlined),
+                              title: const Text('Escalas'),
+                              subtitle: const Text('Gerenciar escalas'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.push('/leader/escalas');
+                              },
+                            ),
+                          ),
+                        // 2. EVENTOS - Depende de escalas
+                        if (usuario.role != UserRole.servus_admin)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: ListTile(
+                              leading: const Icon(Icons.event_outlined),
+                              title: const Text('Eventos'),
+                              subtitle: const Text('Gerenciar eventos'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.go('/leader/eventos');
+                              },
+                            ),
+                          ),
+                        // 3. TEMPLATES - Ferramenta para escalas
+                        if (usuario.role != UserRole.servus_admin)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: ListTile(
+                              leading: const Icon(Icons.copy_outlined),
+                              title: const Text('Templates'),
+                              subtitle: const Text('Modelos de escala'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.go('/leader/templates');
+                              },
+                            ),
+                          ),
+                        // 4. FORMULÁRIOS - Independente (visível apenas para tenant_admin e branch_admin)
+                        if (usuario.role == UserRole.tenant_admin ||
+                            usuario.role == UserRole.branch_admin)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: ListTile(
+                              leading: const Icon(Icons.assignment_outlined),
+                              title: const Text('Formulários'),
+                              subtitle: const Text('Criar e gerenciar'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.push('/forms');
+                              },
+                            ),
+                          ),
+                      ],
+                      ),
                     ),
 
-                  // Formulários (visível apenas para tenant_admin e branch_admin)
-                  if (usuario.role == UserRole.tenant_admin ||
-                      usuario.role == UserRole.branch_admin)
-                    ListTile(
-                      leading: const Icon(Icons.assignment),
-                      title: const Text('Formulários'),
-                      subtitle: const Text('Criar e gerenciar'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/forms');
-                      },
-                    ),
-                  // Criar Tenants (apenas para ServusAdmin)
-                  if (usuario.role == UserRole.servus_admin)
-                    ListTile(
-                      leading: const Icon(Icons.business),
-                      title: const Text('Nova igreja'),
-                      subtitle: const Text('Nova organização'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/leader/tenants/create');
-                      },
-                    ),
-
-                  // Escalas (não visível para servus_admin)
-                  if (usuario.role != UserRole.servus_admin)
-                    ListTile(
-                      leading: const Icon(Icons.schedule),
-                      title: const Text('Escalas'),
-                      subtitle: const Text('Gerenciar escalas'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/leader/escalas');
-                      },
-                    ),
-
-                  // Eventos (não visível para servus_admin)
-                  if (usuario.role != UserRole.servus_admin)
-                    ListTile(
-                      leading: const Icon(Icons.event),
-                      title: const Text('Eventos'),
-                      subtitle: const Text('Gerenciar eventos'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.go('/leader/eventos');
-                      },
-                    ),
-
-                  // Templates (não visível para servus_admin)
-                  if (usuario.role != UserRole.servus_admin)
-                    ListTile(
-                      leading: const Icon(Icons.copy),
-                      title: const Text('Templates'),
-                      subtitle: const Text('Modelos de escala'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.go('/leader/templates');
-                      },
-                    ),
+                    // ⚙️ ADMINISTRAÇÃO (só aparece se tiver conteúdo)
+                    if (usuario.role == UserRole.servus_admin)
+                      Theme(
+                        data: Theme.of(context).copyWith(
+                          dividerColor: Colors.transparent,
+                        ),
+                        child: ExpansionTile(
+                        leading: const Icon(Icons.settings_outlined),
+                        title: const Text('Administração'),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: ListTile(
+                              leading: const Icon(Icons.business_outlined),
+                              title: const Text('Nova igreja'),
+                              subtitle: const Text('Nova organização'),
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.push('/leader/tenants/create');
+                              },
+                            ),
+                          ),
+                        ],
+                        ),
+                      ),
 
                   ],
                 ),
@@ -220,10 +266,21 @@ class DrawerMenuLider extends StatelessWidget {
             ),
 
             // Rodapé fixo
-            Divider(
-              height: 10,
-              thickness: 0.6,
-              color: context.colors.onSurface.withValues(alpha: 0.2),
+            Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    context.colors.outline.withValues(alpha: 0.1),
+                    context.colors.outline.withValues(alpha: 0.2),
+                    context.colors.outline.withValues(alpha: 0.1),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.2, 0.5, 0.8, 1.0],
+                ),
+              ),
             ),
             if (usuario.role == UserRole.tenant_admin ||
                 usuario.role == UserRole.branch_admin ||
@@ -254,4 +311,5 @@ class DrawerMenuLider extends StatelessWidget {
         return 'Voluntário';
     }
   }
+
 }

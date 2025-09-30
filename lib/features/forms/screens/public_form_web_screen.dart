@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:servus_app/core/widgets/responsive_animation.dart';
 import 'package:dio/dio.dart';
 import 'package:servus_app/core/models/custom_form.dart';
 import 'package:servus_app/core/network/dio_client.dart';
@@ -18,7 +19,7 @@ class PublicFormWebScreen extends StatefulWidget {
   State<PublicFormWebScreen> createState() => _PublicFormWebScreenState();
 }
 
-class _PublicFormWebScreenState extends State<PublicFormWebScreen> {
+class _PublicFormWebScreenState extends State<PublicFormWebScreen> with TickerProviderStateMixin {
   final Dio _dio = DioClient.instance;
   final _formKey = GlobalKey<FormState>();
 
@@ -38,15 +39,44 @@ class _PublicFormWebScreenState extends State<PublicFormWebScreen> {
   List<String> _selectedMinistries = [];
   List<String> _selectedFunctions = [];
   bool _isLoadingFunctions = false;
+  
+  // Controllers para hover effects
+  late final AnimationController _hoverController;
+  late final Animation<double> _hoverScaleAnimation;
+  late final Animation<double> _hoverElevationAnimation;
 
   @override
   void initState() {
     super.initState();
+    
+    // Inicializar animações para hover effects
+    _hoverController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    
+    _hoverScaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.02,
+    ).animate(CurvedAnimation(
+      parent: _hoverController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _hoverElevationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 8.0,
+    ).animate(CurvedAnimation(
+      parent: _hoverController,
+      curve: Curves.easeInOut,
+    ));
+    
     _loadForm();
   }
 
   @override
   void dispose() {
+    _hoverController.dispose();
     // Dispose dos controllers
     for (final controller in _controllers.values) {
       controller.dispose();
@@ -309,6 +339,28 @@ class _PublicFormWebScreenState extends State<PublicFormWebScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.0, 0.1),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
+            child: child,
+          ),
+        );
+      },
+      child: _buildCurrentScreen(),
+    );
+  }
+
+  Widget _buildCurrentScreen() {
     if (_isLoading) {
       return _buildLoadingScreen();
     }
@@ -329,21 +381,76 @@ class _PublicFormWebScreenState extends State<PublicFormWebScreen> {
         const Color(0xFF4058DB);
 
     return Scaffold(
+      key: const ValueKey('loading'),
       backgroundColor: primaryColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Carregando formulário...',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
+            // Animated Progress Indicator
+            TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 1500),
+              tween: Tween(begin: 0.0, end: 1.0),
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: 0.8 + (0.2 * value),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 3.0,
                   ),
+                );
+              },
+            ),
+            const SizedBox(height: 32),
+            // Animated Text with Pulse Effect
+            TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 2000),
+              tween: Tween(begin: 0.0, end: 1.0),
+              builder: (context, value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, 10 * (1 - value)),
+                    child: Text(
+                      'Carregando formulário...',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            // Animated Dots
+            TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 1000),
+              tween: Tween(begin: 0.0, end: 1.0),
+              builder: (context, value, child) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (index) {
+                    final delay = index * 0.2;
+                    final dotValue = (value - delay).clamp(0.0, 1.0);
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Transform.scale(
+                        scale: 0.5 + (0.5 * dotValue),
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.7),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
             ),
           ],
         ),
@@ -376,19 +483,25 @@ class _PublicFormWebScreenState extends State<PublicFormWebScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                size: 64,
-                color: ServusColors.error,
+              ResponsiveScaleIn(
+                delay: const Duration(milliseconds: 200),
+                child: const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: ServusColors.error,
+                ),
               ),
               const SizedBox(height: 24),
-              Text(
-                'Erro ao carregar formulário',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: ServusColors.error,
-                    ),
-                textAlign: TextAlign.center,
+              ResponsiveFadeIn(
+                delay: const Duration(milliseconds: 400),
+                child: Text(
+                  'Erro ao carregar formulário',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: ServusColors.error,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               const SizedBox(height: 16),
               Text(
@@ -485,23 +598,49 @@ class _PublicFormWebScreenState extends State<PublicFormWebScreen> {
     final isDarkMode = context.theme.brightness == Brightness.dark;
 
     return Scaffold(
+      key: const ValueKey('form'),
       backgroundColor: backgroundColor,
       body: SingleChildScrollView(
-        child: Container(
-          margin: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: isDarkMode
-                    ? context.colors.surface.withValues(alpha: 0.5)
-                    : context.colors.surface.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
+        child: TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 800),
+          tween: Tween(begin: 0.0, end: 1.0),
+          builder: (context, value, child) {
+            return Transform.translate(
+              offset: Offset(0, 30 * (1 - value)),
+              child: Opacity(
+                opacity: value,
+                child: AnimatedBuilder(
+                  animation: _hoverController,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _hoverScaleAnimation.value,
+                      child: MouseRegion(
+                        onEnter: (_) => _hoverController.forward(),
+                        onExit: (_) => _hoverController.reverse(),
+                        child: Container(
+                          margin: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: backgroundColor,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isDarkMode
+                                    ? Colors.black.withOpacity(0.3 + (_hoverElevationAnimation.value * 0.1))
+                                    : Colors.black.withOpacity(0.15 + (_hoverElevationAnimation.value * 0.1)),
+                                blurRadius: 25 + (_hoverElevationAnimation.value * 5),
+                                offset: Offset(0, 15 + (_hoverElevationAnimation.value * 3)),
+                                spreadRadius: 2 + (_hoverElevationAnimation.value * 1),
+                              ),
+                              BoxShadow(
+                                color: isDarkMode
+                                    ? Colors.black.withOpacity(0.1 + (_hoverElevationAnimation.value * 0.05))
+                                    : Colors.black.withOpacity(0.05 + (_hoverElevationAnimation.value * 0.05)),
+                                blurRadius: 10 + (_hoverElevationAnimation.value * 3),
+                                offset: Offset(0, 5 + (_hoverElevationAnimation.value * 2)),
+                                spreadRadius: 1 + (_hoverElevationAnimation.value * 0.5),
+                              ),
+                            ],
+                          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -633,7 +772,15 @@ class _PublicFormWebScreenState extends State<PublicFormWebScreen> {
                 ),
               ),
             ],
-          ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1194,26 +1341,39 @@ class _PublicFormWebScreenState extends State<PublicFormWebScreen> {
 
   Widget _buildFunctionMultiselectField(CustomFormField field) {
     if (_isLoadingFunctions) {
-      child:
-      const Row(
-        children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          SizedBox(width: 12),
-          Text('Carregando funções...'),
-        ],
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('Carregando funções...'),
+          ],
+        ),
       );
     }
 
     if (_selectedMinistries.isEmpty) {
-      Text(
-        'Selecione primeiro os ministérios de interesse',
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: context.colors.onSurface,
-            ),
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'Selecione primeiro os ministérios de interesse',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.colors.onSurface,
+              ),
+        ),
       );
     }
 

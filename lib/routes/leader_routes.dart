@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:servus_app/core/navigation/custom_transitions.dart';
 import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/features/leader/dashboard/cards_details/escala_mensal/escala_mensal_screen.dart';
 import 'package:servus_app/features/leader/dashboard/leader_dashboard_screen.dart';
@@ -31,11 +32,19 @@ import 'package:servus_app/features/leader/volunteers/screens/volunteers_list_sc
 final List<GoRoute> leaderRoutes = [
   GoRoute(
     path: '/leader/dashboard',
-    builder: (context, state) => const DashboardLiderScreen(),
+    pageBuilder: (context, state) => CustomTransitions.dashboard(
+      context,
+      state,
+      const DashboardLiderScreen(),
+    ),
   ),
   GoRoute(
     path: '/leader/dashboard/solicitacao-troca',
-    builder: (context, state) => const CardDetailsSolicitacoesTrocaScreen(),
+    pageBuilder: (context, state) => CustomTransitions.slideLeft(
+      context,
+      state,
+      const CardDetailsSolicitacoesTrocaScreen(),
+    ),
   ),
   GoRoute(
     path: '/leader/escalas',
@@ -89,11 +98,19 @@ final List<GoRoute> leaderRoutes = [
   // Rotas de membros
   GoRoute(
     path: '/leader/members',
-    builder: (context, state) => const MembersDashboardScreen(),
+    pageBuilder: (context, state) => CustomTransitions.dashboard(
+      context,
+      state,
+      const MembersDashboardScreen(),
+    ),
   ),
   GoRoute(
     path: '/leader/members/create',
-    builder: (context, state) => const CreateMemberScreen(),
+    pageBuilder: (context, state) => CustomTransitions.form(
+      context,
+      state,
+      const CreateMemberScreen(),
+    ),
   ),
   GoRoute(
     path: '/leader/members/details/:id',
@@ -129,7 +146,11 @@ final List<GoRoute> leaderRoutes = [
         // Rotas de formulários
         GoRoute(
           path: '/leader/forms',
-          builder: (context, state) => const FormsListScreen(),
+          pageBuilder: (context, state) => CustomTransitions.dashboard(
+            context,
+            state,
+            const FormsListScreen(),
+          ),
         ),
         // Rota de redirecionamento para compatibilidade
         GoRoute(
@@ -138,11 +159,19 @@ final List<GoRoute> leaderRoutes = [
         ),
         GoRoute(
           path: '/forms/create',
-          builder: (context, state) => const CreateFormScreen(),
+          pageBuilder: (context, state) => CustomTransitions.form(
+            context,
+            state,
+            const CreateFormScreen(),
+          ),
         ),
         GoRoute(
           path: '/forms/create-volunteer',
-          builder: (context, state) => const CreateCustomFormScreen(),
+          pageBuilder: (context, state) => CustomTransitions.form(
+            context,
+            state,
+            const CreateCustomFormScreen(),
+          ),
         ),
         GoRoute(
           path: '/forms/:formId/details',

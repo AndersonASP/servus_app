@@ -21,17 +21,52 @@ class InviteCodeModal extends StatefulWidget {
   State<InviteCodeModal> createState() => _InviteCodeModalState();
 }
 
-class _InviteCodeModalState extends State<InviteCodeModal> {
+class _InviteCodeModalState extends State<InviteCodeModal> with TickerProviderStateMixin {
   final InviteCodeService _inviteCodeService = InviteCodeService();
   final DeepLinkService _deepLinkService = DeepLinkService();
   InviteCode? _currentInviteCode;
   bool _isLoading = false;
   bool _isGenerating = false;
+  
+  // Controllers para animações
+  late final AnimationController _animationController;
+  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    
+    // Inicializar animações
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.elasticOut,
+    ));
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+    
     _loadCurrentInviteCode();
+    
+    // Iniciar animação após um pequeno delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _animationController.forward();
+      }
+    });
   }
 
   Future<void> _loadCurrentInviteCode() async {
@@ -117,17 +152,30 @@ class _InviteCodeModalState extends State<InviteCodeModal> {
   }
 
   @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final maxHeight = screenHeight * 0.8; // 80% da altura da tela
     
-    return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        constraints: BoxConstraints(
-          maxHeight: maxHeight,
-          maxWidth: 400,
-        ),
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Opacity(
+            opacity: _fadeAnimation.value,
+            child: Dialog(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: BoxConstraints(
+                  maxHeight: maxHeight,
+                  maxWidth: 400,
+                ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -184,7 +232,11 @@ class _InviteCodeModalState extends State<InviteCodeModal> {
             ),
           ],
         ),
-      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

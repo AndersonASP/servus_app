@@ -23,7 +23,7 @@ class SimpleLinkMemberModal extends StatefulWidget {
   State<SimpleLinkMemberModal> createState() => _SimpleLinkMemberModalState();
 }
 
-class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
+class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
@@ -39,6 +39,11 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
   List<Map<String, dynamic>> _availableFunctions = [];
   List<String> _selectedFunctionIds = []; // Funções selecionadas
   bool _isLoadingFunctions = false;
+  
+  // Controllers para animações
+  late final AnimationController _animationController;
+  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _fadeAnimation;
 
   /// Verifica se o usuário logado pode vincular líderes
   bool get _canLinkLeaders {
@@ -67,14 +72,45 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
   @override
   void initState() {
     super.initState();
+    
+    // Inicializar animações
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.elasticOut,
+    ));
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+    
     _searchController.addListener(_onSearchChanged);
     _scrollController.addListener(_onScroll);
     _loadAllMembers();
     _loadMinistryFunctions(); // Carregar funções do ministério atual
+    
+    // Iniciar animação após um pequeno delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _animationController.forward();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _animationController.dispose();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -313,63 +349,74 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.95,
-        height: MediaQuery.of(context).size.height * 0.9,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: context.colors.surface,
-        ),
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: context.colors.primary,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Opacity(
+            opacity: _fadeAnimation.value,
+            child: Dialog(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.95,
+                height: MediaQuery.of(context).size.height * 0.9,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: context.colors.surface,
                 ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.person_add,
-                    color: context.colors.onPrimary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Vincular Membro',
-                      style: context.textStyles.titleLarge?.copyWith(
-                        color: context.colors.onPrimary,
-                        fontWeight: FontWeight.bold,
+                child: Column(
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: context.colors.primary,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.person_add,
+                            color: context.colors.onPrimary,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Vincular Membro',
+                              style: context.textStyles.titleLarge?.copyWith(
+                                color: context.colors.onPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: Icon(
+                              Icons.close,
+                              color: context.colors.onPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(
-                      Icons.close,
-                      color: context.colors.onPrimary,
+
+                    // Content
+                    Expanded(
+                      child: _selectedMember == null 
+                          ? _buildMemberSelection()
+                          : _buildFunctionSelection(),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-
-            // Content
-            Expanded(
-              child: _selectedMember == null 
-                  ? _buildMemberSelection()
-                  : _buildFunctionSelection(),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -737,5 +784,4 @@ class _SimpleLinkMemberModalState extends State<SimpleLinkMemberModal> {
       ),
     );
   }
-
 }
