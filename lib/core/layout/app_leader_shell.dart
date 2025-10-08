@@ -16,6 +16,10 @@ class AppLeaderShell extends StatelessWidget {
     return location.startsWith('/leader/configuracoes');
   }
 
+  bool _isEventForm(String location) {
+    return location.contains('/leader/escalas') && location.contains('evento');
+  }
+
   int _getCurrentIndex(String location) {
     if (_isSettings(location)) return 1;
     return 0; // Dashboard é o padrão
@@ -33,7 +37,10 @@ class AppLeaderShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     final isDashboard = _isDashboard(location);
+    final isEventForm = _isEventForm(location);
     final currentIndex = _getCurrentIndex(location);
+    // Se houver uma rota empilhada (ex: formulários abertos via Navigator.push), esconder bottom bar
+    final hasPushedRoute = Navigator.of(context).canPop();
 
     return Scaffold(
         body: child,
@@ -83,8 +90,8 @@ class AppLeaderShell extends StatelessWidget {
               )
             : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        // Bottom navigation bar com Home e Configurações
-        bottomNavigationBar: Container(
+        // Bottom navigation bar com Home e Configurações (oculta quando há rota empilhada ou na tela de formulário de evento)
+        bottomNavigationBar: (hasPushedRoute || isEventForm) ? null : Container(
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: const BorderRadius.only(

@@ -5,6 +5,10 @@ import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/escalas/controllers/evento/evento_controller.dart';
 import 'package:servus_app/features/leader/escalas/models/evento_model.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/shared/widgets/fab_safe_scroll_view.dart';
+import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/core/network/dio_client.dart';
+import 'package:dio/dio.dart';
 import 'dart:developer' as developer;
 
 class EventoFormScreen extends StatefulWidget {
@@ -21,13 +25,17 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
   final TextEditingController nomeController = TextEditingController();
   final TextEditingController observacoesController = TextEditingController();
 
-
   DateTime? dataSelecionada;
   TimeOfDay? horarioSelecionado;
   RecorrenciaTipo recorrenciaSelecionada = RecorrenciaTipo.nenhum;
   int? diaSemanaSelecionado;
   int? semanaDoMesSelecionada;
   DateTime? dataLimiteRecorrencia;
+  
+  // Variáveis para ministérios
+  List<Map<String, dynamic>> _availableMinistries = [];
+  String? _selectedMinistryId;
+  bool _isLoadingMinistries = false;
 
 
   @override
@@ -43,6 +51,72 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
       diaSemanaSelecionado = evento.diaSemana;
       semanaDoMesSelecionada = evento.semanaDoMes;
       dataLimiteRecorrencia = evento.dataLimiteRecorrencia;
+      _selectedMinistryId = evento.ministerioId.isNotEmpty ? evento.ministerioId : null;
+    }
+    
+    // Carregar ministérios do usuário logado
+    _loadUserMinistries();
+  }
+
+  /// Carrega os ministérios onde o usuário logado está vinculado
+  Future<void> _loadUserMinistries() async {
+    try {
+      setState(() {
+        _isLoadingMinistries = true;
+      });
+
+      final context = await TokenService.getContext();
+      final tenantId = context['tenantId'];
+      final branchId = context['branchId'];
+
+      if (tenantId == null) {
+        throw Exception('Tenant ID não encontrado');
+      }
+
+      final dio = DioClient.instance;
+      
+      // Buscar ministérios do usuário logado usando o endpoint /ministry-memberships/me
+      final response = await dio.get(
+        '/ministry-memberships/me',
+        options: Options(
+          headers: {
+            'X-Tenant-ID': tenantId,
+            if (branchId != null && branchId.isNotEmpty) 'X-Branch-ID': branchId,
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> memberships = response.data;
+        final List<Map<String, dynamic>> ministries = [];
+        
+        for (final membership in memberships) {
+          if (membership['ministry'] != null && membership['isActive'] == true) {
+            ministries.add({
+              'id': membership['ministry']['_id'],
+              'name': membership['ministry']['name'],
+              'role': membership['role'],
+            });
+          }
+        }
+        
+        setState(() {
+          _availableMinistries = ministries;
+          _isLoadingMinistries = false;
+        });
+        
+        developer.log('✅ Ministérios carregados: ${ministries.length}', name: 'EventoFormScreen');
+      } else {
+        throw Exception('Erro ao buscar ministérios: ${response.statusCode}');
+      }
+    } catch (e) {
+      developer.log('❌ Erro ao carregar ministérios: $e', name: 'EventoFormScreen');
+      setState(() {
+        _isLoadingMinistries = false;
+      });
+      if (mounted) {
+        showError(context, 'Erro ao carregar ministérios: $e');
+      }
     }
   }
 
@@ -93,7 +167,7 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
           id: widget.eventoExistente?.id,
           nome: nomeController.text,
           dataHora: dataHoraCompleta,
-          ministerioId: '', // Ministério não obrigatório
+          ministerioId: _selectedMinistryId ?? '', // Ministério selecionado
           recorrente: recorrenciaSelecionada != RecorrenciaTipo.nenhum,
           tipoRecorrencia: recorrenciaSelecionada,
           diaSemana: recorrenciaSelecionada == RecorrenciaTipo.semanal
@@ -121,18 +195,21 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
         }
 
         // Mostra notificação
-        if (isNovo) {
-          developer.log('✅ Evento criado com sucesso', name: 'EventoFormScreen');
-          showCreateSuccess(context, 'Evento');
-        } else {
-          developer.log('✅ Evento atualizado com sucesso', name: 'EventoFormScreen');
-          showUpdateSuccess(context, 'Evento');
+        if (mounted) {
+          if (isNovo) {
+            developer.log('✅ Evento criado com sucesso', name: 'EventoFormScreen');
+            showCreateSuccess(context, 'Evento');
+          } else {
+            developer.log('✅ Evento atualizado com sucesso', name: 'EventoFormScreen');
+            showUpdateSuccess(context, 'Evento');
+          }
+          context.pop(); // volta à tela anterior
         }
-
-        context.pop(); // volta à tela anterior
       } catch (e) {
         developer.log('❌ Erro ao salvar evento: $e', name: 'EventoFormScreen');
-        showError(context, 'Erro ao salvar evento: $e');
+        if (mounted) {
+          showError(context, 'Erro ao salvar evento: $e');
+        }
       }
     } else {
       developer.log('❌ Validação do formulário falhou', name: 'EventoFormScreen');
@@ -141,12 +218,14 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
       developer.log('⏰ Horário selecionado: $horarioSelecionado', name: 'EventoFormScreen');
       developer.log('🔄 Validação recorrência: $validacaoRecorrencia', name: 'EventoFormScreen');
       
-      if (!validacaoRecorrencia && erroRecorrencia != null) {
-        showError(context, erroRecorrencia);
-      } else if (dataSelecionada == null) {
-        showError(context, 'Selecione uma data para o evento');
-      } else if (horarioSelecionado == null) {
-        showError(context, 'Selecione um horário para o evento');
+      if (mounted) {
+        if (!validacaoRecorrencia && erroRecorrencia != null) {
+          showError(context, erroRecorrencia);
+        } else if (dataSelecionada == null) {
+          showError(context, 'Selecione uma data para o evento');
+        } else if (horarioSelecionado == null) {
+          showError(context, 'Selecione um horário para o evento');
+        }
       }
     }
   }
@@ -194,14 +273,16 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
             color: context.colors.onPrimary,
           ),
         ),
+        backgroundColor: context.colors.primary,
+        foregroundColor: context.colors.onPrimary,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 100), // Padding inferior aumentado
-          child: Form(
-            key: _formKey,
-            child: ListView(
+        child: Form(
+          key: _formKey,
+          child: FabSafeScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+            child: Column(
               children: [
               const SizedBox(height: 20), // Espaço extra no topo
               // Nome do evento
@@ -227,37 +308,14 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
               
               const SizedBox(height: 32),
               
+              // Seletor de ministério
+              _buildMinistrySelector(),
+              
+              const SizedBox(height: 32),
+              
               // Seletor de data e horário
               GestureDetector(
-                onTap: () async {
-                  // Selecionar data
-                  final hoje = DateTime.now();
-                  final hojeSemHora = DateTime(hoje.year, hoje.month, hoje.day);
-                  final data = await showDatePicker(
-                    context: context,
-                    initialDate: dataSelecionada ?? hojeSemHora,
-                    firstDate: hojeSemHora,
-                    lastDate: DateTime(2030),
-                  );
-                  if (data != null) {
-                    // Selecionar horário
-                    final horario = await showTimePicker(
-                      context: context,
-                      initialTime: horarioSelecionado ?? TimeOfDay.now(),
-                    );
-                    if (horario != null) {
-                      setState(() {
-                        dataSelecionada = data;
-                        horarioSelecionado = horario;
-                        // Se recorrência semanal está selecionada e não há dia da semana definido,
-                        // definir automaticamente baseado na data selecionada
-                        if (recorrenciaSelecionada == RecorrenciaTipo.semanal && diaSemanaSelecionado == null) {
-                          diaSemanaSelecionado = data.weekday % 7; // Converte weekday (1-7) para (0-6)
-                        }
-                      });
-                    }
-                  }
-                },
+                onTap: _selectDateTime,
                 child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: context.premiumCardDecoration(),
@@ -489,6 +547,195 @@ class _EventoFormScreenState extends State<EventoFormScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Método para selecionar data e horário
+  Future<void> _selectDateTime() async {
+    if (!mounted) return;
+    
+    // Selecionar data
+    final hoje = DateTime.now();
+    final hojeSemHora = DateTime(hoje.year, hoje.month, hoje.day);
+    final data = await showDatePicker(
+      context: context,
+      initialDate: dataSelecionada ?? hojeSemHora,
+      firstDate: hojeSemHora,
+      lastDate: DateTime(2030),
+    );
+    
+    if (data != null && mounted) {
+      // Selecionar horário
+      final horario = await showTimePicker(
+        context: context,
+        initialTime: horarioSelecionado ?? TimeOfDay.now(),
+      );
+      
+      if (horario != null && mounted) {
+        setState(() {
+          dataSelecionada = data;
+          horarioSelecionado = horario;
+          // Se recorrência semanal está selecionada e não há dia da semana definido,
+          // definir automaticamente baseado na data selecionada
+          if (recorrenciaSelecionada == RecorrenciaTipo.semanal && diaSemanaSelecionado == null) {
+            diaSemanaSelecionado = data.weekday % 7; // Converte weekday (1-7) para (0-6)
+          }
+        });
+      }
+    }
+  }
+
+  /// Widget para seleção de ministério
+  Widget _buildMinistrySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ministério',
+          style: context.textStyles.titleMedium?.copyWith(
+            color: context.colors.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Selecione o ministério relacionado ao evento',
+          style: context.textStyles.bodySmall?.copyWith(
+            color: context.colors.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        if (_isLoadingMinistries)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              border: Border.all(color: context.colors.outline.withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(16),
+              color: context.colors.surface,
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(context.colors.primary),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Carregando ministérios...',
+                  style: context.textStyles.bodyMedium?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (_availableMinistries.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: context.colors.outline.withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(16),
+              color: context.colors.surface,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: context.colors.onSurfaceVariant,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Nenhum ministério encontrado. Você precisa estar vinculado a pelo menos um ministério.',
+                    style: context.textStyles.bodyMedium?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: _availableMinistries.map((ministry) {
+              final ministryId = ministry['id'] ?? '';
+              final ministryName = ministry['name'] ?? 'Ministério';
+              final ministryRole = ministry['role'] ?? '';
+              final isSelected = _selectedMinistryId == ministryId;
+              
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedMinistryId = isSelected ? null : ministryId;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? context.colors.primary : context.colors.surface,
+                    border: Border.all(
+                      color: isSelected ? context.colors.primary : context.colors.outline.withValues(alpha: 0.3),
+                      width: isSelected ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: isSelected ? [
+                      BoxShadow(
+                        color: context.colors.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ] : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.church,
+                        size: 16,
+                        color: isSelected ? context.colors.onPrimary : context.colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        ministryName,
+                        style: context.textStyles.bodyMedium?.copyWith(
+                          color: isSelected ? context.colors.onPrimary : context.colors.onSurface,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      if (ministryRole.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isSelected 
+                                ? context.colors.onPrimary.withValues(alpha: 0.2)
+                                : context.colors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            ministryRole,
+                            style: context.textStyles.bodySmall?.copyWith(
+                              color: isSelected ? context.colors.onPrimary : context.colors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 

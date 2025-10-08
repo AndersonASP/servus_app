@@ -82,6 +82,11 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
                   
                   const SizedBox(height: 24),
                   
+                  // Limite de bloqueios
+                  _buildBlockLimitSection(context, controller),
+                  
+                  const SizedBox(height: 24),
+                  
                   // Funções do ministério
                   _buildFunctionsSection(context, controller),
                   
@@ -185,6 +190,84 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
             ),
             filled: true,
             fillColor: context.colors.surface,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBlockLimitSection(BuildContext context, MinisterioController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.block,
+              color: context.colors.primary,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Limite de dias bloqueados',
+              style: context.textStyles.labelLarge?.copyWith(
+                color: context.colors.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Número máximo de dias que um voluntário pode bloquear por mês',
+          style: context.textStyles.bodySmall?.copyWith(
+            color: context.colors.onSurface.withValues(alpha: 0.7),
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Slider(
+                value: controller.maxBlockedDays.toDouble(),
+                min: 1,
+                max: 50,
+                divisions: 49,
+                activeColor: context.colors.primary,
+                inactiveColor: context.colors.primary.withValues(alpha: 0.3),
+                onChanged: (value) {
+                  controller.updateMaxBlockedDays(value.round());
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Container(
+              width: 80,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: context.colors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: context.colors.primary.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Text(
+                '${controller.maxBlockedDays} dias',
+                style: context.textStyles.titleMedium?.copyWith(
+                  color: context.colors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Recomendado: 10-15 dias para ministérios com alta demanda',
+          style: context.textStyles.bodySmall?.copyWith(
+            color: context.colors.onSurface.withValues(alpha: 0.5),
           ),
         ),
       ],

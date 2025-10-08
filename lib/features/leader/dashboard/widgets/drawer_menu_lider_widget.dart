@@ -98,21 +98,32 @@ class DrawerMenuLider extends StatelessWidget {
                               onTap: () {
                                 Navigator.pop(context);
                                 
+                                print('🔍 [DrawerMenuLider] ===== CLIQUE EM MEU MINISTÉRIO =====');
+                                print('🔍 [DrawerMenuLider] Usuário role: ${usuario.role}');
+                                print('🔍 [DrawerMenuLider] PrimaryMinistryId: ${usuario.primaryMinistryId}');
+                                print('🔍 [DrawerMenuLider] PrimaryMinistryName: ${usuario.primaryMinistryName}');
+                                print('🔍 [DrawerMenuLider] Ministérios: ${usuario.ministerios}');
+                                
                                 if (usuario.role == UserRole.leader) {
                                   // Usar o ministério principal do usuário
                                   if (usuario.primaryMinistryId != null) {
                                     final ministryId = usuario.primaryMinistryId!;
                                     final route = '/leader/ministerio-detalhes/$ministryId';
+                                    print('🔍 [DrawerMenuLider] Navegando para: $route');
                                     context.push(route);
                                   } else {
                                     // Fallback para ID fixo se não houver ministério principal
                                     const fallbackId = '68d1b58da422169502e5e765';
                                     const fallbackRoute = '/leader/ministerio-detalhes/$fallbackId';
+                                    print('🔍 [DrawerMenuLider] PrimaryMinistryId nulo, usando fallback: $fallbackRoute');
                                     context.push(fallbackRoute);
                                   }
                                 } else {
+                                  print('🔍 [DrawerMenuLider] Não é líder, navegando para lista de ministérios');
                                   context.push('/leader/ministerio/lista');
                                 }
+                                
+                                print('🔍 [DrawerMenuLider] ===== FIM DO CLIQUE =====');
                               },
                             ),
                           ),

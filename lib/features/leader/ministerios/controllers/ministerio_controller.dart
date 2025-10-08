@@ -19,6 +19,9 @@ class MinisterioController extends ChangeNotifier {
   final TextEditingController descricaoController = TextEditingController();
   final TextEditingController funcaoController = TextEditingController();
   
+  // Campo para limite de bloqueios
+  int maxBlockedDays = 10;
+  
   // Estados
   bool ativo = true;
   bool isSaving = false;
@@ -136,6 +139,11 @@ class MinisterioController extends ChangeNotifier {
     descricaoController.text = ministerio.description ?? '';
     ativo = ministerio.isActive;
     funcoes = List.from(ministerio.ministryFunctions);
+    
+    // Carregar limite de bloqueios do campo do ministério
+    maxBlockedDays = ministerio.maxBlockedDays ?? 10; // Fallback para valor padrão
+    debugPrint('🔍 [MinisterioController] Limite de bloqueios carregado para edição: $maxBlockedDays dias');
+    
     notifyListeners();
   }
 
@@ -225,6 +233,12 @@ class MinisterioController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Atualiza o limite de dias bloqueados
+  void updateMaxBlockedDays(int newLimit) {
+    maxBlockedDays = newLimit;
+    notifyListeners();
+  }
+
   /// Valida os campos
   bool _validarCampos() {
     bool isValid = true;
@@ -301,7 +315,16 @@ class MinisterioController extends ChangeNotifier {
           description: descricaoController.text.trim().isEmpty ? null : descricaoController.text.trim(),
           ministryFunctions: funcoes,
           isActive: ativo,
+          maxBlockedDays: maxBlockedDays,
         );
+        
+        debugPrint('🔍 [MinisterioController] Dados para atualização:');
+        debugPrint('🔍 [MinisterioController] - Nome: ${updateData.name}');
+        debugPrint('🔍 [MinisterioController] - Descrição: ${updateData.description}');
+        debugPrint('🔍 [MinisterioController] - Funções: ${updateData.ministryFunctions}');
+        debugPrint('🔍 [MinisterioController] - Ativo: ${updateData.isActive}');
+        debugPrint('🔍 [MinisterioController] - MaxBlockedDays: ${updateData.maxBlockedDays}');
+        debugPrint('🔍 [MinisterioController] - JSON: ${updateData.toJson()}');
         
         
         if (_isServusAdmin) {
@@ -350,7 +373,16 @@ class MinisterioController extends ChangeNotifier {
           description: descricaoController.text.trim().isEmpty ? null : descricaoController.text.trim(),
           ministryFunctions: funcoes,
           isActive: ativo,
+          maxBlockedDays: maxBlockedDays,
         );
+        
+        debugPrint('🔍 [MinisterioController] Dados para criação:');
+        debugPrint('🔍 [MinisterioController] - Nome: ${createData.name}');
+        debugPrint('🔍 [MinisterioController] - Descrição: ${createData.description}');
+        debugPrint('🔍 [MinisterioController] - Funções: ${createData.ministryFunctions}');
+        debugPrint('🔍 [MinisterioController] - Ativo: ${createData.isActive}');
+        debugPrint('🔍 [MinisterioController] - MaxBlockedDays: ${createData.maxBlockedDays}');
+        debugPrint('🔍 [MinisterioController] - JSON: ${createData.toJson()}');
         
         
         if (_isServusAdmin) {

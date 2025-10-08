@@ -29,12 +29,42 @@ class EventRecurrencePattern {
 
   factory EventRecurrencePattern.fromMap(Map<String, dynamic>? map) {
     if (map == null) return EventRecurrencePattern();
+    int? parseInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+    DateTime? parseDate(dynamic v) {
+      if (v == null) return null;
+      if (v is DateTime) return v;
+      if (v is String) return DateTime.tryParse(v);
+      return null;
+    }
+
+    List<int>? parseIntList(dynamic v) {
+      if (v == null) return null;
+      if (v is List) {
+        final result = <int>[];
+        for (final item in v) {
+          if (item is int) {
+            result.add(item);
+          } else if (item is String) {
+            final parsed = int.tryParse(item);
+            if (parsed != null) result.add(parsed);
+          }
+        }
+        return result;
+      }
+      return null;
+    }
+
     return EventRecurrencePattern(
-      interval: map['interval'],
-      daysOfWeek: map['daysOfWeek'] != null ? List<int>.from(map['daysOfWeek']) : null,
-      dayOfMonth: map['dayOfMonth'],
-      endDate: map['endDate'] != null ? DateTime.tryParse(map['endDate']) : null,
-      occurrences: map['occurrences'],
+      interval: parseInt(map['interval']),
+      daysOfWeek: parseIntList(map['daysOfWeek']),
+      dayOfMonth: parseInt(map['dayOfMonth']),
+      endDate: parseDate(map['endDate']),
+      occurrences: parseInt(map['occurrences']),
     );
   }
 

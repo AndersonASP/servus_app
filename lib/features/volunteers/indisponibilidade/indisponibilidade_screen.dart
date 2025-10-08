@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/features/volunteers/indisponibilidade/bloqueios/controller/bloqueio_controller.dart';
 import 'package:servus_app/features/volunteers/indisponibilidade/bloqueios/screens/bloqueio_screen.dart';
 import 'package:servus_app/shared/widgets/calendar_widget.dart';
+import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/state/auth_state.dart';
+import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'indisponibilidade_controller.dart';
 
@@ -14,6 +18,31 @@ class IndisponibilidadeScreen extends StatefulWidget {
 }
 
 class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        print('🔍 [IndisponibilidadeScreen] ===== INICIANDO CARREGAMENTO NO INITSTATE =====');
+        final controller = Provider.of<IndisponibilidadeController>(context, listen: false);
+        final authState = Provider.of<AuthState>(context, listen: false);
+        
+        print('🔍 [IndisponibilidadeScreen] Carregando ministérios do voluntário...');
+        await controller.carregarMinisteriosDoVoluntario(authState);
+        print('🔍 [IndisponibilidadeScreen] Ministérios carregados. Limite atual: ${controller.maxDiasIndisponiveis}');
+        
+        print('🔍 [IndisponibilidadeScreen] Carregando bloqueios existentes...');
+        await controller.carregarBloqueiosExistentes();
+        print('🔍 [IndisponibilidadeScreen] Bloqueios carregados. Limite final: ${controller.maxDiasIndisponiveis}');
+        
+        print('✅ [IndisponibilidadeScreen] ===== CARREGAMENTO CONCLUÍDO =====');
+      } catch (e) {
+        print('❌ [IndisponibilidadeScreen] Erro no initState: $e');
+        print('❌ [IndisponibilidadeScreen] Stack trace: ${StackTrace.current}');
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = Provider.of<IndisponibilidadeController>(context);
@@ -67,23 +96,9 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Center(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      height: 390,
-                      child: TableCalendar(
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 0),
+                  child: TableCalendar(
                         locale: 'pt_BR',
                         firstDay: DateTime.utc(today.year, today.month - 3, 1),
                         lastDay: DateTime.utc(today.year, today.month + 3, 31),
@@ -113,44 +128,80 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
                             controller.isDiaBloqueado(day),
                         onDaySelected: (selectedDay, focusedDay) {
                           controller.setFocusedDay(focusedDay);
+                          
                           if (controller.isDiaBloqueado(selectedDay)) {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => BloqueioScreen(
-                                  onConfirmar: (motivo, ministerios) {
-                                    // Aqui você pode atualizar o estado após editar
-                                    controller.registrarBloqueio(
-                                      dia: selectedDay,
-                                      motivo: motivo,
-                                      ministerios: ministerios,
-                                    );
+                            // Se o dia já está bloqueado, abre o bottom sheet diretamente
+                            controller.selecionarDia(selectedDay);
+                            _mostrarBottomSheetBloqueio(context, controller);
+        } else {
+          // Se o dia não está bloqueado, abre a tela para criar novo bloqueio
+          // 🆕 VALIDAÇÃO REMOVIDA: Agora a validação é feita apenas ao salvar o bloqueio
+          print('🔍 [IndisponibilidadeScreen] Abrindo tela para criar bloqueio - validação será feita ao salvar');
+          
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => BloqueioScreen(
+                                  selectedDate: selectedDay,
+                                  onConfirmar: (motivo, ministerios, recurrencePattern, bloqueioController) async {
+                                    print('🔍 [IndisponibilidadeScreen] ===== onConfirmar CHAMADO =====');
+                                    print('🔍 [IndisponibilidadeScreen] Motivo: "$motivo"');
+                                    print('🔍 [IndisponibilidadeScreen] Ministérios: $ministerios');
+                                    print('🔍 [IndisponibilidadeScreen] Recorrência: ${recurrencePattern?.toString() ?? "Nenhuma"}');
+                                    print('🔍 [IndisponibilidadeScreen] Data selecionada: ${selectedDay.day}/${selectedDay.month}/${selectedDay.year}');
+                                    
+                                    final authState = Provider.of<AuthState>(context, listen: false);
+                                    final usuario = authState.usuario;
+                                    
+                                    if (usuario != null) {
+                                      print('🔍 [IndisponibilidadeScreen] Usuário encontrado: ${usuario.email}');
+                                      
+                                      // Obter o ID do usuário do token
+                                      final userId = await TokenService.getUserId();
+                                      if (userId == null) {
+                                        print('❌ [IndisponibilidadeScreen] Não foi possível obter o ID do usuário');
+                                        return;
+                                      }
+                                      
+                                      print('🔍 [IndisponibilidadeScreen] UserId obtido: $userId');
+                                      print('🔍 [IndisponibilidadeScreen] TenantId: ${usuario.tenantId}');
+                                      
+                                      print('🔍 [IndisponibilidadeScreen] ===== CHAMANDO registrarBloqueio =====');
+                                      final resultado = await controller.registrarBloqueio(
+                                        dia: selectedDay,
+                                        motivo: motivo,
+                                        ministerios: ministerios,
+                                        tenantId: usuario.tenantId ?? '',
+                                        userId: userId,
+                                        recurrencePattern: recurrencePattern,
+                                        context: context, // 🆕 ADICIONADO: Passar context para exibir ServusSnackbar
+                                      );
+                                      
+                                      print('🔍 [IndisponibilidadeScreen] Resultado do registrarBloqueio: $resultado');
+                                      
+                                      if (resultado) {
+                                        print('✅ [IndisponibilidadeScreen] Bloqueio criado com sucesso!');
+                                        
+                            
+                                        
+                                        // Fechar a tela apenas após sucesso
+                                        if (context.mounted) {
+                                          Navigator.pop(context);
+                                          print('✅ [IndisponibilidadeScreen] Navigator.pop chamado após sucesso');
+                                        }
+                                      } else {
+                                        print('❌ [IndisponibilidadeScreen] Falha ao criar bloqueio');
+                                        // Não fechar a tela se houve falha
+                                      }
+                                      
+                                      // Desativar loading após operação concluída
+                                      bloqueioController.setLoading(false);
+                                    } else {
+                                      print('❌ [IndisponibilidadeScreen] Usuário não encontrado');
+                                    }
+                                    
+                                    print('🔍 [IndisponibilidadeScreen] ===== FIM onConfirmar =====');
                                   },
-                                  ministeriosDisponiveis: [
-                                    'Ministério de Louvor',
-                                    'Ministério Infantil',
-                                    'Ministério de Oração',
-                                    'Ministério de Ação Social',
-                                  ],
-                                ),
-                              ),
-                            );
-                          } else {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => BloqueioScreen(
-                                  onConfirmar: (motivo, ministerios) {
-                                    controller.registrarBloqueio(
-                                      dia: selectedDay,
-                                      motivo: motivo,
-                                      ministerios: ministerios,
-                                    );
-                                  },
-                                  ministeriosDisponiveis: [
-                                    'Ministério de Louvor',
-                                    'Ministério Infantil',
-                                    'Ministério de Oração',
-                                    'Ministério de Ação Social',
-                                  ],
+                                  ministeriosDisponiveis: controller.ministeriosDoVoluntario,
                                 ),
                               ),
                             );
@@ -159,36 +210,361 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
                         calendarFormat: CalendarFormat.month,
                         availableGestures: AvailableGestures.all,
                       ),
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 24),
-                // SizedBox(
-                //   width: double.infinity,
-                //   child: ElevatedButton(
-                //     onPressed: controller.salvarIndisponibilidade,
-                //     style: ElevatedButton.styleFrom(
-                //       backgroundColor: const Color(0xFF4058DB),
-                //       padding: const EdgeInsets.symmetric(vertical: 16),
-                //       shape: RoundedRectangleBorder(
-                //         borderRadius: BorderRadius.circular(12),
-                //       ),
-                //     ),
-                // child: const Text(
-                //   'Salvar indisponibilidade',
-                //   style: TextStyle(
-                //     fontSize: 15,
-                //     fontWeight: FontWeight.bold,
-                //     color: Colors.white,
-                //   ),
-                // ),
-                //   ),
-                // ),
+                
+                // Cards removidos - agora o clique direto no dia bloqueado abre o bottom sheet
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+
+  void _mostrarBottomSheetBloqueio(BuildContext context, IndisponibilidadeController controller) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle do bottom sheet
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.colors.onSurface.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Título
+            Text(
+              'Detalhes do Bloqueio',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: context.colors.onSurface,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Lista de bloqueios
+            if (controller.bloqueiosDoDiaSelecionado.isEmpty)
+              Center(
+                child: Text(
+                  'Nenhum bloqueio encontrado',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: context.colors.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              )
+            else
+              ...controller.bloqueiosDoDiaSelecionado.map((bloqueio) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Data
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: context.colors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Data: ${bloqueio.data.day}/${bloqueio.data.month}/${bloqueio.data.year}',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: context.colors.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Motivo
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline, color: context.colors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Motivo: ${bloqueio.motivo}',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Ministérios
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.group, color: context.colors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Ministérios: ${bloqueio.ministerios.join(', ')}',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Botões de ação
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop(); // Fecha o bottom sheet
+                            _abrirTelaEdicao(context, controller, bloqueio);
+                          },
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Editar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.colors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop(); // Fecha o bottom sheet
+                            _removerBloqueio(context, controller, bloqueio);
+                          },
+                          icon: const Icon(Icons.delete),
+                          label: const Text('Excluir'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: context.colors.error,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              )),
+            
+            // Espaço para evitar que o teclado cubra os botões
+            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _abrirTelaEdicao(BuildContext context, IndisponibilidadeController controller, bloqueio) {
+    final authState = Provider.of<AuthState>(context, listen: false);
+    final usuario = authState.usuario;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => BloqueioScreen(
+          selectedDate: bloqueio.data,
+          onConfirmar: (motivo, ministerios, recurrencePattern, bloqueioController) async {
+            if (usuario != null) {
+              await _executarEdicaoBloqueio(context, controller, bloqueio, motivo, ministerios, usuario, recurrencePattern, bloqueioController);
+            }
+          },
+          motivoInicial: bloqueio.motivo,
+          ministeriosIniciais: bloqueio.ministerios,
+          ministeriosDisponiveis: controller.ministeriosDoVoluntario,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _executarEdicaoBloqueio(BuildContext context, IndisponibilidadeController controller, bloqueio, String motivo, List<String> ministerios, usuario, recurrencePattern, BloqueioController bloqueioController) async {
+    try {
+      print('🔍 [IndisponibilidadeScreen] Iniciando edição do bloqueio...');
+      
+      // Obter o ID do usuário do token
+      final userId = await TokenService.getUserId();
+      if (userId == null) {
+        print('❌ [IndisponibilidadeScreen] Não foi possível obter o ID do usuário');
+        return;
+      }
+      
+      // Primeiro remove o bloqueio existente
+      final sucessoRemocao = await controller.removerBloqueioEspecifico(
+        bloqueio: bloqueio,
+        tenantId: usuario.tenantId ?? '',
+        userId: userId,
+      );
+      
+      print('🔍 [IndisponibilidadeScreen] Resultado da remoção: $sucessoRemocao');
+      
+      if (sucessoRemocao) {
+        // Depois cria o novo bloqueio
+        final sucessoCriacao = await controller.registrarBloqueio(
+          dia: bloqueio.data,
+          motivo: motivo,
+          ministerios: ministerios,
+          tenantId: usuario.tenantId ?? '',
+          userId: userId,
+          recurrencePattern: recurrencePattern,
+          context: context, // 🆕 ADICIONADO: Passar context para exibir ServusSnackbar
+        );
+        
+        print('🔍 [IndisponibilidadeScreen] Resultado da criação: $sucessoCriacao');
+        
+        if (sucessoCriacao) {
+          // Recarrega os bloqueios para garantir consistência
+          await controller.carregarBloqueiosExistentes();
+          // Atualiza a seleção do dia
+          controller.selecionarDia(bloqueio.data);
+          
+          // Fechar a tela apenas após sucesso
+          if (context.mounted) {
+            Navigator.pop(context);
+            print('✅ [IndisponibilidadeScreen] Navigator.pop chamado após edição');
+          }
+          
+          print('✅ [IndisponibilidadeScreen] Edição concluída com sucesso');
+        } else {
+          print('❌ [IndisponibilidadeScreen] Falha ao criar novo bloqueio');
+          if (context.mounted) {
+            showWarning(
+              context,
+              'Falha ao salvar as alterações do bloqueio. Tente novamente.',
+              title: 'Erro na Edição',
+            );
+          }
+        }
+      } else {
+        print('❌ [IndisponibilidadeScreen] Falha ao remover bloqueio existente');
+        if (context.mounted) {
+          showWarning(
+            context,
+            'Falha ao remover o bloqueio existente. Tente novamente.',
+            title: 'Erro na Edição',
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ [IndisponibilidadeScreen] Erro durante a edição: $e');
+      if (context.mounted) {
+        showWarning(
+          context,
+          'Ocorreu um erro durante a edição. Tente novamente.',
+          title: 'Erro',
+        );
+      }
+    } finally {
+      // Desativar loading após operação concluída
+      bloqueioController.setLoading(false);
+    }
+  }
+
+  void _removerBloqueio(BuildContext context, IndisponibilidadeController controller, bloqueio) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirmar Remoção', style: context.theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: context.colors.onSurface,
+          ),),
+          content: Text('Deseja realmente remover o bloqueio do dia ${bloqueio.data.day}/${bloqueio.data.month}/${bloqueio.data.year}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _executarRemocaoBloqueio(context, controller, bloqueio);
+              },
+              child: Text('Remover', style: context.theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: context.colors.error,
+              ),),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _executarRemocaoBloqueio(BuildContext context, IndisponibilidadeController controller, bloqueio) async {
+    final authState = Provider.of<AuthState>(context, listen: false);
+    final usuario = authState.usuario;
+    
+    if (usuario != null) {
+      try {
+        print('🔍 [IndisponibilidadeScreen] Iniciando remoção do bloqueio...');
+        
+        // Obter o ID do usuário do token
+        final userId = await TokenService.getUserId();
+        if (userId == null) {
+          print('❌ [IndisponibilidadeScreen] Não foi possível obter o ID do usuário');
+          return;
+        }
+        
+        final sucesso = await controller.removerBloqueioEspecifico(
+          bloqueio: bloqueio,
+          tenantId: usuario.tenantId ?? '',
+          userId: userId,
+        );
+        
+        print('🔍 [IndisponibilidadeScreen] Resultado da remoção: $sucesso');
+        
+        if (sucesso) {
+          // Recarrega os bloqueios para garantir consistência
+          await controller.carregarBloqueiosExistentes();
+          // Limpa a seleção se não há mais bloqueios no dia
+          if (controller.bloqueiosDoDiaSelecionado.isEmpty) {
+            controller.limparSelecao();
+          }
+          print('✅ [IndisponibilidadeScreen] Remoção concluída com sucesso');
+        } else {
+          print('❌ [IndisponibilidadeScreen] Falha na remoção');
+          if (context.mounted) {
+            showWarning(
+              context,
+              'Falha ao remover o bloqueio. Tente novamente.',
+              title: 'Erro na Remoção',
+            );
+          }
+        }
+      } catch (e) {
+        print('❌ [IndisponibilidadeScreen] Erro durante a remoção: $e');
+        if (context.mounted) {
+          showWarning(
+            context,
+            'Ocorreu um erro durante a remoção. Tente novamente.',
+            title: 'Erro',
+          );
+        }
+      }
+    }
   }
 }

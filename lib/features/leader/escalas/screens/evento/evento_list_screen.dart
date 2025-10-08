@@ -701,18 +701,103 @@ class _EventoListScreenState extends State<EventoListScreen> {
     );
   }
 
-  // Confirmar exclusão do evento
+  // Confirmar exclusão do evento (com opções para recorrentes)
   Future<void> _confirmDeleteEvent(BuildContext context, EventoModel evento, EventoController controller) async {
-    final navigator = Navigator.of(context);
+    final pageContext = this.context; // usar o contexto da página, não o do diálogo
+    final navigator = Navigator.of(pageContext, rootNavigator: true);
+    // Extrair id real do evento (quando vem de recorrência no calendário, id pode ser `${eventId}_${ts}`)
+    final String realEventId = evento.id.contains('_') ? evento.id.split('_').first : evento.id;
     
     // Fechar dialog de confirmação
     navigator.pop();
     
-    // Mostrar loading
+    // Se não recorrente: excluir direto
+    if (!evento.recorrente) {
+      if (!mounted) return;
+      showDialog(
+        context: pageContext,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'Excluindo evento...',
+                style: context.textStyles.bodyMedium?.copyWith(
+                  color: context.colors.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      try {
+        await controller.removerEvento(realEventId);
+        // Recarregar recorrências do mês do evento
+        try {
+          final ed = evento.dataHora.toUtc();
+          await controller.carregarRecorrencias(monthNumber: ed.month, year: ed.year);
+        } catch (_) {}
+        if (mounted) navigator.pop();
+        if (mounted) {
+        ScaffoldMessenger.of(pageContext).showSnackBar(
+            SnackBar(
+              content: Text('${evento.nome} foi excluído com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) navigator.pop();
+        if (mounted) {
+        ScaffoldMessenger.of(pageContext).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao excluir evento: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+      return;
+    }
+
+    // Se recorrente: perguntar o que fazer
+    final escolha = await showDialog<String>(
+      context: pageContext,
+      useRootNavigator: true,
+      builder: (context) => AlertDialog(
+        title: Text('Excluir recorrência', style: context.textStyles.titleMedium),
+        content: Text('Você deseja excluir apenas esta ocorrência, todas as futuras, ou toda a série?', style: context.textStyles.bodyMedium),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('cancel'),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('one'),
+            child: const Text('Somente esta'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('future'),
+            child: const Text('Esta e futuras'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('all'),
+            child: const Text('Toda a série'),
+          ),
+        ],
+      ),
+    );
+
+    if (escolha == null || escolha == 'cancel') return;
+
     if (!mounted) return;
     showDialog(
-      context: context,
+      context: pageContext,
       barrierDismissible: false,
+      useRootNavigator: true,
       builder: (context) => AlertDialog(
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -720,7 +805,7 @@ class _EventoListScreenState extends State<EventoListScreen> {
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Excluindo evento...',
+              'Aplicando exclusão...',
               style: context.textStyles.bodyMedium?.copyWith(
                 color: context.colors.onSurface,
               ),
@@ -731,27 +816,42 @@ class _EventoListScreenState extends State<EventoListScreen> {
     );
 
     try {
-      controller.removerEvento(evento.id);
-      
-      // Fechar loading
+      if (escolha == 'one') {
+        // Pular somente esta ocorrência (usa a data do próprio evento como instância-base)
+        await controller.pularOcorrencia(eventId: realEventId, instanceDate: evento.dataHora.toUtc());
+      } else if (escolha == 'future') {
+        // Encerrar série a partir desta data (inclui a data)
+        await controller.encerrarSerieApos(eventId: realEventId, fromDate: evento.dataHora.toUtc());
+      } else if (escolha == 'all') {
+        // Excluir evento inteiro
+        await controller.removerEvento(realEventId);
+      }
+
+      // Recarregar recorrências do mês do evento para refletir alterações
+      final ed = evento.dataHora.toUtc();
+      final monthNumber = ed.month;
+      final year = ed.year;
+      try {
+        await controller.carregarRecorrencias(monthNumber: monthNumber, year: year);
+      } catch (_) {
+        // ignore refresh errors silently
+      }
+
       if (mounted) navigator.pop();
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(pageContext).showSnackBar(
           SnackBar(
-            content: Text('${evento.nome} foi excluído com sucesso!'),
+            content: Text('Exclusão aplicada com sucesso.'),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      // Fechar loading
       if (mounted) navigator.pop();
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(pageContext).showSnackBar(
           SnackBar(
-            content: Text('Erro ao excluir evento: ${e.toString()}'),
+            content: Text('Erro ao aplicar exclusão: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

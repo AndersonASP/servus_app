@@ -461,6 +461,60 @@ class MinistryService {
     }
   }
 
+  /// Obtém apenas a configuração de bloqueio do ministério (endpoint público)
+  Future<Map<String, dynamic>> getBlockConfig({
+    required String tenantId,
+    required String branchId,
+    required String ministryId,
+    BuildContext? context,
+  }) async {
+    try {
+      final deviceId = await TokenService.getDeviceId();
+
+      // 🆕 CORREÇÃO: Usa rota diferente para matriz vs filial
+      final String url;
+      final Map<String, String> headers;
+      
+      // 🏢 Verifica se é matriz (branchId vazio, null ou apenas espaços)
+      if (branchId.isEmpty || branchId.trim().isEmpty) {
+        // 🏢 Ministério da matriz (sem branch)
+        url = '/tenants/$tenantId/ministries/$ministryId/block-config';
+        headers = {
+          'device-id': deviceId,
+          'x-tenant-id': tenantId,
+          // Não inclui x-branch-id para matriz
+        };
+      } else {
+        // 🏪 Ministério de filial específica
+        url = '/tenants/$tenantId/branches/$branchId/ministries/$ministryId/block-config';
+        headers = {
+          'device-id': deviceId,
+          'x-tenant-id': tenantId,
+          'x-branch-id': branchId,
+        };
+      }
+
+      final response = await dio.get(
+        url,
+        options: Options(headers: headers),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        if (context != null) {
+          showLoadError(context, 'configuração de bloqueio');
+        }
+        throw Exception('Erro ao obter configuração de bloqueio: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      if (context != null) {
+        showLoadError(context, 'configuração de bloqueio');
+      }
+      throw Exception(_handleDioError(e));
+    }
+  }
+
   /// Ativa/desativa um ministério
   Future<MinistryResponse> toggleMinistryStatus({
     required String tenantId,

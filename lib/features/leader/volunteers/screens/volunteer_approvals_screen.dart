@@ -750,7 +750,7 @@ class _VolunteerApprovalsScreenState extends State<VolunteerApprovalsScreen> {
                     });
                   },
                 );
-              }).toList(),
+              }),
             ],
           ),
           actions: [

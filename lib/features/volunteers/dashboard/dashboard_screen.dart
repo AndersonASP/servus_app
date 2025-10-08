@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/core/widgets/scroll_reveal_animation.dart';
 import 'package:servus_app/core/widgets/shimmer_widget.dart';
-import 'package:servus_app/core/widgets/responsive_animation.dart';
 import 'package:servus_app/features/volunteers/dashboard/escala/escala_card/escala_card_screen.dart';
 import 'package:servus_app/features/volunteers/dashboard/widgets/drawer_menu_voluntario.dart';
 import 'package:servus_app/state/auth_state.dart';

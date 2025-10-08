@@ -2,18 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
+import 'package:servus_app/core/models/recurrence_pattern.dart';
 import 'package:servus_app/features/volunteers/indisponibilidade/bloqueios/controller/bloqueio_controller.dart';
+import 'package:servus_app/features/volunteers/indisponibilidade/widgets/recurrence_config_widget.dart';
 
 class BloqueioScreen extends StatefulWidget {
-  final Function(String, List<String>) onConfirmar;
+  final Function(String, List<String>, RecurrencePattern?, BloqueioController) onConfirmar;
   final String? motivoInicial;
-  final List<String> ministeriosDisponiveis;
+  final List<String>? ministeriosIniciais;
+  final List<Map<String, String>> ministeriosDisponiveis;
+  final DateTime? selectedDate;
 
   const BloqueioScreen({
     super.key,
     required this.onConfirmar,
     required this.ministeriosDisponiveis,
     this.motivoInicial,
+    this.ministeriosIniciais,
+    this.selectedDate,
   });
 
   @override
@@ -23,14 +29,25 @@ class BloqueioScreen extends StatefulWidget {
 class _BloqueioScreenState extends State<BloqueioScreen> {
   final BloqueioController controller = BloqueioController();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  RecurrencePattern? _recurrencePattern;
 
   @override
   void initState() {
     super.initState();
+    print('🔍 [BloqueioScreen] ===== BLOQUEIO SCREEN ABERTA =====');
+    print('🔍 [BloqueioScreen] initState chamado');
+    print('🔍 [BloqueioScreen] Ministérios disponíveis recebidos: ${widget.ministeriosDisponiveis}');
+    print('🔍 [BloqueioScreen] Quantidade de ministérios: ${widget.ministeriosDisponiveis.length}');
+    print('🔍 [BloqueioScreen] Tipo dos ministérios: ${widget.ministeriosDisponiveis.runtimeType}');
+    
     controller.inicializar(
       motivoInicial: widget.motivoInicial,
+      ministeriosIniciais: widget.ministeriosIniciais,
       todosMinisterios: widget.ministeriosDisponiveis,
     );
+    
+    print('🔍 [BloqueioScreen] Controller inicializado');
+    print('🔍 [BloqueioScreen] Ministérios no controller após inicialização: ${controller.ministeriosSelecionados.keys.toList()}');
   }
 
   @override
@@ -52,127 +69,217 @@ class _BloqueioScreenState extends State<BloqueioScreen> {
               backgroundColor: context.theme.scaffoldBackgroundColor,
               elevation: 0,
               leading: IconButton(
-                icon: Icon(Icons.arrow_back, color: context.colors.onSurface),
+                icon: Icon(
+                  Icons.arrow_back,
+                  color: context.colors.onSurface,
+                ),
                 onPressed: () => context.pop(),
               ),
-              centerTitle: false,
               title: Text(
                 isEdicao ? 'Editar Bloqueio' : 'Novo Bloqueio',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: context.colors.onSurface,
-                    ),
+                style: context.theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.onSurface,
+                ),
               ),
             ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
+            body: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Form(
-                      key: formKey,
-                      child: TextFormField(
-                        controller: controller.motivoController,
-                        maxLines: 1,
-                        validator: controller.validarMotivo,
-                        decoration: InputDecoration(
-                          hintText: 'Ex: Vou tirar férias em Acapulco',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                    // Campo de motivo
+                    Text(
+                      'Motivo do bloqueio',
+                      style: context.theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: context.colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: controller.motivoController,
+                      decoration: InputDecoration(
+                        hintText: 'Digite o motivo do bloqueio...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: context.colors.surface,
+                      ),
+                      maxLines: 3,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Por favor, digite o motivo do bloqueio';
+                        }
+                        return null;
+                      },
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Seleção de ministérios
+                    Text(
+                      'Ministérios',
+                      style: context.theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: context.colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    if (controller.mostrarMensagemInfo)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: context.colors.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: context.colors.onPrimaryContainer,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Selecione os ministérios para os quais este bloqueio se aplica',
+                                style: context.theme.textTheme.bodySmall?.copyWith(
+                                  color: context.colors.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (controller.mostrarMensagemInfo)
-                      Text(
-                        'Apenas seu líder poderá ver o motivo da indisponibilidade.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontStyle: FontStyle.italic,
-                              fontSize: 10,
-                            ),
-                      ),
-                    const SizedBox(height: 16),
-                    const Text('Selecione os ministérios:'),
-                    ...controller.ministeriosSelecionados.entries.map(
-                      (entry) => CheckboxListTile(
-                        value: entry.value,
-                        title: Text(entry.key),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Lista de ministérios
+                    ...controller.ministeriosSelecionados.entries.map((entry) {
+                      final nomeMinisterio = entry.key;
+                      final isSelecionado = entry.value;
+                      
+                      return CheckboxListTile(
+                        title: Text(nomeMinisterio),
+                        value: isSelecionado,
                         onChanged: (value) {
-                          controller.atualizarMinisterio(
-                              entry.key, value ?? false);
-                          controller.erroMinisterios = false;
-                          controller.notifyListeners();
+                          controller.toggleMinisterio(nomeMinisterio);
                         },
-                      ),
-                    ),
+                        activeColor: context.colors.primary,
+                      );
+                    }).toList(),
+                    
                     if (controller.erroMinisterios)
                       Padding(
-                        padding: const EdgeInsets.only(left: 12, top: 4),
+                        padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          'Selecione ao menos um ministério.',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 12,
+                          'Selecione pelo menos um ministério',
+                          style: context.theme.textTheme.bodySmall?.copyWith(
+                            color: context.colors.error,
                           ),
                         ),
                       ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(
-                            'Cancelar',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            final sucesso =
-                                controller.validarFormulario(formKey);
-                            if (sucesso) {
-                              widget.onConfirmar(
-                                controller.motivoController.text.trim(),
-                                controller.ministeriosSelecionados.entries
-                                    .where((e) => e.value)
-                                    .map((e) => e.key)
-                                    .toList(),
-                              );
-                              Navigator.pop(context);
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4058DB),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            isEdicao ? 'Salvar alterações' : 'Confirmar',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Configuração de recorrência
+                    RecurrenceConfigWidget(
+                      initialPattern: _recurrencePattern,
+                      startDate: widget.selectedDate ?? DateTime.now(),
+                      onPatternChanged: (pattern) {
+                        setState(() {
+                          _recurrencePattern = pattern;
+                        });
+                      },
                     ),
+                    
+                    const SizedBox(height: 100), // Espaço para o botão flutuante
                   ],
                 ),
               ),
+            ),
+            floatingActionButton: Consumer<BloqueioController>(
+              builder: (context, controller, child) {
+                return FloatingActionButton.extended(
+                  onPressed: controller.isLoading ? null : () async {
+                    print('🔍 [BloqueioScreen] ===== BOTÃO CONFIRMAR CLICADO =====');
+                    print('🔍 [BloqueioScreen] Motivo: "${controller.motivoController.text}"');
+                    print('🔍 [BloqueioScreen] Motivo length: ${controller.motivoController.text.length}');
+                    print('🔍 [BloqueioScreen] Ministérios selecionados: ${controller.ministeriosSelecionados.entries.where((e) => e.value).map((e) => e.key).toList()}');
+                    print('🔍 [BloqueioScreen] Todos os ministérios: ${controller.ministeriosSelecionados}');
+                    
+                    try {
+                      final sucesso = controller.validarFormulario(formKey);
+                      print('🔍 [BloqueioScreen] Validação: $sucesso');
+                      print('🔍 [BloqueioScreen] Erro ministérios: ${controller.erroMinisterios}');
+                      
+                      if (sucesso) {
+                        print('✅ [BloqueioScreen] Validação passou, chamando onConfirmar');
+                        
+                        // Ativar loading
+                        controller.setLoading(true);
+                        
+                        final motivo = controller.motivoController.text.trim();
+                        final ministerios = controller.ministeriosSelecionados.entries
+                            .where((e) => e.value)
+                            .map((e) => e.key)
+                            .toList();
+                        
+                        print('🔍 [BloqueioScreen] Chamando onConfirmar com:');
+                        print('🔍 [BloqueioScreen] - Motivo: "$motivo"');
+                        print('🔍 [BloqueioScreen] - Recorrência: ${_recurrencePattern?.toString() ?? "Nenhuma"}');
+                        print('🔍 [BloqueioScreen] ===== CHAMANDO onConfirmar =====');
+                        
+                        await widget.onConfirmar(motivo, ministerios, _recurrencePattern, controller);
+                        print('✅ [BloqueioScreen] onConfirmar concluído com sucesso');
+                        
+                        // Navigator.pop será chamado pelo IndisponibilidadeScreen após sucesso
+                        print('🔍 [BloqueioScreen] Aguardando Navigator.pop do IndisponibilidadeScreen');
+                      } else {
+                        print('❌ [BloqueioScreen] Validação falhou');
+                        print('❌ [BloqueioScreen] Motivo válido: ${controller.motivoController.text.trim().isNotEmpty}');
+                        print('❌ [BloqueioScreen] Ministérios válidos: ${!controller.erroMinisterios}');
+                      }
+                    } catch (e) {
+                      print('❌ [BloqueioScreen] Erro no onPressed: $e');
+                      print('❌ [BloqueioScreen] Stack trace: ${StackTrace.current}');
+                      // Desativar loading em caso de erro
+                      controller.setLoading(false);
+                    }
+                    
+                    print('🔍 [BloqueioScreen] ===== FIM DO BOTÃO CONFIRMAR =====');
+                  },
+                  backgroundColor: controller.isLoading ? Colors.grey : const Color(0xFF4058DB),
+                  icon: controller.isLoading 
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(
+                        isEdicao ? Icons.save : Icons.check,
+                        color: Colors.white,
+                      ),
+                  label: Text(
+                    controller.isLoading 
+                      ? 'Salvando...' 
+                      : (isEdicao ? 'Salvar alterações' : 'Confirmar'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              },
             ),
           );
         },

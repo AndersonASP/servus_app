@@ -23,6 +23,7 @@ class MinisterioDetalhesController extends ChangeNotifier {
   bool isAtivo = true;
   DateTime? dataCriacao;
   DateTime? dataAtualizacao;
+  int maxBlockedDays = 10; // Limite de dias bloqueados
   
   // Dados de membros
   int totalMembros = 0;
@@ -69,6 +70,10 @@ class MinisterioDetalhesController extends ChangeNotifier {
       isAtivo = ministryData.isActive;
       dataCriacao = ministryData.createdAt;
       dataAtualizacao = ministryData.updatedAt;
+
+      // Carregar limite de bloqueios do campo do ministério
+      maxBlockedDays = ministryData.maxBlockedDays ?? 10; // Fallback para valor padrão
+      debugPrint('🔍 [MinisterioDetalhesController] Limite de bloqueios carregado: $maxBlockedDays dias');
 
       // Carrega membros do ministério
       await carregarMembros();

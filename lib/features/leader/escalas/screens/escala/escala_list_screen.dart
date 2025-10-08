@@ -3,7 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/leader/escalas/controllers/escala/escala_controller.dart';
 import 'package:servus_app/features/leader/escalas/controllers/evento/evento_controller.dart';
+import 'package:servus_app/features/leader/escalas/controllers/substitution_controller.dart';
 import 'package:servus_app/features/leader/escalas/models/escala_model.dart';
+import 'package:servus_app/features/leader/escalas/screens/substitution/substitution_requests_screen.dart';
+import 'package:servus_app/features/volunteers/indisponibilidade/indisponibilidade_screen.dart';
 import 'escala_form_screen.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,6 +17,7 @@ class EscalaListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final escalaController = context.watch<EscalaController>();
     final eventoController = context.watch<EventoController>();
+    final substitutionController = context.watch<SubstitutionController>();
 
     final escalas = escalaController.todas;
 
@@ -31,6 +35,94 @@ class EscalaListScreen extends StatelessWidget {
           ),
         ),
         centerTitle: false,
+        actions: [
+          // Badge para solicitações pendentes
+          if (substitutionController.hasPendingRequests)
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.swap_horiz),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SubstitutionRequestsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${substitutionController.pendingRequestsCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          // Menu de opções
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'availability':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const IndisponibilidadeScreen(),
+                    ),
+                  );
+                  break;
+                case 'substitutions':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SubstitutionRequestsScreen(),
+                    ),
+                  );
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'availability',
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_today),
+                    SizedBox(width: 8),
+                    Text('Disponibilidade'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'substitutions',
+                child: Row(
+                  children: [
+                    Icon(Icons.swap_horiz),
+                    SizedBox(width: 8),
+                    Text('Solicitações de Troca'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: escalas.isEmpty
           ? const Center(child: Text('Nenhuma escala criada ainda.'))

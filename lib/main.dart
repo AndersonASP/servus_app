@@ -8,6 +8,7 @@ import 'package:servus_app/features/leader/dashboard/cards_details/escala_mensal
 import 'package:servus_app/features/leader/escalas/controllers/escala/escala_controller.dart';
 import 'package:servus_app/features/leader/escalas/controllers/evento/evento_controller.dart';
 import 'package:servus_app/features/leader/escalas/controllers/template/template_controller.dart';
+import 'package:servus_app/features/leader/escalas/controllers/substitution_controller.dart';
 import 'package:servus_app/features/leader/ministerios/controllers/ministerio_controller.dart';
 import 'package:servus_app/features/volunteers/indisponibilidade/bloqueios/controller/bloqueio_controller.dart';
 
@@ -59,6 +60,7 @@ class ServusApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MinisterioController()),
         ChangeNotifierProvider(create: (_) => MinisterioController()),
         ChangeNotifierProvider(create: (_) => EventoController()),
+        ChangeNotifierProvider(create: (_) => SubstitutionController()),
         ChangeNotifierProvider(create: (_) => MinistryFunctionsController(MinistryFunctionsService())),
 
       ],

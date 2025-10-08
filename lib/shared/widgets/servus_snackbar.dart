@@ -100,23 +100,23 @@ Future<void> _showSnackWithAnimation({
   final theme = Theme.of(context);
   final scheme = theme.colorScheme;
 
-  // Cores por tipo com gradientes mais bonitos
+  // Cores por tipo com gradientes mais sólidos para melhor legibilidade
   final Map<ServusSnackType, List<Color>> gradientColors = {
     ServusSnackType.success: [
       ServusColors.success,
-      ServusColors.success.withOpacity(0.8),
+      ServusColors.success.withOpacity(0.95),
     ],
     ServusSnackType.warning: [
       ServusColors.warning,
-      ServusColors.warning.withOpacity(0.8),
+      ServusColors.warning.withOpacity(0.95),
     ],
     ServusSnackType.error: [
       scheme.error,
-      scheme.error.withOpacity(0.8),
+      scheme.error.withOpacity(0.95),
     ],
     ServusSnackType.info: [
       scheme.primary,
-      scheme.primary.withOpacity(0.8),
+      scheme.primary.withOpacity(0.95),
     ],
   };
 
@@ -174,7 +174,7 @@ Future<void> _showSnackWithAnimation({
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -194,9 +194,9 @@ Future<void> _showSnackWithAnimation({
                           if (title != null) ...[
                             Text(
                               title,
-                              style: theme.textTheme.titleSmall?.copyWith(
+                              style: theme.textTheme.titleMedium?.copyWith(
                                 color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -205,7 +205,7 @@ Future<void> _showSnackWithAnimation({
                             message,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.white,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -220,7 +220,7 @@ Future<void> _showSnackWithAnimation({
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(

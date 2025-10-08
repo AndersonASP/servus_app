@@ -330,6 +330,26 @@ class MinisterioDetalhesScreen extends StatelessWidget {
                           ),
                         ],
 
+                        // Informações de bloqueio
+                        const SizedBox(height: 16),
+                        RichText(
+                          text: TextSpan(
+                            style: context.textStyles.bodyMedium?.copyWith(
+                              color: context.colors.onSurface.withValues(alpha: 0.7),
+                            ),
+                            children: [
+                              const TextSpan(text: 'Limite para bloqueios de indisponibilidade: '),
+                              TextSpan(
+                                text: '${controller.maxBlockedDays} dias',
+                                style: context.textStyles.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: context.colors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
                         const SizedBox(height: 16),
                         Container(
                           height: 0.5,

@@ -142,6 +142,7 @@ class _ScrollRevealAnimationState extends State<ScrollRevealAnimation>
 /// Widget detector de visibilidade personalizado
 class VisibilityDetector extends StatefulWidget {
   final Widget child;
+  @override
   final Key key;
   final Function(VisibilityInfo) onVisibilityChanged;
 

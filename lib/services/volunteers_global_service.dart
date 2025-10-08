@@ -51,6 +51,7 @@ class VolunteersGlobalService extends ChangeNotifier {
   }
 
   /// Limpa o serviço
+  @override
   void dispose() {
     _controller?.dispose();
     _controller = null;

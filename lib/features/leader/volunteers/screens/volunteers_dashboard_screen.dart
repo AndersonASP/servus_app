@@ -415,7 +415,7 @@ class _VolunteersDashboardScreenState extends State<VolunteersDashboardScreen> {
                         });
                       },
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
           actions: [

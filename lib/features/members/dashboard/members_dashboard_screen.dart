@@ -5,7 +5,6 @@ import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/core/widgets/scroll_reveal_animation.dart';
 import 'package:servus_app/core/widgets/shimmer_widget.dart';
 import 'package:servus_app/services/members_service.dart';
-import 'package:servus_app/shared/widgets/loading_widget.dart';
 import 'package:servus_app/shared/widgets/error_widget.dart';
 import 'package:servus_app/features/members/create/create_member_screen.dart';
 import 'package:servus_app/features/members/details/member_details_screen.dart';

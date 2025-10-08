@@ -3,12 +3,14 @@ class CreateMinistryDto {
   final String? description;
   final List<String>? ministryFunctions;
   final bool isActive;
+  final int? maxBlockedDays;
 
   CreateMinistryDto({
     required this.name,
     this.description,
     this.ministryFunctions,
     this.isActive = true,
+    this.maxBlockedDays,
   });
 
   Map<String, dynamic> toJson() {
@@ -17,6 +19,7 @@ class CreateMinistryDto {
       if (description != null) 'description': description,
       if (ministryFunctions != null) 'ministryFunctions': ministryFunctions,
       'isActive': isActive,
+      if (maxBlockedDays != null) 'maxBlockedDays': maxBlockedDays,
     };
   }
 }
@@ -26,12 +29,14 @@ class UpdateMinistryDto {
   final String? description;
   final List<String>? ministryFunctions;
   final bool? isActive;
+  final int? maxBlockedDays;
 
   UpdateMinistryDto({
     this.name,
     this.description,
     this.ministryFunctions,
     this.isActive,
+    this.maxBlockedDays,
   });
 
   Map<String, dynamic> toJson() {
@@ -40,6 +45,7 @@ class UpdateMinistryDto {
     if (description != null) data['description'] = description;
     if (ministryFunctions != null) data['ministryFunctions'] = ministryFunctions;
     if (isActive != null) data['isActive'] = isActive;
+    if (maxBlockedDays != null) data['maxBlockedDays'] = maxBlockedDays;
     return data;
   }
 }
@@ -75,6 +81,7 @@ class MinistryResponse {
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final int? maxBlockedDays;
 
   MinistryResponse({
     required this.id,
@@ -84,6 +91,7 @@ class MinistryResponse {
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
+    this.maxBlockedDays,
   });
 
   factory MinistryResponse.fromJson(Map<String, dynamic> json) {
@@ -95,6 +103,7 @@ class MinistryResponse {
       isActive: json['isActive'] ?? true,
       createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
       updatedAt: DateTime.parse(json['updatedAt'] ?? DateTime.now().toIso8601String()),
+      maxBlockedDays: json['maxBlockedDays'],
     );
   }
 }

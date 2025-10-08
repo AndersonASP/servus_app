@@ -81,7 +81,41 @@ class EventsService {
   }
 
   Future<void> remove(String id) async {
-    await _dio.delete('${_basePath()}/$id');
+    developer.log('🗑️ [EventsService] Removendo evento $id em ${_basePath()}/$id', name: 'EventsService');
+    try {
+      final response = await _dio.delete('${_basePath()}/$id');
+      developer.log('✅ [EventsService] Remoção status: ${response.statusCode}', name: 'EventsService');
+      developer.log('📊 [EventsService] Resposta: ${response.data}', name: 'EventsService');
+      // ignore: avoid_print
+      print('[EventsService] DELETE ${_basePath()}/$id -> ${response.statusCode} ${response.data}');
+    } catch (e) {
+      developer.log('❌ [EventsService] Erro ao remover evento: $e', name: 'EventsService');
+      // ignore: avoid_print
+      print('[EventsService] Erro ao remover: $e');
+      rethrow;
+    }
+  }
+
+  // Pula (cancela) uma ocorrência específica de um evento recorrente
+  Future<void> skipInstance({
+    required String eventId,
+    required DateTime instanceDate,
+  }) async {
+    final dateIso = instanceDate.toUtc().toIso8601String();
+    await _dio.delete('${_basePath()}/$eventId/instances', queryParameters: {
+      'date': dateIso,
+    });
+  }
+
+  // Encerra a série após (e incluindo) uma data
+  Future<void> cancelSeriesAfter({
+    required String eventId,
+    required DateTime fromDate,
+  }) async {
+    final fromIso = fromDate.toUtc().toIso8601String();
+    await _dio.patch('${_basePath()}/$eventId/cancel-after', queryParameters: {
+      'from': fromIso,
+    });
   }
 
   /// Busca recorrências de eventos para um mês específico

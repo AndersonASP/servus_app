@@ -48,9 +48,23 @@ class EventoController extends ChangeNotifier {
 
         final recorrenciaTipoStr = e['recurrenceType']?.toString() ?? 'none';
         final recorrenciaTipo = _mapRecurrenceType(recorrenciaTipoStr);
-        final diasSemana = (e['recurrencePattern'] != null ? e['recurrencePattern']['daysOfWeek'] : null) as List?;
-        final diaSemana = diasSemana != null && diasSemana.isNotEmpty ? (diasSemana.first as int) : null;
-        final semanaDoMes = (e['recurrencePattern'] != null ? e['recurrencePattern']['dayOfMonth'] : null) as int?;
+        final diasSemanaAny = (e['recurrencePattern'] != null ? e['recurrencePattern']['daysOfWeek'] : null);
+        int? diaSemana;
+        if (diasSemanaAny is List && diasSemanaAny.isNotEmpty) {
+          final first = diasSemanaAny.first;
+          if (first is int) {
+            diaSemana = first;
+          } else if (first is String) {
+            diaSemana = int.tryParse(first);
+          }
+        }
+        final semanaAny = (e['recurrencePattern'] != null ? e['recurrencePattern']['dayOfMonth'] : null);
+        int? semanaDoMes;
+        if (semanaAny is int) {
+          semanaDoMes = semanaAny;
+        } else if (semanaAny is String) {
+          semanaDoMes = int.tryParse(semanaAny);
+        }
         
         developer.log('🔄 Recorrência: $recorrenciaTipoStr -> $recorrenciaTipo, diaSemana: $diaSemana, semanaDoMes: $semanaDoMes', name: 'EventoController');
 
@@ -85,6 +99,9 @@ class EventoController extends ChangeNotifier {
     
     final payload = _toPayload(evento);
     developer.log('📤 Payload enviado: ${payload.toString()}', name: 'EventoController');
+    // Fallback de log caso developer.log não apareça no console
+    // ignore: avoid_print
+    print('[EventoController] Payload enviado: ${payload.toString()}');
     
     if (templateId != null && templateId.isNotEmpty) {
       payload['templateId'] = templateId;
@@ -94,6 +111,10 @@ class EventoController extends ChangeNotifier {
     try {
       final created = await _service.create(payload);
       developer.log('✅ Evento criado com sucesso: ${created.id}', name: 'EventoController');
+      // ignore: avoid_print
+      print('[EventoController] Evento criado com sucesso: ${created.id}');
+      // Recarregar recorrências do mês do evento com pequenas tentativas (evita race conditions)
+      await _refreshRecurrencesAfterChange(evento.dataHora);
       
       // Converte EventModel para EventoModel e adiciona à lista local
       final novoEvento = _convertFromEventModel(created);
@@ -102,7 +123,29 @@ class EventoController extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       developer.log('❌ Erro ao criar evento: $e', name: 'EventoController');
+      // ignore: avoid_print
+      print('[EventoController] Erro ao criar evento: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _refreshRecurrencesAfterChange(DateTime referenceDate) async {
+    final ed = referenceDate.toUtc();
+    final m = ed.month;
+    final y = ed.year;
+    int attempts = 0;
+    while (attempts < 3) {
+      try {
+        await carregarRecorrencias(
+          monthNumber: m,
+          year: y,
+          status: 'published',
+        );
+        break;
+      } catch (e) {
+        attempts += 1;
+        await Future.delayed(const Duration(milliseconds: 250));
+      }
     }
   }
 
@@ -123,6 +166,22 @@ class EventoController extends ChangeNotifier {
     await _service.remove(id);
     _eventos.removeWhere((e) => e.id == id);
     notifyListeners();
+  }
+
+  // Pula (cancela) uma ocorrência específica de um evento recorrente
+  Future<void> pularOcorrencia({
+    required String eventId,
+    required DateTime instanceDate,
+  }) async {
+    await _service.skipInstance(eventId: eventId, instanceDate: instanceDate);
+  }
+
+  // Encerra a série após (e incluindo) uma data
+  Future<void> encerrarSerieApos({
+    required String eventId,
+    required DateTime fromDate,
+  }) async {
+    await _service.cancelSeriesAfter(eventId: eventId, fromDate: fromDate);
   }
 
   // Filtrar eventos por ministério
@@ -235,6 +294,9 @@ class EventoController extends ChangeNotifier {
       'status': 'published', // Status padrão para novos eventos
       if (e.observacoes != null && e.observacoes!.isNotEmpty) 'specialNotes': e.observacoes,
     };
+    developer.log('🧱 Payload base criado', name: 'EventoController');
+    developer.log('🧱 recurrenceType: ${payload['recurrenceType']}', name: 'EventoController');
+    developer.log('🧱 specialNotes: ${payload['specialNotes']}', name: 'EventoController');
 
     // Adicionar ministryId apenas se não estiver vazio
     if (e.ministerioId.isNotEmpty) {
@@ -242,7 +304,15 @@ class EventoController extends ChangeNotifier {
       developer.log('🏛️ Ministry ID adicionado: ${e.ministerioId}', name: 'EventoController');
     }
 
-    if (e.tipoRecorrencia == RecorrenciaTipo.semanal) {
+    if (e.tipoRecorrencia == RecorrenciaTipo.diario) {
+      developer.log('↪️ Montando recurrencePattern diário', name: 'EventoController');
+      // Definir padrão diário com interval default 1 (pode ser estendido futuramente)
+      payload['recurrencePattern'] = {
+        'interval': 1,
+      };
+      developer.log('📅 Padrão diário adicionado: interval 1', name: 'EventoController');
+    } else if (e.tipoRecorrencia == RecorrenciaTipo.semanal) {
+      developer.log('↪️ Montando recurrencePattern semanal', name: 'EventoController');
       if (e.diaSemana == null) {
         throw Exception('Dia da semana é obrigatório para eventos semanais');
       }
@@ -256,6 +326,7 @@ class EventoController extends ChangeNotifier {
       developer.log('📅 Padrão semanal adicionado: dia ${e.diaSemana}', name: 'EventoController');
       developer.log('📅 Payload recurrencePattern: ${payload['recurrencePattern']}', name: 'EventoController');
     } else if (e.tipoRecorrencia == RecorrenciaTipo.mensal) {
+      developer.log('↪️ Montando recurrencePattern mensal', name: 'EventoController');
       if (e.semanaDoMes == null) {
         throw Exception('Semana do mês é obrigatória para eventos mensais');
       }
@@ -271,16 +342,80 @@ class EventoController extends ChangeNotifier {
         'weekOfMonth': e.semanaDoMes, // 1-5 (primeira, segunda, etc.)
         'dayOfWeek': diaSemanaOriginal, // 0-6 (domingo, segunda, etc.)
       };
-      developer.log('📅 Padrão mensal adicionado: semana ${e.semanaDoMes}, dia da semana ${diaSemanaOriginal}', name: 'EventoController');
+      developer.log('📅 Padrão mensal adicionado: semana ${e.semanaDoMes}, dia da semana $diaSemanaOriginal', name: 'EventoController');
     }
 
     // Adicionar data limite se definida
     if (e.dataLimiteRecorrencia != null) {
-      payload['recurrencePattern']['endDate'] = e.dataLimiteRecorrencia!.toIso8601String();
+      // Garantir que recurrencePattern exista antes de setar endDate
+      final existedBefore = payload['recurrencePattern'] != null;
+      developer.log('⏱️ Tentando setar endDate; recurrencePattern existe antes? $existedBefore', name: 'EventoController');
+      payload['recurrencePattern'] ??= {};
+      final end = e.dataLimiteRecorrencia!;
+      final endOnlyDate = DateTime(end.year, end.month, end.day).toIso8601String();
+      payload['recurrencePattern']['endDate'] = endOnlyDate;
       developer.log('📅 Data limite adicionada: ${e.dataLimiteRecorrencia!.toIso8601String()}', name: 'EventoController');
     }
 
     developer.log('📦 Payload final: ${payload.toString()}', name: 'EventoController');
+    // Coerção final: garantir tipos numéricos corretos no recurrencePattern
+    try {
+      if (payload['recurrencePattern'] != null) {
+        final rp = payload['recurrencePattern'] as Map<String, dynamic>;
+        int? toInt(dynamic v) {
+          if (v == null) return null;
+          if (v is int) return v;
+          if (v is String) return int.tryParse(v);
+          return null;
+        }
+        List<int>? toIntList(dynamic v) {
+          if (v == null) return null;
+          if (v is List) {
+            final out = <int>[];
+            for (final item in v) {
+              final parsed = toInt(item);
+              if (parsed != null) out.add(parsed);
+            }
+            return out;
+          }
+          return null;
+        }
+
+        if (rp.containsKey('interval')) {
+          final val = toInt(rp['interval']);
+          if (val != null) rp['interval'] = val; else rp.remove('interval');
+        }
+        if (rp.containsKey('dayOfMonth')) {
+          final val = toInt(rp['dayOfMonth']);
+          if (val != null) rp['dayOfMonth'] = val; else rp.remove('dayOfMonth');
+        }
+        if (rp.containsKey('occurrences')) {
+          final val = toInt(rp['occurrences']);
+          if (val != null) rp['occurrences'] = val; else rp.remove('occurrences');
+        }
+        if (rp.containsKey('daysOfWeek')) {
+          final list = toIntList(rp['daysOfWeek']);
+          if (list != null) rp['daysOfWeek'] = list; else rp.remove('daysOfWeek');
+        }
+        payload['recurrencePattern'] = rp;
+      }
+    } catch (err) {
+      developer.log('⚠️ Falha ao coagir recurrencePattern: $err', name: 'EventoController');
+    }
+
+    developer.log('📦 Payload coerced: ${payload.toString()}', name: 'EventoController');
+    // Se diário, garantir que não enviamos campos que não se aplicam
+    if (payload['recurrenceType'] == 'daily') {
+      final rp = payload['recurrencePattern'] as Map<String, dynamic>?;
+      if (rp != null) {
+        rp.remove('daysOfWeek');
+        rp.remove('dayOfMonth');
+        payload['recurrencePattern'] = rp;
+      }
+    }
+    // fallback print
+    // ignore: avoid_print
+    print('[EventoController] Payload coerced: ${payload.toString()}');
     return payload;
   }
 
@@ -320,9 +455,19 @@ class EventoController extends ChangeNotifier {
     }
 
     final recorrenciaTipo = _mapRecurrenceType(eventModel.recurrenceType ?? 'none');
-    final diasSemana = eventModel.recurrencePattern?.daysOfWeek;
-    final diaSemana = diasSemana != null && diasSemana.isNotEmpty ? (diasSemana.first as int) : null;
-    final semanaDoMes = eventModel.recurrencePattern?.dayOfMonth;
+    // Coerção segura para dias da semana e semana do mês (podem vir como string)
+    int? _coerceInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+    int? diaSemana;
+    final diasSemanaDyn = eventModel.recurrencePattern?.daysOfWeek;
+    if (diasSemanaDyn is List && diasSemanaDyn.isNotEmpty) {
+      diaSemana = _coerceInt(diasSemanaDyn.first);
+    }
+    final semanaDoMes = _coerceInt(eventModel.recurrencePattern?.dayOfMonth);
     
     developer.log('🔄 Recorrência convertida: ${eventModel.recurrenceType} -> $recorrenciaTipo', name: 'EventoController');
     developer.log('📅 Dia da semana: $diaSemana, Semana do mês: $semanaDoMes', name: 'EventoController');
