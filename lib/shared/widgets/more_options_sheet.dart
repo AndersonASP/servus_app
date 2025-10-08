@@ -29,7 +29,15 @@ class MoreOptionsSheet {
               ),
               Divider(color: context.colors.onSurface, thickness: 0.5),
               _buildOption(
-                  context, Icons.person, 'Meu Perfil', '/volunteer/perfil'),
+                  context, Icons.notifications_outlined, 'Notificações', '/volunteer/notificacoes'),
+              _buildOption(
+                  context, Icons.help_outline, 'Ajuda', '/volunteer/ajuda'),
+              _buildOption(
+                  context, Icons.info_outline, 'Sobre', '/volunteer/sobre'),
+              const SizedBox(height: 8),
+              Divider(color: context.colors.onSurface, thickness: 0.5),
+              _buildOption(
+                  context, Icons.logout, 'Sair', '/logout'),
               const SizedBox(height: 12),
             ],
           ),
@@ -41,11 +49,16 @@ class MoreOptionsSheet {
   static Widget _buildOption(
       BuildContext context, IconData icon, String label, String route) {
     return ListTile(
-      leading: Icon(icon, color: Colors.indigo[700]),
+      leading: Icon(icon, color: context.colors.onSurface.withValues(alpha: 0.7)),
       title: Text(label),
       onTap: () {
         Navigator.pop(context);
-        context.push(route);
+        if (route == '/logout') {
+          // TODO: Implementar logout
+          debugPrint('Logout solicitado');
+        } else {
+          context.push(route);
+        }
       },
     );
   }

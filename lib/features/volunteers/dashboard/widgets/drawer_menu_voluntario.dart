@@ -59,183 +59,106 @@ class DrawerMenuVoluntario extends StatelessWidget {
               ),
             ),
 
-            // Menu
+            // Menu simplificado
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 physics: const BouncingScrollPhysics(),
                 child: Column(
                   children: [
-                    // 🏠 PRINCIPAL
-                    Theme(
-                      data: Theme.of(context).copyWith(
-                        dividerColor: Colors.transparent,
-                      ),
-                      child: ExpansionTile(
-                        leading: const Icon(Icons.home_outlined),
-                        title: const Text('Principal'),
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16),
-                            child: ListTile(
-                              leading: const Icon(Icons.dashboard_outlined),
-                              title: const Text('Dashboard'),
-                              subtitle: const Text('Visão geral'),
-                              onTap: () {
-                                Navigator.pop(context);
-                                // TODO: Implementar navegação para dashboard do voluntário
-                              },
-                            ),
-                          ),
-                          // Ministérios (visível apenas quando NÃO está visualizando como voluntário)
-                          if (modoAtual != 'Voluntário' && 
-                              (usuario!.role == UserRole.tenant_admin || 
-                               usuario.role == UserRole.branch_admin || 
-                               usuario.role == UserRole.leader))
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: const Icon(Icons.groups_outlined),
-                                title: const Text('Ministérios'),
-                                subtitle: const Text('Gerenciar ministérios'),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  // TODO: Implementar navegação para ministérios
-                                },
-                              ),
-                            ),
-                        ],
-                      ),
+                    // 📊 Dashboard detalhado
+                    ListTile(
+                      leading: const Icon(Icons.dashboard_outlined),
+                      title: const Text('Dashboard'),
+                      subtitle: const Text('Visão geral detalhada'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        // TODO: Implementar navegação para dashboard detalhado
+                      },
                     ),
 
-                    // 👥 PESSOAS
-                    Theme(
-                      data: Theme.of(context).copyWith(
-                        dividerColor: Colors.transparent,
+                    // 🎯 Eventos
+                    ListTile(
+                      leading: const Icon(Icons.event_outlined),
+                      title: const Text('Eventos'),
+                      subtitle: const Text('Calendário de eventos'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        // TODO: Implementar navegação para eventos
+                      },
+                    ),
+
+                    // 📋 Formulários (condicional)
+                    if (modoAtual != 'Voluntário' && 
+                        (usuario?.role == UserRole.tenant_admin || 
+                         usuario?.role == UserRole.branch_admin))
+                      ListTile(
+                        leading: const Icon(Icons.assignment_outlined),
+                        title: const Text('Formulários'),
+                        subtitle: const Text('Preencher formulários'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          // TODO: Implementar navegação para formulários
+                        },
                       ),
-                      child: ExpansionTile(
+
+                    // ⚙️ Configurações
+                    ListTile(
+                      leading: const Icon(Icons.settings_outlined),
+                      title: const Text('Configurações'),
+                      subtitle: const Text('Preferências do app'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        // TODO: Implementar navegação para configurações
+                      },
+                    ),
+
+                    // 🏢 Administração (apenas para servus_admin)
+                    if (usuario?.role == UserRole.servus_admin)
+                      ListTile(
+                        leading: const Icon(Icons.business_outlined),
+                        title: const Text('Nova Igreja'),
+                        subtitle: const Text('Criar nova organização'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          // TODO: Implementar navegação para criar tenant
+                        },
+                      ),
+
+                    // 👥 Gestão de Pessoas (apenas quando não está como voluntário)
+                    if (modoAtual != 'Voluntário' && 
+                        (usuario?.role == UserRole.tenant_admin || 
+                         usuario?.role == UserRole.branch_admin || 
+                         usuario?.role == UserRole.leader)) ...[
+                      const Divider(),
+                      ListTile(
+                        leading: const Icon(Icons.groups_outlined),
+                        title: const Text('Ministérios'),
+                        subtitle: const Text('Gerenciar ministérios'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          // TODO: Implementar navegação para ministérios
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.group_add_outlined),
+                        title: const Text('Membros'),
+                        subtitle: const Text('Gerenciar membros'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          // TODO: Implementar navegação para membros
+                        },
+                      ),
+                      ListTile(
                         leading: const Icon(Icons.people_outlined),
-                        title: const Text('Pessoas'),
-                        children: [
-                          // Membros (visível apenas quando NÃO está visualizando como voluntário)
-                          if (modoAtual != 'Voluntário' && 
-                              (usuario!.role == UserRole.tenant_admin || 
-                               usuario.role == UserRole.branch_admin || 
-                               usuario.role == UserRole.leader))
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: const Icon(Icons.group_add_outlined),
-                                title: const Text('Membros'),
-                                subtitle: const Text('Gerenciar membros'),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  // TODO: Implementar navegação para tela de membros
-                                },
-                              ),
-                            ),
-                          // Voluntários (visível apenas quando NÃO está visualizando como voluntário)
-                          if (modoAtual != 'Voluntário' && 
-                              (usuario!.role == UserRole.tenant_admin || 
-                               usuario.role == UserRole.branch_admin || 
-                               usuario.role == UserRole.leader))
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: const Icon(Icons.people_outlined),
-                                title: const Text('Voluntários'),
-                                subtitle: const Text('Gerenciar voluntários'),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  // TODO: Implementar navegação para voluntários
-                                },
-                              ),
-                            ),
-                        ],
+                        title: const Text('Voluntários'),
+                        subtitle: const Text('Gerenciar voluntários'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          // TODO: Implementar navegação para voluntários
+                        },
                       ),
-                    ),
-
-                    // 📋 GERENCIAR
-                    Theme(
-                      data: Theme.of(context).copyWith(
-                        dividerColor: Colors.transparent,
-                      ),
-                      child: ExpansionTile(
-                        leading: const Icon(Icons.description_outlined),
-                        title: const Text('Gerenciar'),
-                        children: [
-                          // 1. MINHAS ESCALAS - Mais importante para voluntário
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16),
-                            child: ListTile(
-                              leading: const Icon(Icons.schedule_outlined),
-                              title: const Text('Minhas Escalas'),
-                              subtitle: const Text('Ver escalas atribuídas'),
-                              onTap: () {
-                                Navigator.pop(context);
-                                // TODO: Implementar navegação para escalas do voluntário
-                              },
-                            ),
-                          ),
-                          // 2. EVENTOS - Depende de escalas
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16),
-                            child: ListTile(
-                              leading: const Icon(Icons.event_outlined),
-                              title: const Text('Eventos'),
-                              subtitle: const Text('Ver eventos próximos'),
-                              onTap: () {
-                                Navigator.pop(context);
-                                // TODO: Implementar navegação para eventos do voluntário
-                              },
-                            ),
-                          ),
-                          // 3. FORMULÁRIOS - Independente (visível apenas quando NÃO está visualizando como voluntário)
-                          if (modoAtual != 'Voluntário' && 
-                              (usuario!.role == UserRole.tenant_admin || 
-                               usuario.role == UserRole.branch_admin))
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: const Icon(Icons.assignment_outlined),
-                                title: const Text('Formulários'),
-                                subtitle: const Text('Criar e gerenciar'),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  // TODO: Implementar navegação para formulários
-                                },
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-
-                    // ⚙️ ADMINISTRAÇÃO (só aparece se tiver conteúdo)
-                    if (usuario!.role == UserRole.servus_admin)
-                      Theme(
-                        data: Theme.of(context).copyWith(
-                          dividerColor: Colors.transparent,
-                        ),
-                        child: ExpansionTile(
-                          leading: const Icon(Icons.settings_outlined),
-                          title: const Text('Administração'),
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16),
-                              child: ListTile(
-                                leading: const Icon(Icons.business_outlined),
-                                title: const Text('Nova igreja'),
-                                subtitle: const Text('Nova organização'),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  // TODO: Implementar navegação para criar tenant
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
+                    ],
                   ],
                 ),
               ),
@@ -258,7 +181,7 @@ class DrawerMenuVoluntario extends StatelessWidget {
                 ),
               ),
             ),
-            if (usuario.role == UserRole.tenant_admin || usuario.role == UserRole.leader || usuario.role == UserRole.servus_admin)
+            if (usuario?.role == UserRole.tenant_admin || usuario?.role == UserRole.leader || usuario?.role == UserRole.servus_admin)
               ListTile(
                 leading: const Icon(Icons.swap_horiz),
                 title: const Text('Trocar para admin'),

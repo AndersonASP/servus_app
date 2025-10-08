@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:servus_app/shared/widgets/more_options_sheet.dart';
 
 class AppShell extends StatelessWidget {
   final Widget child;
@@ -8,22 +7,22 @@ class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.child});
 
   int _getCurrentIndex(String location) {
-    if (location.startsWith('/volunteer/indisponibilidade')) return 0;
-    if (location.startsWith('/volunteer/dashboard')) return 1;
+    if (location.startsWith('/volunteer/dashboard')) return 0;
+    if (location.startsWith('/volunteer/indisponibilidade')) return 1;
     if (location.startsWith('/perfil')) return 2;
-    return 1;
+    return 0; // Default para Home
   }
 
   void _onTabSelected(BuildContext context, int index) {
     switch (index) {
       case 0:
-        context.push('/volunteer/indisponibilidade');
-        break;
-      case 1:
         context.go('/volunteer/dashboard');
         break;
+      case 1:
+        context.push('/volunteer/indisponibilidade');
+        break;
       case 2:
-        MoreOptionsSheet.show(context);
+        context.push('/perfil');
         break;
     }
   }
@@ -52,9 +51,10 @@ class AppShell extends StatelessWidget {
         ),
         child: BottomNavigationBar(
           elevation: 0,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           currentIndex: currentIndex,
-          type: BottomNavigationBarType.shifting, // mais controle visual
-          selectedItemColor: Theme.of(context).colorScheme.onSurface,
+          type: BottomNavigationBarType.fixed, // mais controle visual
+          selectedItemColor: Theme.of(context).colorScheme.primary,
           unselectedItemColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           selectedLabelStyle: const TextStyle(
             fontSize: 12,
@@ -67,31 +67,34 @@ class AppShell extends StatelessWidget {
           onTap: (index) => _onTabSelected(context, index),
           items: [
             BottomNavigationBarItem(
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               icon: AnimatedScale(
                 scale: currentIndex == 0 ? 1.2 : 1.0,
                 duration: const Duration(milliseconds: 200),
-                child: const Icon(Icons.event_busy),
+                child: const Icon(Icons.home_outlined),
               ),
-              label: 'Indisponível',
-            ),
-            BottomNavigationBarItem(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              icon: AnimatedScale(
-                scale: currentIndex == 1 ? 1.2 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                child: const Icon(Icons.home),
-              ),
+              activeIcon: const Icon(Icons.home),
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              icon: AnimatedScale(
+                scale: currentIndex == 1 ? 1.2 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.event_busy_outlined),
+              ),
+              activeIcon: const Icon(Icons.event_busy),
+              label: 'Indisponível',
+            ),
+            BottomNavigationBarItem(
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               icon: AnimatedScale(
                 scale: currentIndex == 2 ? 1.2 : 1.0,
                 duration: const Duration(milliseconds: 200),
-                child: const Icon(Icons.more_horiz),
+                child: const Icon(Icons.person_outline),
               ),
-              label: 'Mais',
+              activeIcon: const Icon(Icons.person),
+              label: 'Perfil',
             ),
           ],
         ),

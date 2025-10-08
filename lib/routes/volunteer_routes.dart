@@ -15,6 +15,14 @@ final List<GoRoute> volunteerRoutes = [
     ),
   ),
   GoRoute(
+    path: '/volunteer/escalas',
+    pageBuilder: (context, state) => CustomTransitions.scale(
+      context,
+      state,
+      const EscalaDetalheScreen(),
+    ),
+  ),
+  GoRoute(
     path: '/volunteer/indisponibilidade',
     pageBuilder: (context, state) => CustomTransitions.slideLeft(
       context,
@@ -37,6 +45,7 @@ final List<GoRoute> volunteerRoutes = [
       );
     },
   ),
+  // Manter rota antiga para compatibilidade
   GoRoute(
     path: '/volunteer/detalhes-escalas',
     pageBuilder: (context, state) => CustomTransitions.scale(
