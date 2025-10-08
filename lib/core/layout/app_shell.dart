@@ -84,7 +84,7 @@ class AppShell extends StatelessWidget {
                 child: const Icon(Icons.event_busy_outlined),
               ),
               activeIcon: const Icon(Icons.event_busy),
-              label: 'Indisponível',
+              label: 'Indisponibilidade',
             ),
             BottomNavigationBarItem(
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,

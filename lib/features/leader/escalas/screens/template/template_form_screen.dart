@@ -19,12 +19,6 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
   final TextEditingController observacoesController = TextEditingController();
 
   final List<FuncaoEscala> funcoes = [];
-  final List<String> ministeriosMock = [
-    'Louvor',
-    'Mídia',
-    'Acolhimento',
-    'Diaconato',
-  ];
 
   @override
   void initState() {
@@ -37,7 +31,7 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
     }
   }
 
-  void _salvar() {
+  void _salvar() async {
     if (_formKey.currentState!.validate() && funcoes.isNotEmpty) {
       final template = TemplateModel(
         id: widget.templateExistente?.id,
@@ -47,13 +41,28 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
       );
 
       final controller = context.read<TemplateController>();
-      if (widget.templateExistente == null) {
-        controller.adicionarTemplate(template);
-      } else {
-        controller.atualizarTemplate(template);
+      try {
+        if (widget.templateExistente == null) {
+          await controller.adicionarTemplate(template);
+        } else {
+          await controller.atualizarTemplate(template);
+        }
+        Navigator.pop(context);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao salvar template: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-
-      Navigator.pop(context);
+    } else if (funcoes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Adicione pelo menos uma função ao template'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -87,13 +96,29 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _salvar,
-        label:  Text('Salvar', style: context.textStyles.bodyLarge?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: context.colors.onPrimary,
-        )),
-        icon: const Icon(Icons.check),
+      floatingActionButton: Consumer<TemplateController>(
+        builder: (context, controller, _) {
+          return FloatingActionButton.extended(
+            onPressed: controller.isLoading ? null : _salvar,
+            label: Text(
+              controller.isLoading ? 'Salvando...' : 'Salvar', 
+              style: context.textStyles.bodyLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: context.colors.onPrimary,
+              )
+            ),
+            icon: controller.isLoading 
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.check),
+          );
+        },
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -140,17 +165,42 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
                               value == null || value.isEmpty ? 'Obrigatório' : null,
                         ),
                         const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          initialValue: funcao.ministerioId.isEmpty ? null : funcao.ministerioId,
-                          decoration: const InputDecoration(labelText: 'Ministério'),
-                          items: ministeriosMock
-                              .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                              .toList(),
-                          onChanged: (value) => setState(() {
-                            funcoes[index] = funcao.copyWith(ministerioId: value!);
-                          }),
-                          validator: (value) =>
-                              value == null ? 'Obrigatório' : null,
+                        Consumer<TemplateController>(
+                          builder: (context, controller, _) {
+                            if (controller.isLoadingMinistries) {
+                              return DropdownButtonFormField<String>(
+                                decoration: const InputDecoration(labelText: 'Ministério'),
+                                items: const [],
+                                hint: const Text('Carregando ministérios...'),
+                                onChanged: null,
+                              );
+                            }
+                            
+                            if (!controller.hasMinistries) {
+                              return DropdownButtonFormField<String>(
+                                decoration: const InputDecoration(labelText: 'Ministério'),
+                                items: const [],
+                                hint: const Text('Nenhum ministério encontrado'),
+                                onChanged: null,
+                              );
+                            }
+                            
+                            return DropdownButtonFormField<String>(
+                              initialValue: funcao.ministerioId.isEmpty ? null : funcao.ministerioId,
+                              decoration: const InputDecoration(labelText: 'Ministério'),
+                              items: controller.ministerios
+                                  .map((m) => DropdownMenuItem(
+                                    value: m.id, 
+                                    child: Text(m.name),
+                                  ))
+                                  .toList(),
+                              onChanged: (value) => setState(() {
+                                funcoes[index] = funcao.copyWith(ministerioId: value!);
+                              }),
+                              validator: (value) =>
+                                  value == null ? 'Obrigatório' : null,
+                            );
+                          },
                         ),
                         const SizedBox(height: 8),
                         TextFormField(

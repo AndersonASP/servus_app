@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
-import 'package:servus_app/core/models/recurrence_pattern.dart';
 import 'package:servus_app/features/volunteers/indisponibilidade/bloqueios/controller/bloqueio_controller.dart';
-import 'package:servus_app/features/volunteers/indisponibilidade/widgets/recurrence_config_widget.dart';
 
 class BloqueioScreen extends StatefulWidget {
-  final Function(String, List<String>, RecurrencePattern?, BloqueioController) onConfirmar;
+  final Function(String, List<String>, BloqueioController) onConfirmar;
   final String? motivoInicial;
   final List<String>? ministeriosIniciais;
-  final List<Map<String, String>> ministeriosDisponiveis;
+  final List<Map<String, dynamic>> ministeriosDisponiveis;
   final DateTime? selectedDate;
 
   const BloqueioScreen({
@@ -29,25 +27,16 @@ class BloqueioScreen extends StatefulWidget {
 class _BloqueioScreenState extends State<BloqueioScreen> {
   final BloqueioController controller = BloqueioController();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-  RecurrencePattern? _recurrencePattern;
 
   @override
   void initState() {
     super.initState();
-    print('🔍 [BloqueioScreen] ===== BLOQUEIO SCREEN ABERTA =====');
-    print('🔍 [BloqueioScreen] initState chamado');
-    print('🔍 [BloqueioScreen] Ministérios disponíveis recebidos: ${widget.ministeriosDisponiveis}');
-    print('🔍 [BloqueioScreen] Quantidade de ministérios: ${widget.ministeriosDisponiveis.length}');
-    print('🔍 [BloqueioScreen] Tipo dos ministérios: ${widget.ministeriosDisponiveis.runtimeType}');
     
     controller.inicializar(
       motivoInicial: widget.motivoInicial,
       ministeriosIniciais: widget.ministeriosIniciais,
       todosMinisterios: widget.ministeriosDisponiveis,
     );
-    
-    print('🔍 [BloqueioScreen] Controller inicializado');
-    print('🔍 [BloqueioScreen] Ministérios no controller após inicialização: ${controller.ministeriosSelecionados.keys.toList()}');
   }
 
   @override
@@ -75,10 +64,10 @@ class _BloqueioScreenState extends State<BloqueioScreen> {
                 ),
                 onPressed: () => context.pop(),
               ),
+              centerTitle: false,
               title: Text(
                 isEdicao ? 'Editar Bloqueio' : 'Novo Bloqueio',
                 style: context.theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
                   color: context.colors.onSurface,
                 ),
               ),
@@ -160,19 +149,38 @@ class _BloqueioScreenState extends State<BloqueioScreen> {
                     const SizedBox(height: 12),
                     
                     // Lista de ministérios
-                    ...controller.ministeriosSelecionados.entries.map((entry) {
-                      final nomeMinisterio = entry.key;
-                      final isSelecionado = entry.value;
-                      
-                      return CheckboxListTile(
-                        title: Text(nomeMinisterio),
-                        value: isSelecionado,
-                        onChanged: (value) {
-                          controller.toggleMinisterio(nomeMinisterio);
-                        },
-                        activeColor: context.colors.primary,
-                      );
-                    }).toList(),
+                    Consumer<BloqueioController>(
+                      builder: (context, controller, _) {
+                        if (controller.ministeriosSelecionados.isEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'Nenhum ministério disponível',
+                              style: TextStyle(
+                                color: context.colors.onSurface.withValues(alpha: 0.6),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          );
+                        }
+                        
+                        return Column(
+                          children: controller.ministeriosSelecionados.entries.map((entry) {
+                            final nomeMinisterio = entry.key;
+                            final isSelecionado = entry.value;
+                            
+                            return CheckboxListTile(
+                              title: Text(nomeMinisterio),
+                              value: isSelecionado,
+                              onChanged: (value) {
+                                controller.toggleMinisterio(nomeMinisterio);
+                              },
+                              activeColor: context.colors.primary,
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
                     
                     if (controller.erroMinisterios)
                       Padding(
@@ -186,19 +194,6 @@ class _BloqueioScreenState extends State<BloqueioScreen> {
                       ),
                     
                     const SizedBox(height: 24),
-                    
-                    // Configuração de recorrência
-                    RecurrenceConfigWidget(
-                      initialPattern: _recurrencePattern,
-                      startDate: widget.selectedDate ?? DateTime.now(),
-                      onPatternChanged: (pattern) {
-                        setState(() {
-                          _recurrencePattern = pattern;
-                        });
-                      },
-                    ),
-                    
-                    const SizedBox(height: 100), // Espaço para o botão flutuante
                   ],
                 ),
               ),
@@ -207,20 +202,10 @@ class _BloqueioScreenState extends State<BloqueioScreen> {
               builder: (context, controller, child) {
                 return FloatingActionButton.extended(
                   onPressed: controller.isLoading ? null : () async {
-                    print('🔍 [BloqueioScreen] ===== BOTÃO CONFIRMAR CLICADO =====');
-                    print('🔍 [BloqueioScreen] Motivo: "${controller.motivoController.text}"');
-                    print('🔍 [BloqueioScreen] Motivo length: ${controller.motivoController.text.length}');
-                    print('🔍 [BloqueioScreen] Ministérios selecionados: ${controller.ministeriosSelecionados.entries.where((e) => e.value).map((e) => e.key).toList()}');
-                    print('🔍 [BloqueioScreen] Todos os ministérios: ${controller.ministeriosSelecionados}');
-                    
                     try {
                       final sucesso = controller.validarFormulario(formKey);
-                      print('🔍 [BloqueioScreen] Validação: $sucesso');
-                      print('🔍 [BloqueioScreen] Erro ministérios: ${controller.erroMinisterios}');
                       
                       if (sucesso) {
-                        print('✅ [BloqueioScreen] Validação passou, chamando onConfirmar');
-                        
                         // Ativar loading
                         controller.setLoading(true);
                         
@@ -230,29 +215,12 @@ class _BloqueioScreenState extends State<BloqueioScreen> {
                             .map((e) => e.key)
                             .toList();
                         
-                        print('🔍 [BloqueioScreen] Chamando onConfirmar com:');
-                        print('🔍 [BloqueioScreen] - Motivo: "$motivo"');
-                        print('🔍 [BloqueioScreen] - Recorrência: ${_recurrencePattern?.toString() ?? "Nenhuma"}');
-                        print('🔍 [BloqueioScreen] ===== CHAMANDO onConfirmar =====');
-                        
-                        await widget.onConfirmar(motivo, ministerios, _recurrencePattern, controller);
-                        print('✅ [BloqueioScreen] onConfirmar concluído com sucesso');
-                        
-                        // Navigator.pop será chamado pelo IndisponibilidadeScreen após sucesso
-                        print('🔍 [BloqueioScreen] Aguardando Navigator.pop do IndisponibilidadeScreen');
-                      } else {
-                        print('❌ [BloqueioScreen] Validação falhou');
-                        print('❌ [BloqueioScreen] Motivo válido: ${controller.motivoController.text.trim().isNotEmpty}');
-                        print('❌ [BloqueioScreen] Ministérios válidos: ${!controller.erroMinisterios}');
+                        await widget.onConfirmar(motivo, ministerios, controller);
                       }
                     } catch (e) {
-                      print('❌ [BloqueioScreen] Erro no onPressed: $e');
-                      print('❌ [BloqueioScreen] Stack trace: ${StackTrace.current}');
                       // Desativar loading em caso de erro
                       controller.setLoading(false);
                     }
-                    
-                    print('🔍 [BloqueioScreen] ===== FIM DO BOTÃO CONFIRMAR =====');
                   },
                   backgroundColor: controller.isLoading ? Colors.grey : const Color(0xFF4058DB),
                   icon: controller.isLoading 

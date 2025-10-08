@@ -383,19 +383,35 @@ class EventoController extends ChangeNotifier {
 
         if (rp.containsKey('interval')) {
           final val = toInt(rp['interval']);
-          if (val != null) rp['interval'] = val; else rp.remove('interval');
+          if (val != null) {
+            rp['interval'] = val;
+          } else {
+            rp.remove('interval');
+          }
         }
         if (rp.containsKey('dayOfMonth')) {
           final val = toInt(rp['dayOfMonth']);
-          if (val != null) rp['dayOfMonth'] = val; else rp.remove('dayOfMonth');
+          if (val != null) {
+            rp['dayOfMonth'] = val;
+          } else {
+            rp.remove('dayOfMonth');
+          }
         }
         if (rp.containsKey('occurrences')) {
           final val = toInt(rp['occurrences']);
-          if (val != null) rp['occurrences'] = val; else rp.remove('occurrences');
+          if (val != null) {
+            rp['occurrences'] = val;
+          } else {
+            rp.remove('occurrences');
+          }
         }
         if (rp.containsKey('daysOfWeek')) {
           final list = toIntList(rp['daysOfWeek']);
-          if (list != null) rp['daysOfWeek'] = list; else rp.remove('daysOfWeek');
+          if (list != null) {
+            rp['daysOfWeek'] = list;
+          } else {
+            rp.remove('daysOfWeek');
+          }
         }
         payload['recurrencePattern'] = rp;
       }
@@ -456,7 +472,7 @@ class EventoController extends ChangeNotifier {
 
     final recorrenciaTipo = _mapRecurrenceType(eventModel.recurrenceType ?? 'none');
     // Coerção segura para dias da semana e semana do mês (podem vir como string)
-    int? _coerceInt(dynamic v) {
+    int? coerceInt(dynamic v) {
       if (v == null) return null;
       if (v is int) return v;
       if (v is String) return int.tryParse(v);
@@ -465,9 +481,9 @@ class EventoController extends ChangeNotifier {
     int? diaSemana;
     final diasSemanaDyn = eventModel.recurrencePattern?.daysOfWeek;
     if (diasSemanaDyn is List && diasSemanaDyn.isNotEmpty) {
-      diaSemana = _coerceInt(diasSemanaDyn.first);
+      diaSemana = coerceInt(diasSemanaDyn.first);
     }
-    final semanaDoMes = _coerceInt(eventModel.recurrencePattern?.dayOfMonth);
+    final semanaDoMes = coerceInt(eventModel.recurrencePattern?.dayOfMonth);
     
     developer.log('🔄 Recorrência convertida: ${eventModel.recurrenceType} -> $recorrenciaTipo', name: 'EventoController');
     developer.log('📅 Dia da semana: $diaSemana, Semana do mês: $semanaDoMes', name: 'EventoController');

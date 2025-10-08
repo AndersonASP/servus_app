@@ -1,31 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:servus_app/services/scales_advanced_service.dart';
-import 'package:servus_app/services/recurrence_service.dart';
-import 'package:servus_app/state/auth_state.dart';
+import 'package:dio/dio.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/shared/widgets/servus_snackbar.dart';
-import 'package:servus_app/core/models/recurrence_pattern.dart';
-import 'package:dio/dio.dart';
-import 'package:servus_app/features/ministries/services/ministry_service.dart';
 
 class BloqueioIndisponibilidade {
   final DateTime data;
   final String motivo;
-  final List<String> ministerios; // Manter como List<String> para compatibilidade com a UI
-  
-  // Campos para recorrência
-  final RecurrencePattern? recurrence;
-  final bool isRecurring;
-  final String? parentId; // ID do bloqueio pai (para bloqueios gerados automaticamente)
+  final List<String> ministerios;
 
   BloqueioIndisponibilidade({
     required this.data,
     required this.motivo,
     required this.ministerios,
-    this.recurrence,
-    this.isRecurring = false,
-    this.parentId,
   });
 
   /// Cria uma cópia do bloqueio com novos valores
@@ -33,21 +20,15 @@ class BloqueioIndisponibilidade {
     DateTime? data,
     String? motivo,
     List<String>? ministerios,
-    RecurrencePattern? recurrence,
-    bool? isRecurring,
-    String? parentId,
   }) => BloqueioIndisponibilidade(
     data: data ?? this.data,
     motivo: motivo ?? this.motivo,
     ministerios: ministerios ?? this.ministerios,
-    recurrence: recurrence ?? this.recurrence,
-    isRecurring: isRecurring ?? this.isRecurring,
-    parentId: parentId ?? this.parentId,
   );
 
   @override
   String toString() {
-    return 'BloqueioIndisponibilidade(data: $data, motivo: $motivo, ministerios: $ministerios, isRecurring: $isRecurring)';
+    return 'BloqueioIndisponibilidade(data: $data, motivo: $motivo, ministerios: $ministerios)';
   }
 
   @override
@@ -57,19 +38,13 @@ class BloqueioIndisponibilidade {
           runtimeType == other.runtimeType &&
           data == other.data &&
           motivo == other.motivo &&
-          ministerios == other.ministerios &&
-          recurrence == other.recurrence &&
-          isRecurring == other.isRecurring &&
-          parentId == other.parentId;
+          ministerios == other.ministerios;
 
   @override
   int get hashCode =>
       data.hashCode ^
       motivo.hashCode ^
-      ministerios.hashCode ^
-      recurrence.hashCode ^
-      isRecurring.hashCode ^
-      parentId.hashCode;
+      ministerios.hashCode;
 }
 
 class IndisponibilidadeController extends ChangeNotifier {
@@ -79,6 +54,14 @@ class IndisponibilidadeController extends ChangeNotifier {
   List<BloqueioIndisponibilidade> bloqueiosDoDiaSelecionado = [];
   int _maxDiasIndisponiveis = 0; // Será carregado do backend - não usar valor padrão
   
+  // Seleção múltipla de dias
+  final Set<DateTime> _diasSelecionados = {};
+  bool _modoSelecaoMultipla = false;
+  
+  Set<DateTime> get diasSelecionados => Set.unmodifiable(_diasSelecionados);
+  bool get modoSelecaoMultipla => _modoSelecaoMultipla;
+  bool get temDiasSelecionados => _diasSelecionados.isNotEmpty;
+  
   /// Limite máximo de dias indisponíveis por mês
   int get maxDiasIndisponiveis {
     print('🔍 [IndisponibilidadeController] maxDiasIndisponiveis getter chamado');
@@ -87,531 +70,21 @@ class IndisponibilidadeController extends ChangeNotifier {
   }
   
   // Serviço para carregar dados do ministério
-  final MinistryService _ministryService = MinistryService();
-  
-  // Cache para limites de bloqueios por ministério
-  final Map<String, int> _ministryLimits = {};
   bool _isLoading = false;
   bool _isSaving = false;
   String? _errorMessage;
-  dynamic _ministeriosDoVoluntario = <Map<String, String>>[];
+  List<Map<String, dynamic>> _ministeriosDoVoluntario = [];
   
   // Cache para evitar múltiplas requisições
   DateTime? _lastLoadTime;
   static const Duration _cacheDuration = Duration(minutes: 5);
+  
+  // Flag para evitar múltiplas tentativas de carregamento
+  bool _isLoadingMinisterios = false;
 
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
-
-  List<Map<String, String>> get ministeriosDoVoluntario {
-    if (_ministeriosDoVoluntario is List<String>) {
-      // Converter lista antiga para nova estrutura
-      return [];
-    }
-    return (_ministeriosDoVoluntario as List).cast<Map<String, String>>();
-  }
-
-  // Define o dia em foco (exibido no calendário)
-  void setFocusedDay(DateTime day, {bool notify = true}) {
-    focusedDay = day;
-    if (notify) notifyListeners();
-  }
-
-  // Seleciona um dia e atualiza os bloqueios exibidos
-  void selecionarDia(DateTime day) {
-    selectedDay = day;
-    bloqueiosDoDiaSelecionado = bloqueios.where((b) => isSameDay(b.data, day)).toList();
-    notifyListeners();
-    print('🔍 [IndisponibilidadeController] Dia selecionado: $day');
-    print('🔍 [IndisponibilidadeController] Bloqueios encontrados: ${bloqueiosDoDiaSelecionado.length}');
-  }
-
-  // Limpa a seleção de dia
-  void limparSelecao() {
-    selectedDay = null;
-    bloqueiosDoDiaSelecionado.clear();
-    notifyListeners();
-  }
-
-  void abrirTelaDeBloqueio(BuildContext context, DateTime dia) {
-    final bloqueio = getBloqueio(dia);
-    Navigator.pushNamed(
-      context,
-      '/bloqueio',
-      arguments: {
-        'dia': dia,
-        'bloqueioExistente': bloqueio,
-        'controller': this,
-      },
-    );
-  }
-
-  // Verifica se duas datas são o mesmo dia (sem considerar hora)
-  bool isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  // Verifica se o dia está bloqueado
-  bool isDiaBloqueado(DateTime day) {
-    print('🔍 [IndisponibilidadeController] Verificando se dia está bloqueado: $day');
-    print('🔍 [IndisponibilidadeController] Total de bloqueios: ${bloqueios.length}');
-    print('🔍 [IndisponibilidadeController] Bloqueios: ${bloqueios.map((b) => '${b.data.day}/${b.data.month}/${b.data.year}').join(', ')}');
-    
-    final result = bloqueios.any((b) => isSameDay(b.data, day));
-    print('🔍 [IndisponibilidadeController] Resultado: $result');
-    
-    return result;
-  }
-
-  // Retorna o bloqueio correspondente ao dia (ou null se não existir)
-  BloqueioIndisponibilidade? getBloqueio(DateTime day) {
-    try {
-      return bloqueios.firstWhere((b) => isSameDay(b.data, day));
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // Registra ou atualiza um bloqueio no dia
-  Future<bool> registrarBloqueio({
-    required DateTime dia,
-    required String motivo,
-    required List<String> ministerios,
-    required String tenantId,
-    required String userId,
-    RecurrencePattern? recurrencePattern,
-    BuildContext? context,
-  }) async {
-    print('🔍 [IndisponibilidadeController] ===== REGISTRAR BLOQUEIO INICIADO =====');
-    print('🔍 [IndisponibilidadeController] Dia: $dia');
-    print('🔍 [IndisponibilidadeController] Motivo: "$motivo"');
-    print('🔍 [IndisponibilidadeController] Ministérios: $ministerios');
-    print('🔍 [IndisponibilidadeController] TenantId: $tenantId');
-    print('🔍 [IndisponibilidadeController] UserId: $userId');
-    print('🔍 [IndisponibilidadeController] Context recebido: ${context != null ? "SIM" : "NÃO"}');
-    print('🔍 [IndisponibilidadeController] Context mounted: ${context?.mounted ?? "N/A"}');
-    print('🔍 [IndisponibilidadeController] Recorrência: ${recurrencePattern?.type ?? 'Nenhuma'}');
-    
-    if (ministerios.isEmpty) {
-      print('❌ [IndisponibilidadeController] Nenhum ministério selecionado');
-      _setError('Selecione pelo menos um ministério');
-      return false;
-    }
-    
-    _setSaving(true);
-    _clearError();
-
-    try {
-      // Obter IDs dos ministérios selecionados
-      final List<String> ministryIds = [];
-      print('🔍 [IndisponibilidadeController] Ministérios selecionados: $ministerios');
-      print('🔍 [IndisponibilidadeController] Ministérios do voluntário: $_ministeriosDoVoluntario');
-      
-      for (final ministryName in ministerios) {
-        final ministry = _ministeriosDoVoluntario.firstWhere(
-          (m) => m['name'] == ministryName,
-          orElse: () => <String, String>{},
-        );
-        print('🔍 [IndisponibilidadeController] Ministério encontrado para "$ministryName": $ministry');
-        if (ministry.isNotEmpty && ministry['id'] != null) {
-          ministryIds.add(ministry['id']!);
-          print('🔍 [IndisponibilidadeController] ID adicionado: ${ministry['id']}');
-        }
-      }
-      
-      print('🔍 [IndisponibilidadeController] IDs dos ministérios: $ministryIds');
-      
-      // Carregar limites dos ministérios selecionados
-      print('🔍 [IndisponibilidadeController] ===== CARREGANDO LIMITE DOS MINISTÉRIOS =====');
-      print('🔍 [IndisponibilidadeController] IDs dos ministérios para carregar limite: $ministryIds');
-      Map<String, int> limitesPorMinisterio = await getMaxBlockedDaysForMinistries(ministryIds);
-      print('🔍 [IndisponibilidadeController] Limites carregados por ministério: $limitesPorMinisterio');
-      print('🔍 [IndisponibilidadeController] ===== FIM DO CARREGAMENTO DE LIMITE =====');
-      
-      // Se há padrão de recorrência, gerar todas as datas
-      List<DateTime> datasParaBloquear = [dia];
-      if (recurrencePattern != null && recurrencePattern.type != RecurrenceType.none) {
-        print('🔍 [IndisponibilidadeController] ===== GERANDO RECORRÊNCIA =====');
-        print('🔍 [IndisponibilidadeController] Padrão recebido: ${recurrencePattern.toString()}');
-        print('🔍 [IndisponibilidadeController] Tipo: ${recurrencePattern.type}');
-        print('🔍 [IndisponibilidadeController] DayOfWeek: ${recurrencePattern.dayOfWeek}');
-        print('🔍 [IndisponibilidadeController] DayOfMonth: ${recurrencePattern.dayOfMonth}');
-        print('🔍 [IndisponibilidadeController] WeekOfMonth: ${recurrencePattern.weekOfMonth}');
-        print('🔍 [IndisponibilidadeController] MaxOccurrences: ${recurrencePattern.maxOccurrences}');
-        print('🔍 [IndisponibilidadeController] EndDate: ${recurrencePattern.endDate}');
-        print('🔍 [IndisponibilidadeController] Data inicial: ${dia.day}/${dia.month}/${dia.year}');
-        
-        // Validar padrão antes de gerar
-        final validationError = RecurrenceService.validatePattern(recurrencePattern);
-        if (validationError != null) {
-          print('❌ [IndisponibilidadeController] Erro na validação do padrão: $validationError');
-          _setError('Padrão de recorrência inválido: $validationError');
-          return false;
-        }
-        
-        datasParaBloquear = RecurrenceService.generateDateSeries(
-          dia,
-          recurrencePattern,
-          maxDates: 12, // Limite razoável para evitar spam
-        );
-        print('🔍 [IndisponibilidadeController] Datas geradas: ${datasParaBloquear.length}');
-        for (int i = 0; i < datasParaBloquear.length; i++) {
-          print('🔍 [IndisponibilidadeController] Data ${i + 1}: ${datasParaBloquear[i].day}/${datasParaBloquear[i].month}/${datasParaBloquear[i].year}');
-        }
-      } else {
-        print('🔍 [IndisponibilidadeController] Sem recorrência - bloqueio único');
-        print('🔍 [IndisponibilidadeController] RecurrencePattern é null: ${recurrencePattern == null}');
-        if (recurrencePattern != null) {
-          print('🔍 [IndisponibilidadeController] Tipo é none: ${recurrencePattern.type == RecurrenceType.none}');
-        }
-      }
-      
-      // Verificar limite de dias bloqueados por mês
-      print('🔍 [IndisponibilidadeController] ===== VERIFICAÇÃO DE LIMITE NO REGISTRAR BLOQUEIO =====');
-      print('🔍 [IndisponibilidadeController] Limite atual: $_maxDiasIndisponiveis');
-      print('🔍 [IndisponibilidadeController] Datas para bloquear: ${datasParaBloquear.length}');
-      
-      Map<String, int> bloqueiosPorMes = {};
-      
-      // Contar bloqueios existentes por mês
-      for (final bloqueio in bloqueios) {
-        if (bloqueio.isRecurring) {
-          // Para bloqueios recorrentes, contar apenas o bloqueio principal
-          final chaveMes = '${bloqueio.data.year}-${bloqueio.data.month.toString().padLeft(2, '0')}';
-          bloqueiosPorMes[chaveMes] = (bloqueiosPorMes[chaveMes] ?? 0) + 1;
-        } else {
-          // Para bloqueios únicos, contar por mês
-          final chaveMes = '${bloqueio.data.year}-${bloqueio.data.month.toString().padLeft(2, '0')}';
-          bloqueiosPorMes[chaveMes] = (bloqueiosPorMes[chaveMes] ?? 0) + 1;
-        }
-      }
-      
-      print('🔍 [IndisponibilidadeController] ===== INICIANDO VALIDAÇÃO DE LIMITE =====');
-      print('🔍 [IndisponibilidadeController] Ministérios para validar: $ministerios');
-      print('🔍 [IndisponibilidadeController] Limites por ministério: $limitesPorMinisterio');
-      
-      for (String ministryName in ministerios) {
-        final ministryId = _getMinistryIdFromName(ministryName);
-        if (ministryId == null || ministryId.isEmpty) continue;
-        
-        final limiteDoMinisterio = limitesPorMinisterio[ministryId];
-        if (limiteDoMinisterio == null) {
-          print('⚠️ [IndisponibilidadeController] Limite não encontrado para ministério $ministryName ($ministryId)');
-          continue;
-        }
-        
-        print('🔍 [IndisponibilidadeController] Verificando limite para $ministryName: $limiteDoMinisterio dias');
-        
-        // Contar bloqueios existentes para este ministério específico no mês
-        Map<String, int> bloqueiosPorMesPorMinisterio = {};
-        for (final bloqueio in bloqueios) {
-          if (bloqueio.ministerios.contains(ministryName)) {
-            final chaveMes = '${bloqueio.data.year}-${bloqueio.data.month.toString().padLeft(2, '0')}';
-            bloqueiosPorMesPorMinisterio[chaveMes] = (bloqueiosPorMesPorMinisterio[chaveMes] ?? 0) + 1;
-          }
-        }
-        
-        // Verificar se algum mês excederia o limite para este ministério
-        for (DateTime dataParaBloquear in datasParaBloquear) {
-          final chaveMes = '${dataParaBloquear.year}-${dataParaBloquear.month.toString().padLeft(2, '0')}';
-          final bloqueiosExistentesNoMes = bloqueiosPorMesPorMinisterio[chaveMes] ?? 0;
-          final novosBloqueiosNoMes = datasParaBloquear.where((d) => 
-            d.year == dataParaBloquear.year && d.month == dataParaBloquear.month
-          ).length;
-          
-          if (bloqueiosExistentesNoMes + novosBloqueiosNoMes > limiteDoMinisterio) {
-            final nomeMes = _getNomeMes(dataParaBloquear.month);
-            print('❌ [IndisponibilidadeController] Limite do ministério $ministryName seria excedido no mês $nomeMes/${dataParaBloquear.year}');
-            print('❌ [IndisponibilidadeController] Bloqueios existentes: $bloqueiosExistentesNoMes');
-            print('❌ [IndisponibilidadeController] Novos bloqueios: $novosBloqueiosNoMes');
-            print('❌ [IndisponibilidadeController] Limite do ministério: $limiteDoMinisterio');
-            print('❌ [IndisponibilidadeController] Total seria: ${bloqueiosExistentesNoMes + novosBloqueiosNoMes}');
-            
-            _setError('Limite de $limiteDoMinisterio dias bloqueados seria excedido no ministério "$ministryName" no mês de $nomeMes/${dataParaBloquear.year}. Você já tem $bloqueiosExistentesNoMes bloqueios e tentaria adicionar $novosBloqueiosNoMes novos.');
-
-            if (context != null && context.mounted) {
-              print('🔔 [IndisponibilidadeController] Exibindo ServusSnackbar de aviso');
-              showWarning(
-                context,
-                'Limite de dias bloqueados excedido no ministério "$ministryName". Remova alguns bloqueios existentes para adicionar novos.',
-                title: 'Limite de bloqueios excedido',
-              );
-              print('🔔 [IndisponibilidadeController] ServusSnackbar exibido');
-            } else {
-              print('⚠️ [IndisponibilidadeController] Context não disponível para exibir ServusSnackbar');
-            }
-
-            return false;
-          }
-        }
-      }
-      
-      print('✅ [IndisponibilidadeController] Validação de limite por ministério concluída com sucesso');
-      print('🔍 [IndisponibilidadeController] ===== INICIANDO CRIAÇÃO DOS BLOQUEIOS =====');
-
-      // Bloquear TODAS as datas para CADA ministério selecionado
-      bool allSuccess = true;
-      List<String> failedMinistries = [];
-      List<DateTime> datasProcessadasComSucesso = [];
-      
-      print('🔍 [IndisponibilidadeController] Ministérios disponíveis: $_ministeriosDoVoluntario');
-      print('🔍 [IndisponibilidadeController] Ministérios selecionados: $ministerios');
-      
-      for (String ministryName in ministerios) {
-        final ministryId = _getMinistryIdFromName(ministryName);
-        print('🔍 [IndisponibilidadeController] Processando ministério: $ministryName (ID: $ministryId)');
-        
-        if (ministryId == null || ministryId.isEmpty) {
-          print('❌ [IndisponibilidadeController] ID inválido para ministério: $ministryName');
-          print('❌ [IndisponibilidadeController] Ministérios disponíveis: ${_ministeriosDoVoluntario.map((m) => '${m['name']}:${m['id']}').join(', ')}');
-          failedMinistries.add(ministryName);
-          allSuccess = false;
-          continue;
-        }
-
-        // Processar cada data para este ministério
-        for (DateTime dataParaBloquear in datasParaBloquear) {
-          final dataAjustada = DateTime(dataParaBloquear.year, dataParaBloquear.month, dataParaBloquear.day);
-          
-          try {
-            print('🔍 [IndisponibilidadeController] Bloqueando data ${dataAjustada.day}/${dataAjustada.month}/${dataAjustada.year} para $ministryName...');
-            
-            final response = await ScalesAdvancedService.blockDate(
-              tenantId: tenantId,
-              userId: userId,
-              ministryId: ministryId,
-              date: dataAjustada.toIso8601String().split('T')[0],
-              reason: motivo,
-            );
-
-            print('🔍 [IndisponibilidadeController] Resposta da API para $ministryName em ${dataAjustada.day}/${dataAjustada.month}: ${response['success']}');
-
-            if (response['success'] != true) {
-              print('❌ [IndisponibilidadeController] Falha para ministério $ministryName em ${dataAjustada.day}/${dataAjustada.month}: ${response['message']}');
-              failedMinistries.add('$ministryName (${dataAjustada.day}/${dataAjustada.month})');
-              allSuccess = false;
-            } else {
-              print('✅ [IndisponibilidadeController] Sucesso para ministério $ministryName em ${dataAjustada.day}/${dataAjustada.month}');
-              if (!datasProcessadasComSucesso.contains(dataAjustada)) {
-                datasProcessadasComSucesso.add(dataAjustada);
-              }
-            }
-          } catch (e) {
-            print('❌ [IndisponibilidadeController] Erro para ministério $ministryName em ${dataAjustada.day}/${dataAjustada.month}: $e');
-            failedMinistries.add('$ministryName (${dataAjustada.day}/${dataAjustada.month})');
-            allSuccess = false;
-          }
-        }
-      }
-
-      if (allSuccess) {
-        print('✅ [IndisponibilidadeController] Todos os bloqueios processados com sucesso');
-        // Atualizar estado local - adicionar todos os bloqueios processados
-        for (DateTime dataProcessada in datasProcessadasComSucesso) {
-          // Remover bloqueios existentes para esta data
-          bloqueios.removeWhere((b) => isSameDay(b.data, dataProcessada));
-          
-          // Adicionar novo bloqueio
-          bloqueios.add(BloqueioIndisponibilidade(
-            data: dataProcessada,
-            motivo: motivo,
-            ministerios: ministerios,
-            recurrence: recurrencePattern,
-            isRecurring: recurrencePattern != null && recurrencePattern.type != RecurrenceType.none,
-            parentId: dataProcessada == dia ? null : 'parent_${dia.millisecondsSinceEpoch}', // Primeira data é o pai
-          ));
-        }
-        
-        print('✅ [IndisponibilidadeController] ${datasProcessadasComSucesso.length} bloqueios adicionados localmente');
-        notifyListeners();
-        
-        // Mostrar feedback de sucesso
-        if (context != null && context.mounted) {
-          final nomeMes = _getNomeMes(dia.month);
-          showSuccess(
-            context,
-            'Bloqueio registrado com sucesso para $nomeMes/${dia.year}!',
-            title: 'Bloqueio salvo',
-          );
-        }
-        
-        print('🔍 [IndisponibilidadeController] Resultado final: allSuccess=$allSuccess, failedMinistries=$failedMinistries');
-        
-        print('✅ [IndisponibilidadeController] ===== REGISTRAR BLOQUEIO CONCLUÍDO COM SUCESSO =====');
-        print('🔔 [IndisponibilidadeController] Retornando TRUE - bloqueio criado com sucesso');
-        return true;
-      } else {
-        print('❌ [IndisponibilidadeController] Falha em alguns bloqueios: $failedMinistries');
-        _setError('Falha ao bloquear algumas datas: ${failedMinistries.join(', ')}');
-        
-        // Mostrar feedback de erro
-        if (context != null && context.mounted) {
-          showError(
-            context,
-            'Falha ao registrar bloqueio: ${failedMinistries.join(', ')}',
-            title: 'Erro ao salvar',
-          );
-        }
-        
-        return false;
-      }
-    } catch (e) {
-      print('❌ [IndisponibilidadeController] ===== ERRO NO REGISTRAR BLOQUEIO =====');
-      print('❌ [IndisponibilidadeController] Erro: $e');
-      print('❌ [IndisponibilidadeController] Stack trace: ${StackTrace.current}');
-      _setError('Erro ao bloquear data: $e');
-      
-      // Mostrar feedback de erro
-      if (context != null && context.mounted) {
-        showError(
-          context,
-          'Erro ao registrar bloqueio: $e',
-          title: 'Erro ao salvar',
-        );
-      }
-      
-      return false;
-    } finally {
-      print('🔍 [IndisponibilidadeController] Finalizando registrarBloqueio...');
-      _setSaving(false);
-      print('🔍 [IndisponibilidadeController] ===== FIM DO REGISTRAR BLOQUEIO =====');
-    }
-  }
-
-  // Remove um bloqueio específico
-  Future<bool> removerBloqueioEspecifico({
-    required BloqueioIndisponibilidade bloqueio,
-    required String tenantId,
-    required String userId,
-  }) async {
-    print('🔍 [IndisponibilidadeController] ===== REMOVENDO BLOQUEIO ESPECÍFICO =====');
-    print('🔍 [IndisponibilidadeController] Bloqueio: ${bloqueio.data} - ${bloqueio.motivo}');
-    
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final dataAjustada = DateTime(bloqueio.data.year, bloqueio.data.month, bloqueio.data.day);
-      
-      // Remover bloqueio para cada ministério
-      bool allSuccess = true;
-      List<String> failedMinistries = [];
-      
-      for (String ministryName in bloqueio.ministerios) {
-        final ministryId = _getMinistryIdFromName(ministryName);
-        print('🔍 [IndisponibilidadeController] Desbloqueando ministério: $ministryName (ID: $ministryId)');
-        
-        if (ministryId == null || ministryId.isEmpty) {
-          print('❌ [IndisponibilidadeController] ID inválido para ministério: $ministryName');
-          failedMinistries.add(ministryName);
-          allSuccess = false;
-          continue;
-        }
-
-        try {
-          final response = await ScalesAdvancedService.unblockDate(
-            tenantId: tenantId,
-            userId: userId,
-            ministryId: ministryId,
-            date: dataAjustada.toIso8601String().split('T')[0],
-          );
-
-          if (response['success'] != true) {
-            print('❌ [IndisponibilidadeController] Falha ao desbloquear ministério $ministryName: ${response['message']}');
-            failedMinistries.add(ministryName);
-            allSuccess = false;
-          } else {
-            print('✅ [IndisponibilidadeController] Ministério $ministryName desbloqueado com sucesso');
-          }
-        } catch (e) {
-          print('❌ [IndisponibilidadeController] Erro ao desbloquear ministério $ministryName: $e');
-          failedMinistries.add(ministryName);
-          allSuccess = false;
-        }
-      }
-
-      if (allSuccess) {
-        // Remover bloqueio da lista local
-        bloqueios.remove(bloqueio);
-        // Atualizar lista de bloqueios do dia selecionado
-        if (selectedDay != null) {
-          bloqueiosDoDiaSelecionado = bloqueios.where((b) => isSameDay(b.data, selectedDay!)).toList();
-        }
-        notifyListeners();
-        print('✅ [IndisponibilidadeController] Bloqueio removido com sucesso');
-        return true;
-      } else {
-        print('❌ [IndisponibilidadeController] Falha em alguns ministérios: $failedMinistries');
-        _setError('Falha ao desbloquear data para: ${failedMinistries.join(', ')}');
-        return false;
-      }
-    } catch (e) {
-      print('❌ [IndisponibilidadeController] Erro ao remover bloqueio: $e');
-      _setError('Erro ao remover bloqueio: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Remove o bloqueio de um dia
-  Future<bool> removerBloqueio({
-    required DateTime day,
-    required String tenantId,
-    required String userId,
-  }) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final dataAjustada = DateTime(day.year, day.month, day.day);
-      
-      // Usar o primeiro ministério disponível para desbloqueio
-      final ministryId = _ministeriosDoVoluntario.isNotEmpty 
-          ? _ministeriosDoVoluntario.first['id'] 
-          : null;
-      
-      if (ministryId == null || ministryId.isEmpty) {
-        _setError('Nenhum ministério disponível para desbloqueio');
-        return false;
-      }
-      
-      // Chamar API para desbloquear data
-      final response = await ScalesAdvancedService.unblockDate(
-        tenantId: tenantId,
-        userId: userId,
-        ministryId: ministryId,
-        date: dataAjustada.toIso8601String().split('T')[0],
-      );
-
-      if (response['success'] == true) {
-        // Atualizar estado local
-        bloqueios.removeWhere((b) => isSameDay(b.data, dataAjustada));
-        notifyListeners();
-        return true;
-      } else {
-        _setError('Erro ao desbloquear data no servidor');
-        return false;
-      }
-    } catch (e) {
-      _setError('Erro ao desbloquear data: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Exportar ou salvar os bloqueios (mock)
-  void salvarIndisponibilidade() {
-    for (var b in bloqueios) {
-      debugPrint(
-          "Bloqueio: ${b.data} | Motivo: ${b.motivo} | Ministérios: ${b.ministerios.join(', ')}");
-    }
-  }
-
-  // Lista de dias bloqueados (útil para o calendário)
-  List<DateTime> get diasBloqueados => bloqueios.map((b) => b.data).toList();
 
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -633,439 +106,651 @@ class IndisponibilidadeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Obtém o ID do ministério pelo nome
-  String? _getMinistryIdFromName(String ministryName) {
+  // Carrega os bloqueios do voluntário
+  Future<void> carregarBloqueios() async {
+    // Verificar cache
+    if (_lastLoadTime != null && 
+        DateTime.now().difference(_lastLoadTime!) < _cacheDuration) {
+      return;
+    }
+
+    _setLoading(true);
+    _clearError();
+
     try {
-      print('🔍 [IndisponibilidadeController] Buscando ID para ministério: "$ministryName"');
-      print('🔍 [IndisponibilidadeController] Ministérios disponíveis: ${_ministeriosDoVoluntario.map((m) => '${m['name']}:${m['id']}').join(', ')}');
-      
-      final ministry = _ministeriosDoVoluntario.firstWhere(
-        (m) => m['name'] == ministryName,
-        orElse: () => {'id': '', 'name': ''},
+      final userId = await TokenService.getUserId();
+      final context = await TokenService.getContext();
+      final tenantId = context['tenantId'];
+
+      final response = await DioClient.instance.get(
+        '/scales/$tenantId/availability/unavailabilities',
+        queryParameters: {
+          'userId': userId,
+        },
       );
-      
-      print('🔍 [IndisponibilidadeController] Ministério encontrado: ${ministry['name']} (ID: ${ministry['id']})');
-      
-      final id = ministry['id']?.isNotEmpty == true ? ministry['id'] : null;
-      print('🔍 [IndisponibilidadeController] ID retornado: $id');
-      
-      return id;
+
+      if (response.statusCode == 200) {
+        final dynamic responseData = response.data;
+        final List<dynamic> data = responseData['data'] ?? [];
+        bloqueios.clear();
+        
+        for (final item in data) {
+          // Processar blockedDates de cada disponibilidade
+          if (item['blockedDates'] != null) {
+            for (final blockedDate in item['blockedDates']) {
+              final ministryName = item['ministryId']?['name'] ?? 'Ministério';
+              bloqueios.add(BloqueioIndisponibilidade(
+                data: DateTime.parse(blockedDate['date']),
+                motivo: blockedDate['reason'] ?? '',
+                ministerios: [ministryName],
+              ));
+            }
+          }
+        }
+        
+        _lastLoadTime = DateTime.now();
+      } else {
+        _setError('Erro ao carregar bloqueios: ${response.statusCode}');
+      }
     } catch (e) {
-      print('⚠️ [IndisponibilidadeController] Ministério não encontrado: $ministryName');
-      print('⚠️ [IndisponibilidadeController] Erro: $e');
+      _setError('Erro ao carregar bloqueios: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Carrega os ministérios do voluntário
+  Future<void> carregarMinisteriosDoVoluntario() async {
+    // Evitar múltiplas tentativas simultâneas
+    if (_isLoadingMinisterios) {
+      await Future.delayed(Duration(milliseconds: 100));
+      if (_isLoadingMinisterios) {
+        return;
+      }
+    }
+
+    _isLoadingMinisterios = true;
+    
+    try {
+      final userId = await TokenService.getUserId();
+      
+      if (userId == null) {
+        _setError('Usuário não autenticado');
+        return;
+      }
+      
+      final context = await TokenService.getContext();
+      final tenantId = context['tenantId'];
+      final branchId = context['branchId'];
+
+      if (tenantId == null) {
+        _setError('Contexto de autenticação incompleto - TenantId ausente');
+        return;
+      }
+      
+      // Usar endpoint simplificado para buscar ministérios do usuário: /ministry-memberships/my-ministries
+      final deviceId = await TokenService.getDeviceId();
+      final endpoint = '/ministry-memberships/my-ministries';
+      
+      final response = await DioClient.instance.get(
+        endpoint,
+        options: Options(headers: {
+          'device-id': deviceId,
+          'x-tenant-id': tenantId,
+          if (branchId != null && branchId.isNotEmpty) 'x-branch-id': branchId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic responseData = response.data;
+        
+        // Processar resposta do endpoint /ministry-memberships/my-ministries
+        List<dynamic> membershipsList;
+        if (responseData is List) {
+          membershipsList = responseData;
+        } else if (responseData is Map && responseData.containsKey('data')) {
+          // Se a resposta vem em formato { data: [...] }
+          membershipsList = responseData['data'] as List<dynamic>;
+        } else {
+          membershipsList = [];
+        }
+        
+        // Extrair ministérios dos memberships (apenas os ativos)
+        _ministeriosDoVoluntario = membershipsList
+            .where((membership) {
+              final isActive = membership['isActive'] == true;
+              final hasMinistry = membership['ministry'] != null;
+              return isActive && hasMinistry;
+            })
+            .map((membership) {
+              final ministry = membership['ministry'];
+              return {
+                'id': ministry['_id']?.toString() ?? ministry['id']?.toString() ?? '',
+                'name': ministry['name'] ?? 'Ministério sem nome',
+                'maxBlockedDays': ministry['maxBlockedDays'] ?? 10, // Valor padrão se não especificado
+              };
+            })
+            .toList();
+        
+        // Se não encontrou ministérios, manter lista vazia
+        if (_ministeriosDoVoluntario.isEmpty) {
+          print('⚠️ [IndisponibilidadeController] Nenhum ministério encontrado para o usuário');
+        }
+        
+        notifyListeners();
+      } else {
+        _setError('Erro ao carregar ministérios: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Em caso de erro, manter lista vazia
+      print('⚠️ [IndisponibilidadeController] Erro ao carregar ministérios, mantendo lista vazia');
+      _ministeriosDoVoluntario = [];
+      notifyListeners();
+    } finally {
+      _isLoadingMinisterios = false;
+    }
+  }
+
+  // Verifica se um dia está bloqueado
+  bool isDiaBloqueado(DateTime day) {
+    return bloqueios.any((b) => isSameDay(b.data, day));
+  }
+
+  // Retorna o bloqueio correspondente ao dia (ou null se não existir)
+  BloqueioIndisponibilidade? getBloqueio(DateTime day) {
+    try {
+      return bloqueios.firstWhere((b) => isSameDay(b.data, day));
+    } catch (_) {
       return null;
     }
   }
 
-  /// Carregar bloqueios existentes do voluntário
-  Future<void> carregarBloqueiosExistentes() async {
-    print('🔍 [IndisponibilidadeController] ===== INICIANDO CARREGAMENTO DE BLOQUEIOS =====');
+  // Registra ou atualiza um bloqueio no dia
+  Future<bool> registrarBloqueio({
+    required DateTime dia,
+    required String motivo,
+    required List<String> ministerios,
+    required String tenantId,
+    required String userId,
+    BuildContext? context,
+  }) async {
+    if (ministerios.isEmpty) {
+      _setError('Selecione pelo menos um ministério');
+      return false;
+    }
     
-    _setLoading(true);
+    _setSaving(true);
     _clearError();
 
     try {
-      final context = await TokenService.getContext();
-      print('🔍 [IndisponibilidadeController] Context obtido para bloqueios: $context');
-      
-      final tenantId = context['tenantId'];
-      final userId = context['userId'];
-      
-      print('🔍 [IndisponibilidadeController] TenantId: $tenantId');
-      print('🔍 [IndisponibilidadeController] UserId: $userId');
-
-      if (tenantId == null || userId == null) {
-        throw Exception('Tenant ID ou User ID não encontrado');
-      }
-
-      print('🔍 [IndisponibilidadeController] Chamando ScalesAdvancedService.getVolunteerUnavailabilities...');
-      final response = await ScalesAdvancedService.getVolunteerUnavailabilities(
-        tenantId: tenantId,
-        userId: userId,
-      );
-      
-      print('🔍 [IndisponibilidadeController] Resposta recebida: $response');
-      
-      if (response['success'] == true && response['data'] != null) {
-        final List<dynamic> availabilityData = response['data'];
-        print('🔍 [IndisponibilidadeController] Registros de disponibilidade encontrados: ${availabilityData.length}');
-        
-        // Limpar bloqueios existentes
-        bloqueios.clear();
-        
-        // Processar cada registro de disponibilidade
-        for (var availability in availabilityData) {
-          try {
-            final ministryName = availability['ministryId']?['name'] ?? 'Ministério';
-            final blockedDates = availability['blockedDates'] ?? [];
-            
-            print('🔍 [IndisponibilidadeController] Processando ministério: $ministryName');
-            print('🔍 [IndisponibilidadeController] Bloqueios encontrados: ${blockedDates.length}');
-            
-            // Processar cada data bloqueada
-            for (var blockedDate in blockedDates) {
-              try {
-                final dateStr = blockedDate['date'];
-                final reason = blockedDate['reason'] ?? '';
-                final isBlocked = blockedDate['isBlocked'] ?? true;
-                
-                if (dateStr != null && isBlocked) {
-                  final date = DateTime.parse(dateStr);
-                  
-                  // Verificar se já existe um bloqueio para esta data
-                  final existingBlockIndex = bloqueios.indexWhere((b) => isSameDay(b.data, date));
-                  
-                  if (existingBlockIndex >= 0) {
-                    // Adicionar ministério ao bloqueio existente
-                    if (!bloqueios[existingBlockIndex].ministerios.contains(ministryName)) {
-                      bloqueios[existingBlockIndex].ministerios.add(ministryName);
-                    }
-                  } else {
-                    // Criar novo bloqueio
-                    bloqueios.add(BloqueioIndisponibilidade(
-                      data: date,
-                      motivo: reason,
-                      ministerios: [ministryName],
-                    ));
-                  }
-                  
-                  print('✅ [IndisponibilidadeController] Bloqueio processado: $date - $reason - $ministryName');
-                }
-              } catch (e) {
-                print('⚠️ [IndisponibilidadeController] Erro ao processar data bloqueada: $e');
-                print('⚠️ [IndisponibilidadeController] Dados da data: $blockedDate');
-              }
-            }
-          } catch (e) {
-            print('⚠️ [IndisponibilidadeController] Erro ao processar disponibilidade: $e');
-            print('⚠️ [IndisponibilidadeController] Dados da disponibilidade: $availability');
-          }
-        }
-        
-        print('✅ [IndisponibilidadeController] Total de bloqueios carregados: ${bloqueios.length}');
-        notifyListeners();
-      } else {
-        print('⚠️ [IndisponibilidadeController] Nenhum bloqueio encontrado ou resposta inválida');
-        print('⚠️ [IndisponibilidadeController] Resposta: $response');
-      }
-      
-      print('✅ [IndisponibilidadeController] ===== CARREGAMENTO DE BLOQUEIOS CONCLUÍDO =====');
-      
-      // Carregar limite dos ministérios após carregar os dados
-      await _carregarLimiteDosMinisterios();
-      
-    } catch (e) {
-      print('❌ [IndisponibilidadeController] ===== ERRO NO CARREGAMENTO DE BLOQUEIOS =====');
-      print('❌ [IndisponibilidadeController] Erro ao carregar bloqueios: $e');
-      print('❌ [IndisponibilidadeController] Stack trace: ${StackTrace.current}');
-      _setError('Erro ao carregar bloqueios: $e');
-    } finally {
-      print('🔍 [IndisponibilidadeController] Finalizando carregamento de bloqueios...');
-      _setLoading(false);
-      print('🔍 [IndisponibilidadeController] ===== FIM DO CARREGAMENTO DE BLOQUEIOS =====');
-    }
-  }
-
-  /// Carrega os limites dos ministérios do voluntário
-  /// 🆕 NOVA ESTRATÉGIA: Armazena limites por ministério em vez de um único limite global
-  Future<void> _carregarLimiteDosMinisterios() async {
-    try {
-      print('🔍 [IndisponibilidadeController] ===== CARREGANDO LIMITE DOS MINISTÉRIOS =====');
-      
-      if (_ministeriosDoVoluntario.isEmpty) {
-        print('⚠️ [IndisponibilidadeController] Nenhum ministério encontrado para carregar limite');
-        _setError('Nenhum ministério encontrado para carregar limite');
-        return;
-      }
-      
-      // Obter IDs dos ministérios
+      // Obter IDs dos ministérios selecionados
       final List<String> ministryIds = [];
-      for (final ministry in _ministeriosDoVoluntario) {
-        if (ministry['id'] != null) {
+      
+      for (final ministryName in ministerios) {
+        final ministry = _ministeriosDoVoluntario.firstWhere(
+          (m) => m['name'] == ministryName,
+          orElse: () => <String, String>{},
+        );
+        if (ministry.isNotEmpty && ministry['id'] != null) {
           ministryIds.add(ministry['id']!);
         }
       }
       
-      if (ministryIds.isEmpty) {
-        print('⚠️ [IndisponibilidadeController] Nenhum ID de ministério válido encontrado');
-        _setError('Nenhum ID de ministério válido encontrado');
-        return;
+      // Obter limites dos ministérios já carregados (sem requisições adicionais)
+      Map<String, int> limitesPorMinisterio = getMaxBlockedDaysFromLoadedMinistries(ministryIds);
+      
+      // Validar limites para o dia específico
+      for (String ministryName in ministerios) {
+        final ministryId = _getMinistryIdFromName(ministryName);
+        if (ministryId == null || ministryId.isEmpty) continue;
+        
+        final limiteDoMinisterio = limitesPorMinisterio[ministryId];
+        if (limiteDoMinisterio == null) {
+          continue;
+        }
+        
+        // Contar bloqueios existentes para este ministério específico no mês
+        final chaveMes = '${dia.year}-${dia.month.toString().padLeft(2, '0')}';
+        int bloqueiosExistentesNoMes = 0;
+        
+        for (final bloqueio in bloqueios) {
+          if (bloqueio.ministerios.contains(ministryName)) {
+            final bloqueioChaveMes = '${bloqueio.data.year}-${bloqueio.data.month.toString().padLeft(2, '0')}';
+            if (bloqueioChaveMes == chaveMes) {
+              bloqueiosExistentesNoMes++;
+            }
+          }
+        }
+        
+        if (bloqueiosExistentesNoMes >= limiteDoMinisterio) {
+          final nomeMes = _getNomeMes(dia.month);
+          _setError('Limite de $limiteDoMinisterio dias bloqueados já foi atingido no ministério "$ministryName" no mês de $nomeMes/${dia.year}. Você já tem $bloqueiosExistentesNoMes bloqueios.');
+
+          if (context != null && context.mounted) {
+            showWarning(
+              context,
+              'Você já atingiu o limite de bloqueios para o ministério "$ministryName" neste mês.',
+              title: 'Limite atingido',
+            );
+          }
+
+          return false;
+        }
       }
       
-      print('🔍 [IndisponibilidadeController] IDs dos ministérios para carregar limite: $ministryIds');
-      
-      // Carregar limites dos ministérios (agora retorna um mapa)
-      final limitesPorMinisterio = await getMaxBlockedDaysForMinistries(ministryIds);
-      
-      // Armazenar os limites por ministério
-      _ministryLimits.clear();
-      _ministryLimits.addAll(limitesPorMinisterio);
-      
-      // Para compatibilidade, manter o menor limite como padrão global
-      final limites = limitesPorMinisterio.values.toList();
-      _maxDiasIndisponiveis = limites.reduce((a, b) => a < b ? a : b);
-      
-      print('✅ [IndisponibilidadeController] Limites carregados por ministério: $limitesPorMinisterio');
-      print('✅ [IndisponibilidadeController] Limite global (menor): $_maxDiasIndisponiveis dias');
-      print('🔍 [IndisponibilidadeController] ===== FIM DO CARREGAMENTO DE LIMITE =====');
-      
+      // Criar bloqueio único
+      try {
+        // Criar bloqueios no backend (um para cada ministério)
+        for (final ministryId in ministryIds) {
+          await DioClient.instance.post(
+            '/scales/$tenantId/availability/block-date',
+            data: {
+              'userId': userId,
+              'ministryId': ministryId,
+              'date': dia.toIso8601String().split('T')[0],
+              'reason': motivo,
+            },
+          );
+        }
+        
+        // Adicionar bloqueio localmente
+        bloqueios.add(BloqueioIndisponibilidade(
+          data: dia,
+          motivo: motivo,
+          ministerios: ministerios,
+        ));
+        
+        notifyListeners();
+        
+        // Mostrar feedback de sucesso
+        if (context != null && context.mounted) {
+          final nomeMes = _getNomeMes(dia.month);
+          showSuccess(
+            context,
+            'Bloqueio registrado com sucesso para $nomeMes/${dia.year}!',
+            title: 'Bloqueio salvo',
+          );
+        }
+        
+        return true;
+      } catch (e) {
+        _setError('Erro ao bloquear data: $e');
+        
+        if (context != null && context.mounted) {
+          showError(
+            context,
+            'Erro ao registrar bloqueio: $e',
+            title: 'Erro ao salvar',
+          );
+        }
+        
+        return false;
+      }
     } catch (e) {
-      print('❌ [IndisponibilidadeController] Erro ao carregar limite dos ministérios: $e');
-      print('❌ [IndisponibilidadeController] Stack trace: ${StackTrace.current}');
-      _setError('Erro ao carregar limite dos ministérios: $e');
+      _setError('Erro ao bloquear data: $e');
+      
+      // Mostrar feedback de erro
+      if (context != null && context.mounted) {
+        showError(
+          context,
+          'Erro ao registrar bloqueio: $e',
+          title: 'Erro ao salvar',
+        );
+      }
+      
+      return false;
+    } finally {
+      _setSaving(false);
     }
   }
 
-  /// Obtém o nome do mês em português
-  String _getNomeMes(int mes) {
-    const nomesMeses = [
-      '', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    return nomesMeses[mes];
-  }
-
-  /// Obtém o limite de dias bloqueados para um ministério específico
-  Future<int> getMaxBlockedDaysForMinistry(String ministryId) async {
-    try {
-      // Verificar cache primeiro
-      if (_ministryLimits.containsKey(ministryId)) {
-        print('🔍 [IndisponibilidadeController] Usando limite do cache para ministério $ministryId: ${_ministryLimits[ministryId]} dias');
-        return _ministryLimits[ministryId]!;
-      }
-      
-      print('🔍 [IndisponibilidadeController] Carregando limite do ministério: $ministryId');
-      
-      final context = await TokenService.getContext();
-      final tenantId = context['tenantId'];
-      final branchId = context['branchId'];
-      
-      if (tenantId == null) {
-        print('❌ [IndisponibilidadeController] TenantId não encontrado');
-        throw Exception('TenantId não encontrado');
-      }
-      
-      // Usar o novo endpoint público para obter apenas o maxBlockedDays
-      final blockConfig = await _ministryService.getBlockConfig(
-        tenantId: tenantId,
-        branchId: branchId ?? '',
-        ministryId: ministryId,
-      );
-      
-      final limit = blockConfig['maxBlockedDays'];
-      if (limit == null) {
-        throw Exception('maxBlockedDays não encontrado no ministério');
-      }
-      
-      // Armazenar no cache
-      _ministryLimits[ministryId] = limit;
-      
-      print('✅ [IndisponibilidadeController] Limite carregado para ministério $ministryId: $limit dias');
-      return limit;
-      
-    } catch (e) {
-      print('❌ [IndisponibilidadeController] Erro ao carregar limite do ministério $ministryId: $e');
-      throw Exception('Erro ao carregar limite do ministério: $e');
-    }
-  }
-  
-  /// Obtém o limite de dias bloqueados para múltiplos ministérios
-  /// 🆕 NOVA ESTRATÉGIA: Retorna um mapa com os limites de cada ministério
-  Future<Map<String, int>> getMaxBlockedDaysForMinistries(List<String> ministryIds) async {
-    print('🔍 [IndisponibilidadeController] ===== getMaxBlockedDaysForMinistries INICIADO =====');
-    print('🔍 [IndisponibilidadeController] IDs recebidos: $ministryIds');
-    
-    if (ministryIds.isEmpty) {
-      print('❌ [IndisponibilidadeController] Lista vazia - nenhum ministério fornecido');
-      throw Exception('Nenhum ministério fornecido para carregar limite');
-    }
-    
-    try {
-      print('🔍 [IndisponibilidadeController] Carregando limites para ${ministryIds.length} ministérios');
-      
-      // Carregar limites para todos os ministérios
-      final Map<String, int> ministryLimits = {};
-      for (final ministryId in ministryIds) {
-        print('🔍 [IndisponibilidadeController] Carregando limite para ministério: $ministryId');
-        final limit = await getMaxBlockedDaysForMinistry(ministryId);
-        ministryLimits[ministryId] = limit;
-        print('🔍 [IndisponibilidadeController] Limite obtido para $ministryId: $limit dias');
-      }
-      
-      print('✅ [IndisponibilidadeController] Limites carregados: $ministryLimits');
-      print('🔍 [IndisponibilidadeController] ===== getMaxBlockedDaysForMinistries CONCLUÍDO =====');
-      return ministryLimits;
-      
-    } catch (e) {
-      print('❌ [IndisponibilidadeController] Erro ao carregar limites dos ministérios: $e');
-      print('❌ [IndisponibilidadeController] Stack trace: ${StackTrace.current}');
-      throw Exception('Erro ao carregar limites dos ministérios: $e');
-    }
-  }
-  Future<void> carregarMinisteriosDoVoluntario(AuthState authState) async {
-    print('🔍 [IndisponibilidadeController] ===== INICIANDO CARREGAMENTO =====');
-    print('🔍 [IndisponibilidadeController] AuthState: ${authState.usuario?.nome}');
-    
-    // Verificar cache
-    if (_lastLoadTime != null && 
-        DateTime.now().difference(_lastLoadTime!) < _cacheDuration &&
-        _ministeriosDoVoluntario.isNotEmpty) {
-      print('✅ [IndisponibilidadeController] Usando cache - dados ainda válidos');
-      // Mesmo usando cache, carregar o limite dos ministérios
-      await _carregarLimiteDosMinisterios();
-      return;
-    }
-    
-    _setLoading(true);
+  // Remove um bloqueio específico
+  Future<bool> removerBloqueioEspecifico({
+    required BloqueioIndisponibilidade bloqueio,
+    required String tenantId,
+    required String userId,
+    BuildContext? context,
+  }) async {
+    _setSaving(true);
     _clearError();
 
     try {
-      print('🔍 [IndisponibilidadeController] Carregando ministérios do voluntário...');
-      
-      final context = await TokenService.getContext();
-      print('🔍 [IndisponibilidadeController] Context obtido: $context');
-      
-      final tenantId = context['tenantId'];
-      final branchId = context['branchId'];
-      
-      print('🔍 [IndisponibilidadeController] TenantId: $tenantId');
-      print('🔍 [IndisponibilidadeController] BranchId: $branchId');
-
-      if (tenantId == null) {
-        throw Exception('Tenant ID não encontrado');
+      // Obter IDs dos ministérios do bloqueio
+      final List<String> ministryIds = [];
+      for (final ministryName in bloqueio.ministerios) {
+        final ministry = _ministeriosDoVoluntario.firstWhere(
+          (m) => m['name'] == ministryName,
+          orElse: () => <String, String>{},
+        );
+        if (ministry.isNotEmpty && ministry['id'] != null) {
+          ministryIds.add(ministry['id']!);
+        }
       }
-
-      final dio = DioClient.instance;
       
-      print('🔍 [IndisponibilidadeController] Fazendo requisição para /auth/me/context...');
-      print('🔍 [IndisponibilidadeController] Headers: X-Tenant-ID: $tenantId, X-Branch-ID: $branchId');
-      
-      // Buscar contexto do usuário logado usando o endpoint /auth/me/context
-      final response = await dio.get(
-        '/auth/me/context',
-        options: Options(
-          headers: {
-            'X-Tenant-ID': tenantId,
-            if (branchId != null && branchId.isNotEmpty) 'X-Branch-ID': branchId,
+      // Remover bloqueios no backend (um para cada ministério)
+      for (final ministryId in ministryIds) {
+        await DioClient.instance.post(
+          '/scales/$tenantId/availability/unblock-date',
+          data: {
+            'userId': userId,
+            'ministryId': ministryId,
+            'date': bloqueio.data.toIso8601String().split('T')[0],
           },
-        ),
+        );
+      }
+      
+      // Remover bloqueio localmente
+      bloqueios.removeWhere((b) => 
+        b.data == bloqueio.data && 
+        b.motivo == bloqueio.motivo && 
+        b.ministerios.toString() == bloqueio.ministerios.toString()
       );
       
-      print('🔍 [IndisponibilidadeController] Resposta recebida - Status: ${response.statusCode}');
-      print('🔍 [IndisponibilidadeController] Resposta recebida - Headers: ${response.headers}');
+      notifyListeners();
       
-      if (response.statusCode == 200) {
-        print('✅ [IndisponibilidadeController] Resposta recebida com sucesso');
-        final Map<String, dynamic> userContext = response.data;
-        print('🔍 [IndisponibilidadeController] UserContext completo: $userContext');
-        print('🔍 [IndisponibilidadeController] Tipo da resposta: ${userContext.runtimeType}');
-        print('🔍 [IndisponibilidadeController] Chaves da resposta: ${userContext.keys.toList()}');
-        
-        // Verificar se a resposta tem a estrutura esperada
-        if (!userContext.containsKey('tenants')) {
-          print('❌ [IndisponibilidadeController] Resposta não contém chave "tenants"');
-          print('❌ [IndisponibilidadeController] Estrutura da resposta: ${userContext.keys.toList()}');
-          throw Exception('Resposta da API não contém a estrutura esperada');
-        }
-        
-        // A estrutura correta é: userContext['tenants'][0]['memberships']
-        final List<dynamic> tenants = userContext['tenants'] ?? [];
-        print('🔍 [IndisponibilidadeController] Tenants encontrados: ${tenants.length}');
-        
-        if (tenants.isEmpty) {
-          print('⚠️ [IndisponibilidadeController] Nenhum tenant encontrado na resposta');
-          _ministeriosDoVoluntario = <Map<String, String>>[];
-          notifyListeners();
-          return;
-        }
-        
-        final List<Map<String, String>> ministries = [];
-        
-        // Processar todos os tenants
-        for (int i = 0; i < tenants.length; i++) {
-          final tenant = tenants[i];
-          print('🔍 [IndisponibilidadeController] Processando tenant $i: ${tenant['name'] ?? 'Sem nome'}');
-          print('🔍 [IndisponibilidadeController] Tenant $i completo: $tenant');
-          
-          if (!tenant.containsKey('memberships')) {
-            print('⚠️ [IndisponibilidadeController] Tenant $i não contém chave "memberships"');
-            continue;
-          }
-          
-          final List<dynamic> memberships = tenant['memberships'] ?? [];
-          print('🔍 [IndisponibilidadeController] Memberships no tenant $i: ${memberships.length}');
-          
-          for (int j = 0; j < memberships.length; j++) {
-            final membership = memberships[j];
-            print('🔍 [IndisponibilidadeController] Processando membership $j: $membership');
-            
-            if (membership['ministry'] != null) {
-              final ministryId = membership['ministry']['_id'] ?? membership['ministry']['id'];
-              final ministryName = membership['ministry']['name'] ?? 'Ministério';
-              
-              if (ministryId != null) {
-                ministries.add({
-                  'id': ministryId,
-                  'name': ministryName,
-                });
-                print('✅ [IndisponibilidadeController] Ministério adicionado: $ministryName (ID: $ministryId)');
-              } else {
-                print('⚠️ [IndisponibilidadeController] Ministério sem ID: $ministryName');
-              }
-            } else {
-              print('⚠️ [IndisponibilidadeController] Membership $j sem ministério: $membership');
-            }
-          }
-        }
-        
-        _ministeriosDoVoluntario = ministries;
-        print('✅ [IndisponibilidadeController] Ministérios carregados: ${ministries.length}');
-        print('📋 [IndisponibilidadeController] Ministérios: ${ministries.map((m) => m['name']).join(', ')}');
-        print('📋 [IndisponibilidadeController] Detalhes dos ministérios: ${ministries.map((m) => '${m['name']}:${m['id']}').join(', ')}');
-        
-        // Se não encontrou ministérios, verificar se o usuário tem memberships
-        if (ministries.isEmpty) {
-          print('⚠️ [IndisponibilidadeController] Nenhum ministério encontrado!');
-          print('⚠️ [IndisponibilidadeController] Verificando se o usuário tem memberships...');
-          
-          for (int i = 0; i < tenants.length; i++) {
-            final tenant = tenants[i];
-            final List<dynamic> memberships = tenant['memberships'] ?? [];
-            print('⚠️ [IndisponibilidadeController] Tenant $i tem ${memberships.length} memberships');
-            
-            for (int j = 0; j < memberships.length; j++) {
-              final membership = memberships[j];
-              print('⚠️ [IndisponibilidadeController] Membership $j: role=${membership['role']}, ministry=${membership['ministry']}');
-            }
-          }
-        }
-      } else {
-        print('❌ [IndisponibilidadeController] Erro na resposta: ${response.statusCode}');
-        print('❌ [IndisponibilidadeController] Dados da resposta: ${response.data}');
-        throw Exception('Erro ao buscar contexto do usuário: ${response.statusCode}');
+      // Mostrar feedback de sucesso
+      if (context != null && context.mounted) {
+        final nomeMes = _getNomeMes(bloqueio.data.month);
+        showSuccess(
+          context,
+          'Bloqueio removido com sucesso para $nomeMes/${bloqueio.data.year}!',
+          title: 'Bloqueio removido',
+        );
       }
       
-      // Marcar cache como válido
-      _lastLoadTime = DateTime.now();
-      
-      // Carregar limite dos ministérios após carregar os dados
-      await _carregarLimiteDosMinisterios();
-      
-      notifyListeners();
-      print('✅ [IndisponibilidadeController] ===== CARREGAMENTO CONCLUÍDO COM SUCESSO =====');
+      return true;
     } catch (e) {
-      print('❌ [IndisponibilidadeController] ===== ERRO NO CARREGAMENTO =====');
-      print('❌ [IndisponibilidadeController] Erro ao carregar ministérios: $e');
-      print('❌ [IndisponibilidadeController] Stack trace: ${StackTrace.current}');
-      _setError('Erro ao carregar ministérios: $e');
+      _setError('Erro ao remover bloqueio: $e');
       
-      // Em caso de erro, usar lista vazia para evitar problemas na interface
-      _ministeriosDoVoluntario = <Map<String, String>>[];
-      notifyListeners();
+      // Mostrar feedback de erro
+      if (context != null && context.mounted) {
+        showError(
+          context,
+          'Erro ao remover bloqueio: $e',
+          title: 'Erro ao remover',
+        );
+      }
+      
+      return false;
     } finally {
-      print('🔍 [IndisponibilidadeController] Finalizando carregamento...');
-      _setLoading(false);
-      print('🔍 [IndisponibilidadeController] ===== FIM DO CARREGAMENTO =====');
+      _setSaving(false);
+    }
+  }
+
+  // Seleciona um dia específico
+  void selecionarDia(DateTime day) {
+    selectedDay = day;
+    bloqueiosDoDiaSelecionado = bloqueios.where((b) => isSameDay(b.data, day)).toList();
+    notifyListeners();
+  }
+
+  // Define o dia focado no calendário
+  void setFocusedDay(DateTime day) {
+    focusedDay = day;
+    notifyListeners();
+  }
+
+  // Obtém o ID do ministério pelo nome
+  String? _getMinistryIdFromName(String name) {
+    try {
+      final ministry = _ministeriosDoVoluntario.firstWhere(
+        (m) => m['name'] == name,
+      );
+      return ministry['id'];
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Obtém o nome do mês
+  String _getNomeMes(int month) {
+    const meses = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    return meses[month - 1];
+  }
+
+  // Verifica se duas datas são do mesmo dia
+  bool isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  // Obtém limites de bloqueios dos ministérios já carregados (sem requisições adicionais)
+  Map<String, int> getMaxBlockedDaysFromLoadedMinistries(List<String> ministryIds) {
+    final Map<String, int> limits = {};
+    
+    for (final ministryId in ministryIds) {
+      try {
+        final ministry = _ministeriosDoVoluntario.firstWhere(
+          (m) => m['id'] == ministryId,
+        );
+        limits[ministryId] = ministry['maxBlockedDays'] ?? 10;
+      } catch (e) {
+        limits[ministryId] = 10; // Valor padrão se não encontrado
+      }
+    }
+    
+    return limits;
+  }
+
+  // Limpa todos os dados
+  void limpar() {
+    bloqueios.clear();
+    selectedDay = null;
+    bloqueiosDoDiaSelecionado.clear();
+    _clearError();
+    notifyListeners();
+  }
+
+  // Recarrega todos os dados
+  Future<void> recarregar() async {
+    await carregarBloqueios();
+    await carregarMinisteriosDoVoluntario();
+    notifyListeners(); // Notificar a UI após recarregar todos os dados
+  }
+
+  // Getter para ministérios do voluntário
+  List<Map<String, dynamic>> get ministeriosDoVoluntario {
+    return _ministeriosDoVoluntario;
+  }
+
+  // Método de teste para forçar carregamento de ministérios
+  Future<void> testarCarregamentoMinisterios() async {
+    print('🧪 [IndisponibilidadeController] ===== TESTE DE CARREGAMENTO =====');
+    _isLoadingMinisterios = false; // Resetar flag
+    await carregarMinisteriosDoVoluntario();
+    print('🧪 [IndisponibilidadeController] ===== FIM DO TESTE =====');
+  }
+
+  // Método para carregar bloqueios existentes (alias para carregarBloqueios)
+  Future<void> carregarBloqueiosExistentes() async {
+    await carregarBloqueios();
+    notifyListeners(); // Notificar a UI após carregar bloqueios
+  }
+
+  // Método para limpar seleção
+  void limparSelecao() {
+    selectedDay = null;
+    bloqueiosDoDiaSelecionado.clear();
+    notifyListeners();
+  }
+
+  // Métodos para seleção múltipla
+  void alternarModoSelecaoMultipla() {
+    _modoSelecaoMultipla = !_modoSelecaoMultipla;
+    if (!_modoSelecaoMultipla) {
+      _diasSelecionados.clear();
+    }
+    notifyListeners();
+  }
+
+  void alternarSelecaoDia(DateTime dia) {
+    if (_diasSelecionados.contains(dia)) {
+      _diasSelecionados.remove(dia);
+    } else {
+      _diasSelecionados.add(dia);
+    }
+    notifyListeners();
+  }
+
+  void limparSelecaoMultipla() {
+    _diasSelecionados.clear();
+    notifyListeners();
+  }
+
+  bool isDiaSelecionado(DateTime dia) {
+    return _diasSelecionados.contains(dia);
+  }
+
+  // Criar bloqueios para múltiplos dias
+  Future<bool> criarBloqueiosMultiplos({
+    required String motivo,
+    required List<String> ministerios,
+    required String tenantId,
+    required String userId,
+    BuildContext? context,
+  }) async {
+    if (_diasSelecionados.isEmpty) {
+      _setError('Nenhum dia selecionado');
+      return false;
+    }
+
+    print('🔍 [IndisponibilidadeController] ===== CRIANDO BLOQUEIOS MÚLTIPLOS =====');
+    print('🔍 [IndisponibilidadeController] Dias selecionados: ${_diasSelecionados.length}');
+    print('🔍 [IndisponibilidadeController] Motivo: "$motivo"');
+    print('🔍 [IndisponibilidadeController] Ministérios: $ministerios');
+
+    _setSaving(true);
+    _clearError();
+
+    try {
+      // Obter IDs dos ministérios selecionados
+      final List<String> ministryIds = [];
+      for (final ministryName in ministerios) {
+        final ministry = _ministeriosDoVoluntario.firstWhere(
+          (m) => m['name'] == ministryName,
+          orElse: () => <String, String>{},
+        );
+        if (ministry.isNotEmpty && ministry['id'] != null) {
+          ministryIds.add(ministry['id']!);
+        }
+      }
+
+      // Obter limites dos ministérios já carregados (sem requisições adicionais)
+      Map<String, int> limitesPorMinisterio = getMaxBlockedDaysFromLoadedMinistries(ministryIds);
+
+      // Validar limites para cada dia
+      for (DateTime dia in _diasSelecionados) {
+        for (String ministryName in ministerios) {
+          final ministryId = _getMinistryIdFromName(ministryName);
+          if (ministryId == null || ministryId.isEmpty) continue;
+          
+          final limiteDoMinisterio = limitesPorMinisterio[ministryId];
+          if (limiteDoMinisterio == null) continue;
+          
+          // Contar bloqueios existentes para este ministério específico no mês
+          final chaveMes = '${dia.year}-${dia.month.toString().padLeft(2, '0')}';
+          int bloqueiosExistentesNoMes = 0;
+          
+          for (final bloqueio in bloqueios) {
+            if (bloqueio.ministerios.contains(ministryName)) {
+              final bloqueioChaveMes = '${bloqueio.data.year}-${bloqueio.data.month.toString().padLeft(2, '0')}';
+              if (bloqueioChaveMes == chaveMes) {
+                bloqueiosExistentesNoMes++;
+              }
+            }
+          }
+          
+          if (bloqueiosExistentesNoMes >= limiteDoMinisterio) {
+            final nomeMes = _getNomeMes(dia.month);
+            _setError('Limite de $limiteDoMinisterio dias bloqueados já foi atingido no ministério "$ministryName" no mês de $nomeMes/${dia.year}.');
+            
+            if (context != null && context.mounted) {
+              showWarning(
+                context,
+                'Limite atingido para o ministério "$ministryName" no mês de $nomeMes/${dia.year}.',
+                title: 'Limite atingido',
+              );
+            }
+            
+            return false;
+          }
+        }
+      }
+
+      // Criar bloqueios no backend
+      int sucessos = 0;
+      int falhas = 0;
+
+      for (DateTime dia in _diasSelecionados) {
+        try {
+          // Criar bloqueios no backend (um para cada ministério)
+          for (final ministryId in ministryIds) {
+            await DioClient.instance.post(
+              '/scales/$tenantId/availability/block-date',
+              data: {
+                'userId': userId,
+                'ministryId': ministryId,
+                'date': dia.toIso8601String().split('T')[0],
+                'reason': motivo,
+              },
+            );
+          }
+          
+          // Adicionar bloqueio localmente
+          bloqueios.add(BloqueioIndisponibilidade(
+            data: dia,
+            motivo: motivo,
+            ministerios: ministerios,
+          ));
+          
+          sucessos++;
+        } catch (e) {
+          falhas++;
+        }
+      }
+
+          notifyListeners();
+
+      // Mostrar feedback
+      if (context != null && context.mounted) {
+        if (falhas == 0) {
+          showSuccess(
+            context,
+            '$sucessos bloqueio(s) criado(s) com sucesso!',
+            title: 'Bloqueios salvos',
+          );
+              } else {
+          showWarning(
+            context,
+            '$sucessos bloqueio(s) criado(s), $falhas falharam.',
+            title: 'Resultado parcial',
+          );
+        }
+      }
+
+      // Limpar seleção múltipla
+      _diasSelecionados.clear();
+      _modoSelecaoMultipla = false;
+      notifyListeners();
+
+      return sucessos > 0;
+    } catch (e) {
+      print('❌ [IndisponibilidadeController] Erro ao criar bloqueios múltiplos: $e');
+      _setError('Erro ao criar bloqueios: $e');
+      
+      if (context != null && context.mounted) {
+        showError(
+          context,
+          'Erro ao criar bloqueios: $e',
+          title: 'Erro ao salvar',
+        );
+      }
+      
+      return false;
+    } finally {
+      _setSaving(false);
     }
   }
 }

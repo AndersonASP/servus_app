@@ -25,11 +25,14 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
       try {
         print('🔍 [IndisponibilidadeScreen] ===== INICIANDO CARREGAMENTO NO INITSTATE =====');
         final controller = Provider.of<IndisponibilidadeController>(context, listen: false);
-        final authState = Provider.of<AuthState>(context, listen: false);
         
         print('🔍 [IndisponibilidadeScreen] Carregando ministérios do voluntário...');
-        await controller.carregarMinisteriosDoVoluntario(authState);
-        print('🔍 [IndisponibilidadeScreen] Ministérios carregados. Limite atual: ${controller.maxDiasIndisponiveis}');
+        print('🔍 [IndisponibilidadeScreen] Chamando carregarMinisteriosDoVoluntario()...');
+        await controller.carregarMinisteriosDoVoluntario();
+        print('🔍 [IndisponibilidadeScreen] carregarMinisteriosDoVoluntario() concluído');
+        print('🔍 [IndisponibilidadeScreen] Ministérios carregados. Quantidade: ${controller.ministeriosDoVoluntario.length}');
+        print('🔍 [IndisponibilidadeScreen] Ministérios: ${controller.ministeriosDoVoluntario}');
+        print('🔍 [IndisponibilidadeScreen] Limite atual: ${controller.maxDiasIndisponiveis}');
         
         print('🔍 [IndisponibilidadeScreen] Carregando bloqueios existentes...');
         await controller.carregarBloqueiosExistentes();
@@ -126,7 +129,7 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
                         calendarStyle: buildCalendarStyle(context),
                         selectedDayPredicate: (day) =>
                             controller.isDiaBloqueado(day),
-                        onDaySelected: (selectedDay, focusedDay) {
+                        onDaySelected: (selectedDay, focusedDay) async {
                           controller.setFocusedDay(focusedDay);
                           
                           if (controller.isDiaBloqueado(selectedDay)) {
@@ -135,18 +138,36 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
                             _mostrarBottomSheetBloqueio(context, controller);
         } else {
           // Se o dia não está bloqueado, abre a tela para criar novo bloqueio
-          // 🆕 VALIDAÇÃO REMOVIDA: Agora a validação é feita apenas ao salvar o bloqueio
-          print('🔍 [IndisponibilidadeScreen] Abrindo tela para criar bloqueio - validação será feita ao salvar');
+          print('🔍 [IndisponibilidadeScreen] Abrindo tela para criar bloqueio');
+          print('🔍 [IndisponibilidadeScreen] Ministérios disponíveis: ${controller.ministeriosDoVoluntario}');
+          print('🔍 [IndisponibilidadeScreen] Quantidade de ministérios: ${controller.ministeriosDoVoluntario.length}');
+          
+          // Verificar se os ministérios foram carregados
+          if (controller.ministeriosDoVoluntario.isEmpty) {
+            print('⚠️ [IndisponibilidadeScreen] Ministérios não carregados ainda, tentando carregar...');
+            try {
+              // Usar método de teste que força o carregamento
+              await controller.testarCarregamentoMinisterios();
+              print('✅ [IndisponibilidadeScreen] Ministérios carregados após tentativa');
+            } catch (e) {
+              print('❌ [IndisponibilidadeScreen] Erro ao carregar ministérios: $e');
+            }
+            
+            // Verificar novamente após tentar carregar
+            if (controller.ministeriosDoVoluntario.isEmpty) {
+              print('❌ [IndisponibilidadeScreen] Ministérios ainda não carregados após tentativa');
+              return;
+            }
+          }
           
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => BloqueioScreen(
                                   selectedDate: selectedDay,
-                                  onConfirmar: (motivo, ministerios, recurrencePattern, bloqueioController) async {
+                                  onConfirmar: (motivo, ministerios, bloqueioController) async {
                                     print('🔍 [IndisponibilidadeScreen] ===== onConfirmar CHAMADO =====');
                                     print('🔍 [IndisponibilidadeScreen] Motivo: "$motivo"');
                                     print('🔍 [IndisponibilidadeScreen] Ministérios: $ministerios');
-                                    print('🔍 [IndisponibilidadeScreen] Recorrência: ${recurrencePattern?.toString() ?? "Nenhuma"}');
                                     print('🔍 [IndisponibilidadeScreen] Data selecionada: ${selectedDay.day}/${selectedDay.month}/${selectedDay.year}');
                                     
                                     final authState = Provider.of<AuthState>(context, listen: false);
@@ -172,7 +193,6 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
                                         ministerios: ministerios,
                                         tenantId: usuario.tenantId ?? '',
                                         userId: userId,
-                                        recurrencePattern: recurrencePattern,
                                         context: context, // 🆕 ADICIONADO: Passar context para exibir ServusSnackbar
                                       );
                                       
@@ -384,13 +404,19 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
     final authState = Provider.of<AuthState>(context, listen: false);
     final usuario = authState.usuario;
     
+    // Verificar se os ministérios foram carregados
+    if (controller.ministeriosDoVoluntario.isEmpty) {
+      print('⚠️ [IndisponibilidadeScreen] Ministérios não carregados para edição');
+      return;
+    }
+    
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => BloqueioScreen(
           selectedDate: bloqueio.data,
-          onConfirmar: (motivo, ministerios, recurrencePattern, bloqueioController) async {
+          onConfirmar: (motivo, ministerios, bloqueioController) async {
             if (usuario != null) {
-              await _executarEdicaoBloqueio(context, controller, bloqueio, motivo, ministerios, usuario, recurrencePattern, bloqueioController);
+              await _executarEdicaoBloqueio(context, controller, bloqueio, motivo, ministerios, usuario, bloqueioController);
             }
           },
           motivoInicial: bloqueio.motivo,
@@ -401,7 +427,7 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
     );
   }
 
-  Future<void> _executarEdicaoBloqueio(BuildContext context, IndisponibilidadeController controller, bloqueio, String motivo, List<String> ministerios, usuario, recurrencePattern, BloqueioController bloqueioController) async {
+  Future<void> _executarEdicaoBloqueio(BuildContext context, IndisponibilidadeController controller, bloqueio, String motivo, List<String> ministerios, usuario, BloqueioController bloqueioController) async {
     try {
       print('🔍 [IndisponibilidadeScreen] Iniciando edição do bloqueio...');
       
@@ -429,7 +455,6 @@ class _IndisponibilidadeScreenState extends State<IndisponibilidadeScreen> {
           ministerios: ministerios,
           tenantId: usuario.tenantId ?? '',
           userId: userId,
-          recurrencePattern: recurrencePattern,
           context: context, // 🆕 ADICIONADO: Passar context para exibir ServusSnackbar
         );
         
