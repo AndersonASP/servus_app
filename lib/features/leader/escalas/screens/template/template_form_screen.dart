@@ -9,8 +9,15 @@ import 'package:servus_app/shared/widgets/servus_snackbar.dart';
 
 class TemplateFormScreen extends StatefulWidget {
   final TemplateModel? templateExistente;
+  final bool returnToEscalaForm;
+  final String? initialMinistryId;
 
-  const TemplateFormScreen({super.key, this.templateExistente});
+  const TemplateFormScreen({
+    super.key, 
+    this.templateExistente,
+    this.returnToEscalaForm = false,
+    this.initialMinistryId,
+  });
 
   @override
   State<TemplateFormScreen> createState() => _TemplateFormScreenState();
@@ -52,6 +59,11 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
           ministerioSelecionado = widget.templateExistente!.funcoes.first.ministerioId;
           debugPrint('Ministério do template existente: $ministerioSelecionado');
           _carregarFuncoesDoMinisterio(ministerioSelecionado!);
+        } else if (widget.initialMinistryId != null && widget.initialMinistryId!.isNotEmpty) {
+          // Pré-seleção recebida da tela anterior
+          ministerioSelecionado = widget.initialMinistryId;
+          debugPrint('Ministério pré-selecionado recebido: $ministerioSelecionado');
+          _carregarFuncoesDoMinisterio(widget.initialMinistryId!);
         } else if (controller.ministerios.length == 1) {
           // Template novo: Se líder de apenas um ministério, seleciona automaticamente
           ministerioSelecionado = controller.ministerios.first.id;
@@ -158,7 +170,13 @@ class _TemplateFormScreenState extends State<TemplateFormScreen> {
         } else {
           await controller.atualizarTemplate(template);
         }
-        Navigator.pop(context);
+        // Navegação baseada na origem
+        if (widget.returnToEscalaForm) {
+          Navigator.pop(context, true); // Retorna com resultado para escala_form
+        } else {
+          Navigator.pop(context); // Fluxo normal para listagem
+        }
+        
         ServusSnackQueue.addToQueue(
           context: context,
           message: widget.templateExistente == null 

@@ -2,11 +2,13 @@ import 'package:dio/dio.dart';
 import 'package:servus_app/core/models/event.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/services/auth_context_service.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 import 'dart:developer' as developer;
 
 class EventsService {
   final Dio _dio = DioClient.instance;
   final AuthContextService _auth = AuthContextService.instance;
+  final NotificationService _errorService = NotificationService();
 
   EventsService() {
     // Removido interceptor duplicado - AuthInterceptor global já cuida da autenticação
@@ -30,9 +32,19 @@ class EventsService {
     String? status,
     String? eventType,
     bool? isOrdinary,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
+    print('🔄 [EventsService] Carregando eventos...');
+    print('   - TenantId: ${_auth.tenantId}');
+    print('   - BranchId: ${_auth.branchId}');
+    print('   - HasContext: ${_auth.hasContext}');
+    
+    final path = _basePath();
+    print('   - Path: $path');
+    
     final response = await _dio.get(
-      _basePath(),
+      path,
       queryParameters: {
         'page': page,
         'limit': limit,
@@ -40,8 +52,14 @@ class EventsService {
         if (status != null) 'status': status,
         if (eventType != null) 'eventType': eventType,
         if (isOrdinary != null) 'isOrdinary': isOrdinary,
+        if (startDate != null) 'startDate': startDate.toIso8601String(),
+        if (endDate != null) 'endDate': endDate.toIso8601String(),
       },
     );
+    
+    print('✅ [EventsService] Resposta recebida: ${response.statusCode}');
+    print('   - Data: ${response.data}');
+    
     return response.data as Map<String, dynamic>;
   }
 
@@ -65,6 +83,9 @@ class EventsService {
         developer.log('📊 [EventsService] Headers: ${e.response?.headers}', name: 'EventsService');
         developer.log('📊 [EventsService] Data: ${e.response?.data}', name: 'EventsService');
         developer.log('📊 [EventsService] Request Headers: ${e.requestOptions.headers}', name: 'EventsService');
+        _errorService.handleDioError(e, customMessage: 'Erro ao criar evento');
+      } else {
+        _errorService.handleGenericError(e);
       }
       rethrow;
     }
@@ -72,7 +93,8 @@ class EventsService {
 
   Future<EventModel> getById(String id) async {
     final response = await _dio.get('${_basePath()}/$id');
-    return EventModel.fromMap(response.data as Map<String, dynamic>);
+    final data = (response.data as Map<String, dynamic>)['data'] as Map<String, dynamic>;
+    return EventModel.fromMap(data);
   }
 
   Future<EventModel> update(String id, Map<String, dynamic> payload) async {
@@ -92,6 +114,11 @@ class EventsService {
       developer.log('❌ [EventsService] Erro ao remover evento: $e', name: 'EventsService');
       // ignore: avoid_print
       print('[EventsService] Erro ao remover: $e');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao remover evento');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -165,6 +192,9 @@ class EventsService {
       if (e is DioException) {
         developer.log('📊 [EventsService] Status: ${e.response?.statusCode}', name: 'EventsService');
         developer.log('📊 [EventsService] Data: ${e.response?.data}', name: 'EventsService');
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar recorrências');
+      } else {
+        _errorService.handleGenericError(e);
       }
       rethrow;
     }

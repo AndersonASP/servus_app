@@ -290,13 +290,21 @@ class TemplateController extends ChangeNotifier {
     debugPrint('🔍 [TemplateController] Convertendo ${functionRequirements.length} functionRequirements');
     
     return functionRequirements.map((req) {
-      debugPrint('🔍 [TemplateController] Req: $req');
+      debugPrint('🔍 [TemplateController] Req completo: $req');
+      debugPrint('🔍 [TemplateController] req keys: ${req.keys.toList()}');
+      debugPrint('🔍 [TemplateController] requiredSlots: ${req['requiredSlots']}');
+      debugPrint('🔍 [TemplateController] quantity: ${req['quantity']}');
+      debugPrint('🔍 [TemplateController] functionName: ${req['functionName']}');
+      debugPrint('🔍 [TemplateController] name: ${req['name']}');
+      
+      final quantidade = req['requiredSlots'] ?? req['quantity'] ?? req['required'] ?? 1;
+      debugPrint('🔍 [TemplateController] Quantidade calculada: $quantidade');
       
       final funcao = FuncaoEscala(
         id: req['functionId']?.toString() ?? '',
         nome: req['functionName'] ?? req['name'] ?? 'Função sem nome',
         ministerioId: req['ministryId']?.toString() ?? templateMinistryId,
-        quantidade: req['requiredSlots'] ?? req['quantity'] ?? 0,
+        quantidade: quantidade is int ? quantidade : (quantidade is String ? int.tryParse(quantidade) ?? 1 : 1),
       );
       
       debugPrint('🔍 [TemplateController] Função convertida: ${funcao.nome} - Quantidade: ${funcao.quantidade}');

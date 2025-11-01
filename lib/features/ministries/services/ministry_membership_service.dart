@@ -2,9 +2,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 
 class MinistryMembershipService {
   final Dio _dio = DioClient.instance;
+  final NotificationService _errorService = NotificationService();
 
   /// Vincular usuário a um ministério
   Future<Map<String, dynamic>> addUserToMinistry({
@@ -43,9 +45,15 @@ class MinistryMembershipService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return response.data;
       } else {
+        _errorService.handleGenericError('Erro ao vincular usuário ao ministério');
         throw Exception('Erro ao vincular usuário: ${response.statusCode}');
       }
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao vincular usuário ao ministério');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -104,6 +112,8 @@ class MinistryMembershipService {
       debugPrint('   - Status: ${e.response?.statusCode}');
       debugPrint('   - Mensagem: ${e.message}');
       debugPrint('   - Dados: ${e.response?.data}');
+      
+      _errorService.handleDioError(e, customMessage: 'Erro ao desvincular usuário do ministério');
       
       if (e.response?.statusCode == 404) {
         throw Exception('Usuário não está vinculado a este ministério ou vínculo não encontrado');

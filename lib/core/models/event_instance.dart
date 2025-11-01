@@ -61,6 +61,7 @@ class MinistryScaleModel {
 class EventInstanceModel {
   final String id;
   final String eventId;
+  final String? eventName; // opcional, quando backend popula
   final String tenantId;
   final String? branchId;
   final DateTime instanceDate;
@@ -71,6 +72,7 @@ class EventInstanceModel {
   EventInstanceModel({
     required this.id,
     required this.eventId,
+    this.eventName,
     required this.tenantId,
     this.branchId,
     required this.instanceDate,
@@ -82,9 +84,11 @@ class EventInstanceModel {
   factory EventInstanceModel.fromMap(Map<String, dynamic> map) {
     // Lidar com eventId que pode ser string ou objeto
     String eventId;
+    String? eventName;
     if (map['eventId'] is Map) {
       // Se eventId é um objeto, extrair o _id
       eventId = map['eventId']['_id']?.toString() ?? '';
+      eventName = map['eventId']['name']?.toString();
     } else {
       // Se eventId é uma string
       eventId = map['eventId']?.toString() ?? '';
@@ -93,6 +97,7 @@ class EventInstanceModel {
     return EventInstanceModel(
       id: map['_id'] ?? map['id'] ?? '',
       eventId: eventId,
+      eventName: eventName,
       tenantId: map['tenantId'] ?? '',
       branchId: map['branchId'],
       instanceDate: DateTime.parse(map['instanceDate']),
@@ -108,6 +113,7 @@ class EventInstanceModel {
     return {
       '_id': id,
       'eventId': eventId,
+      if (eventName != null) 'eventName': eventName,
       'tenantId': tenantId,
       'branchId': branchId,
       'instanceDate': instanceDate.toIso8601String(),

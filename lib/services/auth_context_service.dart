@@ -34,8 +34,8 @@ class AuthContextService {
     _userId = null;
   }
 
-  String? get tenantId => _tenantId;
-  String? get branchId => _branchId;
+  String? get tenantId => _tenantId ?? TokenService.tenantId;
+  String? get branchId => _branchId ?? TokenService.branchId;
   String? get userId => _userId;
 
   bool get hasContext => _tenantId != null && _userId != null;

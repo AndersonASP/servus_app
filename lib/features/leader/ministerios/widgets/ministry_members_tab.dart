@@ -299,6 +299,8 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
                   
@@ -614,6 +616,8 @@ class _MinistryMembersTabState extends State<MinistryMembersTab> {
                   style: context.textStyles.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w500,
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 if (functionDescription != null && functionDescription.isNotEmpty) ...[
                   const SizedBox(height: 4),

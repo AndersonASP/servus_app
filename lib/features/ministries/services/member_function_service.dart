@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/constants/env.dart';
 import 'package:servus_app/features/ministries/models/member_function.dart';
-import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 
 class MemberFunctionService {
   final Dio _dio;
+  final NotificationService _errorService = NotificationService();
   static const String baseUrl = Env.baseUrl;
 
   MemberFunctionService() : _dio = DioClient.instance;
@@ -19,7 +19,6 @@ class MemberFunctionService {
     required String functionId,
     String? status,
     String? notes,
-    BuildContext? context,
   }) async {
     try {
       final response = await _dio.post(
@@ -34,21 +33,19 @@ class MemberFunctionService {
       );
 
       if (response.statusCode == 201) {
-        if (context != null) {
-          showCreateSuccess(context, 'Vínculo membro-função');
-        }
+        _errorService.showSuccess('Vínculo membro-função criado com sucesso!');
         return MemberFunction.fromJson(response.data);
       } else {
-        if (context != null) {
-          showCreateError(context, 'vínculo membro-função');
-        }
+        _errorService.handleGenericError('Erro ao criar vínculo membro-função');
         throw Exception('Erro ao criar vínculo membro-função: ${response.statusMessage}');
       }
     } catch (e) {
-      if (context != null) {
-        showCreateError(context, 'vínculo membro-função');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao criar vínculo membro-função');
+      } else {
+        _errorService.handleGenericError('Erro ao criar vínculo membro-função');
       }
-      throw Exception('Erro ao criar vínculo membro-função: $e');
+      rethrow;
     }
   }
 
@@ -56,7 +53,6 @@ class MemberFunctionService {
   /// Listar funções aprovadas de um usuário
   Future<List<MemberFunction>> getApprovedFunctionsForUser({
     required String userId,
-    BuildContext? context,
   }) async {
     try {
       final response = await _dio.get(
@@ -68,16 +64,16 @@ class MemberFunctionService {
             .map((item) => MemberFunction.fromJson(item))
             .toList();
       } else {
-        if (context != null) {
-          showLoadError(context, 'funções aprovadas');
-        }
+        _errorService.handleGenericError('Erro ao carregar funções aprovadas');
         throw Exception('Erro ao listar funções aprovadas: ${response.statusMessage}');
       }
     } catch (e) {
-      if (context != null) {
-        showLoadError(context, 'funções aprovadas');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar funções aprovadas');
+      } else {
+        _errorService.handleGenericError('Erro ao carregar funções aprovadas');
       }
-      throw Exception('Erro ao listar funções aprovadas: $e');
+      rethrow;
     }
   }
 
@@ -85,7 +81,6 @@ class MemberFunctionService {
   /// Listar todas as funções de um usuário
   Future<List<MemberFunction>> getMemberFunctions({
     required String userId,
-    BuildContext? context,
   }) async {
     try {
       final response = await _dio.get(
@@ -97,16 +92,16 @@ class MemberFunctionService {
             .map((item) => MemberFunction.fromJson(item))
             .toList();
       } else {
-        if (context != null) {
-          showLoadError(context, 'funções do usuário');
-        }
+        _errorService.handleGenericError('Erro ao carregar funções do usuário');
         throw Exception('Erro ao listar funções do usuário: ${response.statusMessage}');
       }
     } catch (e) {
-      if (context != null) {
-        showLoadError(context, 'funções do usuário');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar funções do usuário');
+      } else {
+        _errorService.handleGenericError('Erro ao carregar funções do usuário');
       }
-      throw Exception('Erro ao listar funções do usuário: $e');
+      rethrow;
     }
   }
 
@@ -116,7 +111,6 @@ class MemberFunctionService {
     required String userId,
     required String ministryId,
     String? status,
-    BuildContext? context,
   }) async {
     try {
       final queryParams = <String, dynamic>{};
@@ -134,16 +128,61 @@ class MemberFunctionService {
             .map((item) => MemberFunction.fromJson(item))
             .toList();
       } else {
-        if (context != null) {
-          showLoadError(context, 'funções do usuário no ministério');
-        }
+        _errorService.handleGenericError('Erro ao carregar funções do usuário no ministério');
         throw Exception('Erro ao listar funções do usuário no ministério: ${response.statusMessage}');
       }
     } catch (e) {
-      if (context != null) {
-        showLoadError(context, 'funções do usuário no ministério');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar funções do usuário no ministério');
+      } else {
+        _errorService.handleGenericError('Erro ao carregar funções do usuário no ministério');
       }
-      throw Exception('Erro ao listar funções do usuário no ministério: $e');
+      rethrow;
+    }
+  }
+
+  /// GET /member-functions/ministry/:ministryId/function/:functionId/approved
+  /// Busca membros aprovados para uma função específica em um ministério
+  Future<List<MemberFunction>> getApprovedMembersByFunction({
+    required String ministryId,
+    required String functionId,
+  }) async {
+    print('🔄 [MemberFunctionService] Buscando membros aprovados...');
+    print('   - MinistryId: $ministryId');
+    print('   - FunctionId: $functionId');
+    
+    try {
+      final response = await _dio.get(
+        '$baseUrl/member-functions/ministry/$ministryId/function/$functionId/approved',
+      );
+
+      print('📡 [MemberFunctionService] Resposta recebida: ${response.statusCode}');
+      print('   - Data: ${response.data}');
+
+      if (response.statusCode == 200) {
+        final data = response.data as List<dynamic>;
+        print('📋 [MemberFunctionService] Total de itens: ${data.length}');
+        
+        final result = data.map((item) => MemberFunction.fromJson(item)).toList();
+        
+        print('✅ [MemberFunctionService] Membros processados: ${result.length}');
+        for (final member in result) {
+          print('   - ${member.user?.name} (${member.userId}) - Status: ${member.status}');
+        }
+        
+        return result;
+      } else {
+        _errorService.handleGenericError('Erro ao buscar voluntários para esta função');
+        throw Exception('Erro ao buscar voluntários: ${response.statusMessage}');
+      }
+    } catch (e) {
+      print('❌ [MemberFunctionService] Erro na requisição: $e');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao buscar voluntários para esta função');
+      } else {
+        _errorService.handleGenericError('Erro ao buscar voluntários para esta função');
+      }
+      rethrow;
     }
   }
 }

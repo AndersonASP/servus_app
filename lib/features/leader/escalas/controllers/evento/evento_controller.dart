@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:servus_app/services/events_service.dart';
 import 'package:servus_app/core/models/event_instance.dart';
 import '../../models/evento_model.dart';
@@ -14,14 +15,28 @@ class EventoController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> carregarEventos({int page = 1, int limit = 20}) async {
+  Future<void> carregarEventos({int page = 1, int limit = 100}) async {
     developer.log('🔄 Carregando eventos - página: $page, limite: $limit', name: 'EventoController');
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      final data = await _service.list(page: page, limit: limit);
+      // Calcular período: desde o início do mês atual até 6 meses à frente
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfPeriod = DateTime(now.year, now.month + 6, 0, 23, 59, 59);
+      
+      developer.log('📅 Filtrando eventos do período:', name: 'EventoController');
+      developer.log('   - Início: ${startOfMonth.toIso8601String()}', name: 'EventoController');
+      developer.log('   - Fim: ${endOfPeriod.toIso8601String()}', name: 'EventoController');
+
+      final data = await _service.list(
+        page: page, 
+        limit: limit,
+        startDate: startOfMonth,
+        endDate: endOfPeriod,
+      );
       developer.log('📡 Resposta do serviço: ${data.toString()}', name: 'EventoController');
       final items = (data['items'] as List? ?? []);
       developer.log('📋 Total de itens recebidos: ${items.length}', name: 'EventoController');
@@ -68,18 +83,39 @@ class EventoController extends ChangeNotifier {
         
         developer.log('🔄 Recorrência: $recorrenciaTipoStr -> $recorrenciaTipo, diaSemana: $diaSemana, semanaDoMes: $semanaDoMes', name: 'EventoController');
 
+        // Extrair createdBy corretamente (pode vir como ObjectId ou string)
+        String? createdByStr;
+        final createdByValue = e['createdBy'];
+        if (createdByValue != null) {
+          if (createdByValue is Map) {
+            // Se vier como objeto MongoDB, extrair o _id ou usar o objeto completo como string
+            createdByStr = createdByValue['_id']?.toString() ?? createdByValue.toString();
+          } else {
+            createdByStr = createdByValue.toString();
+          }
+        }
+        
+        developer.log('📋 Evento: $nome, createdBy: $createdByStr, ministryId: ${e['ministryId']?.toString()}, isGlobal: ${e['isGlobal']}', name: 'EventoController');
+
         _eventos.add(EventoModel(
           id: (e['_id'] ?? e['id'])?.toString(),
           nome: nome,
           dataHora: dataHora,
           ministerioId: e['ministryId']?.toString() ?? '',
+          templateId: e['templateId']?.toString(),
           isOrdinary: e['isOrdinary'] ?? false,
           recorrente: recorrenciaTipo != RecorrenciaTipo.nenhum,
           tipoRecorrencia: recorrenciaTipo,
           diaSemana: recorrenciaTipo == RecorrenciaTipo.semanal ? diaSemana : null,
           semanaDoMes: recorrenciaTipo == RecorrenciaTipo.mensal ? semanaDoMes : null,
           observacoes: e['specialNotes']?.toString(),
+          createdBy: createdByStr,
+          isGlobal: e['isGlobal'] ?? false,
         ));
+      }
+      // Log para debug: verificar se createdBy está presente
+      for (final evento in _eventos) {
+        developer.log('📋 Evento "${evento.nome}": createdBy=${evento.createdBy}, ministryId=${evento.ministerioId}, isGlobal=${evento.isGlobal}', name: 'EventoController');
       }
       developer.log('✅ Total de eventos carregados: ${_eventos.length}', name: 'EventoController');
     } catch (e) {
@@ -122,9 +158,18 @@ class EventoController extends ChangeNotifier {
       developer.log('📝 Evento adicionado à lista local. Total: ${_eventos.length}', name: 'EventoController');
       notifyListeners();
     } catch (e) {
-      developer.log('❌ Erro ao criar evento: $e', name: 'EventoController');
-      // ignore: avoid_print
-      print('[EventoController] Erro ao criar evento: $e');
+      // Se for DioException com resposta do servidor, logar apenas informações básicas
+      if (e is DioException && e.response != null) {
+        final statusCode = e.response?.statusCode;
+        final url = e.requestOptions.uri;
+        developer.log('❌ Erro ao criar evento: Status $statusCode em $url', name: 'EventoController');
+        // ignore: avoid_print
+        print('[EventoController] Erro ao criar evento: Status $statusCode em $url');
+      } else {
+        developer.log('❌ Erro ao criar evento: $e', name: 'EventoController');
+        // ignore: avoid_print
+        print('[EventoController] Erro ao criar evento: $e');
+      }
       rethrow;
     }
   }
@@ -493,6 +538,7 @@ class EventoController extends ChangeNotifier {
       nome: eventModel.name ?? '',
       dataHora: dataHora,
       ministerioId: eventModel.ministryId ?? '',
+      templateId: eventModel.templateId,
       isOrdinary: eventModel.isOrdinary ?? false,
       recorrente: recorrenciaTipo != RecorrenciaTipo.nenhum,
       tipoRecorrencia: recorrenciaTipo,

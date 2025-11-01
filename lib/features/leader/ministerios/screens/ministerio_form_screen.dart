@@ -326,12 +326,13 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                minimumSize: const Size(0, 48),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add, size: 18, color: context.colors.onPrimary),
+                  Icon(Icons.add, size: 16, color: context.colors.onPrimary),
                   const SizedBox(width: 4),
                   Text(
                     'Adicionar',
@@ -436,53 +437,6 @@ class _MinisterioFormScreenState extends State<MinisterioFormScreen> {
     );
   }
 
-  Widget _buildStatusSection(BuildContext context, MinisterioController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Status do ministério',
-          style: context.textStyles.labelLarge?.copyWith(
-            color: context.colors.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Switch(
-              value: controller.ativo,
-              onChanged: controller.toggleAtivo,
-              activeThumbColor: context.colors.primary,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    controller.ativo ? 'Ativo' : 'Inativo',
-                    style: context.textStyles.titleMedium?.copyWith(
-                      color: controller.ativo ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    controller.ativo 
-                        ? 'O ministério está ativo e pode ser usado'
-                        : 'O ministério está inativo e não será exibido',
-                    style: context.textStyles.bodySmall?.copyWith(
-                      color: context.colors.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
 
   Widget _buildInfoSection(BuildContext context) {
     return Container(

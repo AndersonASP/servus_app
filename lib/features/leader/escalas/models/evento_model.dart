@@ -13,6 +13,7 @@ class EventoModel {
   final DateTime dataHora; // usado para eventos únicos ou primeira instância
   final String ministerioId;
   final bool isOrdinary;
+  final String? templateId;
 
   final bool recorrente;
   final RecorrenciaTipo tipoRecorrencia;
@@ -23,6 +24,8 @@ class EventoModel {
   final DateTime? dataLimiteRecorrencia; // data limite para recorrências
 
   final String? observacoes;
+  final String? createdBy; // ID do usuário que criou o evento
+  final bool isGlobal; // true se for evento global (criado por admin)
 
   EventoModel({
     String? id,
@@ -30,6 +33,7 @@ class EventoModel {
     required this.dataHora,
     required this.ministerioId,
     this.isOrdinary = false,
+    this.templateId,
     this.recorrente = false,
     this.tipoRecorrencia = RecorrenciaTipo.nenhum,
     this.diaSemana,
@@ -37,6 +41,8 @@ class EventoModel {
     this.eventoPaiId,
     this.dataLimiteRecorrencia,
     this.observacoes,
+    this.createdBy,
+    this.isGlobal = false,
   }) : id = id ?? const Uuid().v4();
 
   EventoModel copyWith({
@@ -45,6 +51,7 @@ class EventoModel {
     DateTime? dataHora,
     String? ministerioId,
     bool? isOrdinary,
+    String? templateId,
     bool? recorrente,
     RecorrenciaTipo? tipoRecorrencia,
     int? diaSemana,
@@ -52,6 +59,8 @@ class EventoModel {
     String? eventoPaiId,
     DateTime? dataLimiteRecorrencia,
     String? observacoes,
+    String? createdBy,
+    bool? isGlobal,
   }) {
     return EventoModel(
       id: id ?? this.id,
@@ -59,6 +68,7 @@ class EventoModel {
       dataHora: dataHora ?? this.dataHora,
       ministerioId: ministerioId ?? this.ministerioId,
       isOrdinary: isOrdinary ?? this.isOrdinary,
+      templateId: templateId ?? this.templateId,
       recorrente: recorrente ?? this.recorrente,
       tipoRecorrencia: tipoRecorrencia ?? this.tipoRecorrencia,
       diaSemana: diaSemana ?? this.diaSemana,
@@ -66,6 +76,8 @@ class EventoModel {
       eventoPaiId: eventoPaiId ?? this.eventoPaiId,
       dataLimiteRecorrencia: dataLimiteRecorrencia ?? this.dataLimiteRecorrencia,
       observacoes: observacoes ?? this.observacoes,
+      createdBy: createdBy ?? this.createdBy,
+      isGlobal: isGlobal ?? this.isGlobal,
     );
   }
 
@@ -76,6 +88,7 @@ class EventoModel {
       'dataHora': dataHora.toIso8601String(),
       'ministerioId': ministerioId,
       'isOrdinary': isOrdinary,
+      'templateId': templateId,
       'recorrente': recorrente,
       'tipoRecorrencia': tipoRecorrencia.name,
       'diaSemana': diaSemana,
@@ -83,6 +96,8 @@ class EventoModel {
       'eventoPaiId': eventoPaiId,
       'dataLimiteRecorrencia': dataLimiteRecorrencia?.toIso8601String(),
       'observacoes': observacoes,
+      'createdBy': createdBy,
+      'isGlobal': isGlobal,
     };
   }
 
@@ -93,6 +108,7 @@ class EventoModel {
       dataHora: DateTime.parse(map['dataHora']),
       ministerioId: map['ministerioId'],
       isOrdinary: map['isOrdinary'] ?? false,
+      templateId: map['templateId'],
       recorrente: map['recorrente'] ?? false,
       tipoRecorrencia: RecorrenciaTipo.values.firstWhere(
         (e) => e.name == map['tipoRecorrencia'],
@@ -105,6 +121,8 @@ class EventoModel {
           ? DateTime.parse(map['dataLimiteRecorrencia']) 
           : null,
       observacoes: map['observacoes'],
+      createdBy: map['createdBy']?.toString(),
+      isGlobal: map['isGlobal'] ?? false,
     );
   }
 }

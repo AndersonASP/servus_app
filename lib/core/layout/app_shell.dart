@@ -65,21 +65,22 @@ class AppShell extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
           onTap: (index) => _onTabSelected(context, index),
+          enableFeedback: true,
           items: [
             BottomNavigationBarItem(
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               icon: AnimatedScale(
-                scale: currentIndex == 0 ? 1.2 : 1.0,
+                scale: currentIndex == 0 ? 1.1 : 1.0,
                 duration: const Duration(milliseconds: 200),
-                child: const Icon(Icons.home_outlined),
+                child: const Icon(Icons.dashboard_outlined),
               ),
-              activeIcon: const Icon(Icons.home),
-              label: 'Home',
+              activeIcon: const Icon(Icons.dashboard),
+              label: 'Dashboard',
             ),
             BottomNavigationBarItem(
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               icon: AnimatedScale(
-                scale: currentIndex == 1 ? 1.2 : 1.0,
+                scale: currentIndex == 1 ? 1.1 : 1.0,
                 duration: const Duration(milliseconds: 200),
                 child: const Icon(Icons.event_busy_outlined),
               ),
@@ -89,7 +90,7 @@ class AppShell extends StatelessWidget {
             BottomNavigationBarItem(
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               icon: AnimatedScale(
-                scale: currentIndex == 2 ? 1.2 : 1.0,
+                scale: currentIndex == 2 ? 1.1 : 1.0,
                 duration: const Duration(milliseconds: 200),
                 child: const Icon(Icons.person_outline),
               ),

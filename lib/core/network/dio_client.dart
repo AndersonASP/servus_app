@@ -1,12 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:servus_app/core/auth/services/auth_interceptor.dart';
+import 'package:servus_app/core/error/error_interceptor.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 import 'package:servus_app/core/constants/env.dart';
 
 class DioClient {
   static Dio? _dio;
 
   static Dio get instance {
+    // Forçar recriação para aplicar nova ordem dos interceptors
+    _dio = null;
     if (_dio == null) {
+      print('🔧 [DioClient] Criando nova instância do Dio com ErrorInterceptor primeiro');
       final dio = Dio(BaseOptions(
         baseUrl: Env.baseUrl,
         connectTimeout: const Duration(seconds: 30),
@@ -15,7 +20,12 @@ class DioClient {
         contentType: 'application/json',
       ));
 
+      // Interceptor para lidar com erros e mostrar mensagens limpas (PRIMEIRO)
+      print('🔧 [DioClient] Adicionando ErrorInterceptor (1º)');
+      dio.interceptors.add(ErrorInterceptor());
+
       // Interceptor de retry para timeouts
+      print('🔧 [DioClient] Adicionando RetryInterceptor (2º)');
       dio.interceptors.add(RetryInterceptor(
         dio: dio,
         logPrint: print,
@@ -24,7 +34,9 @@ class DioClient {
           Duration(seconds: 2), // ✅ CORREÇÃO: Apenas 1 delay
         ],
       ));
-
+      
+      // Interceptor de autenticação (deve vir depois do ErrorInterceptor)
+      print('🔧 [DioClient] Adicionando AuthInterceptor (3º)');
       dio.interceptors.add(AuthInterceptor(dio));
       _dio = dio;
     }
@@ -64,6 +76,20 @@ class RetryInterceptor extends Interceptor {
     
     if (!shouldRetry) {
       print('🔄 [RetryInterceptor] Não fazendo retry, passando erro adiante');
+      print('🔄 [RetryInterceptor] Status: ${err.response?.statusCode}');
+      print('🔄 [RetryInterceptor] Response data: ${err.response?.data}');
+      
+      // Mostrar erro no SnackBar se houver mensagem do servidor
+      if (err.response?.data is Map) {
+        final data = err.response!.data as Map;
+        final serverMessage = data['message']?.toString();
+        if (serverMessage != null && serverMessage.isNotEmpty) {
+          print('🔄 [RetryInterceptor] Mostrando mensagem do servidor: $serverMessage');
+          // Usar o NotificationService em vez do método local
+          NotificationService().handleDioError(err);
+        }
+      }
+      
       return handler.next(err);
     }
 

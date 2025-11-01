@@ -5,7 +5,8 @@ import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/features/leader/dashboard/cards_details/escala_mensal/escala_mensal_screen.dart';
 import 'package:servus_app/features/leader/dashboard/leader_dashboard_screen.dart';
 import 'package:servus_app/features/leader/dashboard/cards_details/solicitacao_troca/solicitacao_troca_screen.dart';
-import 'package:servus_app/features/leader/escalas/screens/escala/escala_list_screen.dart';
+// import 'package:servus_app/features/leader/escalas/screens/escala/escala_list_screen.dart';
+import 'package:servus_app/features/leader/escalas/screens/escala/escalas_home_page.dart';
 import 'package:servus_app/features/leader/escalas/screens/evento/evento_list_screen.dart';
 import 'package:servus_app/features/leader/escalas/screens/template/template_list_screen.dart';
 import 'package:servus_app/features/leader/ministerios/screens/ministerio_form_screen.dart';
@@ -48,7 +49,7 @@ final List<GoRoute> leaderRoutes = [
   ),
   GoRoute(
     path: '/leader/escalas',
-    builder: (context, state) => const EscalaListScreen(),
+    builder: (context, state) => const EscalasHomePage(),
   ),
   GoRoute(
     path: '/leader/templates',

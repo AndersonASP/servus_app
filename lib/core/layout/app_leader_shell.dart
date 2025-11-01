@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_speed_dial/flutter_speed_dial.dart';
-import 'package:servus_app/core/theme/context_extension.dart';
 
 class AppLeaderShell extends StatelessWidget {
   final Widget child;
 
   const AppLeaderShell({super.key, required this.child});
 
-  bool _isDashboard(String location) {
-    return location == '/leader/dashboard';
-  }
-
-  bool _isSettings(String location) {
-    return location.startsWith('/leader/configuracoes');
+  bool _isProfile(String location) {
+    return location.startsWith('/perfil');
   }
 
   bool _isEventForm(String location) {
@@ -21,127 +15,129 @@ class AppLeaderShell extends StatelessWidget {
   }
 
   int _getCurrentIndex(String location) {
-    if (_isSettings(location)) return 1;
+    if (location.startsWith('/leader/escalas')) return 1;
+    if (location.startsWith('/leader/eventos')) return 2;
+    if (location.startsWith('/leader/templates')) return 3;
+    if (_isProfile(location)) return 4;
     return 0; // Dashboard é o padrão
   }
 
-  void _onHomePressed(BuildContext context) {
-    context.go('/leader/dashboard');
-  }
-
-  void _onSettingsPressed(BuildContext context) {
-    context.push('/leader/configuracoes');
+  void _onTabSelected(BuildContext context, int index) {
+    switch (index) {
+      case 0:
+        context.go('/leader/dashboard');
+        break;
+      case 1:
+        context.push('/leader/escalas');
+        break;
+      case 2:
+        context.go('/leader/eventos');
+        break;
+      case 3:
+        context.go('/leader/templates');
+        break;
+      case 4:
+        context.push('/perfil');
+        break;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
-    final isDashboard = _isDashboard(location);
     final isEventForm = _isEventForm(location);
     final currentIndex = _getCurrentIndex(location);
-    // Se houver uma rota empilhada (ex: formulários abertos via Navigator.push), esconder bottom bar
     final hasPushedRoute = Navigator.of(context).canPop();
 
     return Scaffold(
-        body: child,
-        // SpeedDial apenas no dashboard
-        floatingActionButton: isDashboard
-            ? SpeedDial(
-                icon: Icons.add,
-                activeIcon: Icons.close,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-                spacing: 12,
-                spaceBetweenChildren: 8,
-                overlayOpacity: 0.8,
-                children: [
-                  SpeedDialChild(
-                    child: Icon(Icons.people, color: context.colors.onPrimary),
-                    label: 'Criar Escala',
-                    labelStyle: context.textStyles.bodyLarge?.copyWith(
-                        color: context.colors.onPrimary,
-                        fontWeight: FontWeight.w800),
-                    labelBackgroundColor: context.colors.primary,
-                    backgroundColor: context.colors.primary,
-                    onTap: () => context.push('/leader/escalas'),
-                  ),
-                  SpeedDialChild(
-                    child: Icon(Icons.list, color: context.colors.onPrimary),
-                    label: 'Criar Template',
-                    labelStyle: context.textStyles.bodyLarge?.copyWith(
-                        color: context.colors.onPrimary,
-                        fontWeight: FontWeight.w800),
-                    labelBackgroundColor: context.colors.primary,
-                    backgroundColor: context.colors.primary,
-                    onTap: () => context.push('/leader/templates'),
-                  ),
-                  SpeedDialChild(
-                    child:
-                        Icon(Icons.person_add, color: context.colors.onPrimary),
-                    label: 'Novo Voluntário',
-                    labelStyle: context.textStyles.bodyLarge?.copyWith(
-                        color: context.colors.onPrimary,
-                        fontWeight: FontWeight.w800),
-                    labelBackgroundColor: context.colors.primary,
-                    backgroundColor: context.colors.primary,
-                    onTap: () => context.push('/leader/voluntarios'),
-                  ),
-                ],
-              )
-            : null,
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        // Bottom navigation bar com Home e Configurações (oculta quando há rota empilhada ou na tela de formulário de evento)
-        bottomNavigationBar: (hasPushedRoute || isEventForm) ? null : Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 8,
-                offset: const Offset(0, -3),
-              ),
-            ],
+      body: SafeArea(child: child),
+      // Bottom navigation bar completo
+      bottomNavigationBar: (hasPushedRoute || isEventForm) ? null : Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
-          child: BottomNavigationBar(
-            elevation: 0,
-            currentIndex: currentIndex,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.transparent,
-            selectedItemColor: Theme.of(context).colorScheme.onSurface,
-            unselectedItemColor:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            selectedLabelStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -3),
             ),
-            unselectedLabelStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-            onTap: (index) {
-              if (index == 0) {
-                _onHomePressed(context);
-              } else if (index == 1) {
-                _onSettingsPressed(context);
-              }
-            },
-            items: [
-              BottomNavigationBarItem(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                icon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                icon: Icon(Icons.settings),
-                label: 'Configurações',
-              ),
-            ],
+          ],
+        ),
+        child: BottomNavigationBar(
+          elevation: 0,
+          currentIndex: currentIndex,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.transparent,
+          enableFeedback: true,
+          selectedItemColor: Theme.of(context).colorScheme.primary,
+          unselectedItemColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+          selectedLabelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
           ),
-        ));
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          onTap: (index) => _onTabSelected(context, index),
+          items: [
+            BottomNavigationBarItem(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              icon: AnimatedScale(
+                scale: currentIndex == 0 ? 1.1 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.dashboard_outlined),
+              ),
+              activeIcon: const Icon(Icons.dashboard),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              icon: AnimatedScale(
+                scale: currentIndex == 1 ? 1.1 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.schedule_outlined),
+              ),
+              activeIcon: const Icon(Icons.schedule),
+              label: 'Escalas',
+            ),
+            BottomNavigationBarItem(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              icon: AnimatedScale(
+                scale: currentIndex == 2 ? 1.1 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.event_outlined),
+              ),
+              activeIcon: const Icon(Icons.event),
+              label: 'Eventos',
+            ),
+            BottomNavigationBarItem(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              icon: AnimatedScale(
+                scale: currentIndex == 3 ? 1.1 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.copy_outlined),
+              ),
+              activeIcon: const Icon(Icons.copy),
+              label: 'Templates',
+            ),
+            BottomNavigationBarItem(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              icon: AnimatedScale(
+                scale: currentIndex == 4 ? 1.1 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.person_outline),
+              ),
+              activeIcon: const Icon(Icons.person),
+              label: 'Perfil',
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

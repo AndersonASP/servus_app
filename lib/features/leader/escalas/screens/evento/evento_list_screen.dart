@@ -8,6 +8,8 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'evento_form_screen.dart';
 import 'package:go_router/go_router.dart';
+import 'package:servus_app/state/auth_state.dart';
+import 'package:servus_app/core/auth/services/token_service.dart';
 import 'dart:developer' as developer;
 
 class EventoListScreen extends StatefulWidget {
@@ -33,6 +35,9 @@ class _EventoListScreenState extends State<EventoListScreen> {
   
   // Estado de carregamento das recorrências
   bool _isLoadingRecurrences = false;
+  
+  // Cache do userId para verificação de permissões
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -41,6 +46,8 @@ class _EventoListScreenState extends State<EventoListScreen> {
     _selectedDay = DateTime.now();
     // Inicializar localização para português
     initializeDateFormatting('pt_BR', null);
+    // Carregar userId para verificação de permissões
+    _loadUserId();
     // carregar eventos na abertura da tela
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final controller = context.read<EventoController>();
@@ -48,6 +55,19 @@ class _EventoListScreenState extends State<EventoListScreen> {
       // Carregar recorrências para o mês atual
       _loadEventsForMonth(_focusedDay, controller);
     });
+  }
+
+  Future<void> _loadUserId() async {
+    try {
+      final userId = await TokenService.getUserId();
+      if (mounted) {
+        setState(() {
+          _currentUserId = userId;
+        });
+      }
+    } catch (e) {
+      developer.log('⚠️ Erro ao carregar userId: $e', name: 'EventoListScreen');
+    }
   }
 
   @override
@@ -75,6 +95,7 @@ class _EventoListScreenState extends State<EventoListScreen> {
               color: context.colors.onSurface,
             ),),
             backgroundColor: Colors.transparent,
+            scrolledUnderElevation: 0,
             centerTitle: false,
             actions: [
               IconButton(
@@ -124,7 +145,15 @@ class _EventoListScreenState extends State<EventoListScreen> {
                   builder: (_) => const EventoFormScreen(),
                 ),
               );
-              controller.carregarEventos();
+              // Recarregar eventos e recorrências do mês atual após criar
+              await controller.carregarEventos();
+              final now = DateTime.now();
+              final monthString = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+              // Limpar cache de recorrências para forçar recarregamento
+              setState(() {
+                _recurrencesByMonth.remove(monthString);
+              });
+              _loadEventsForMonth(_focusedDay, controller);
             },
             icon: const Icon(Icons.add),
             label: Text('Novo Evento', style: context.textStyles.bodyLarge?.copyWith(
@@ -257,11 +286,14 @@ class _EventoListScreenState extends State<EventoListScreen> {
       );
     }
 
+    // Calcular padding inferior para o FAB extended (altura ~56 + margem 16 + espaço extra 16)
+    const fabPadding = 56.0 + 16.0 + 16.0; // 88px total
+    
     return RefreshIndicator(
       onRefresh: () => controller.carregarEventos(),
       child: ListView.separated(
         controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, fabPadding),
         itemCount: eventosDoDia.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
@@ -273,8 +305,10 @@ class _EventoListScreenState extends State<EventoListScreen> {
   }
 
   Widget _buildEventCard(EventoModel evento, EventoController controller) {
+    developer.log('📋 [_buildEventCard] Exibindo evento: id=${evento.id}, nome="${evento.nome}"', name: 'EventoListScreen');
+    final podeEditar = _podeEditarEventoSincrono(evento);
     return GestureDetector(
-      onTap: () => _editEvent(evento),
+      onTap: podeEditar ? () => _editEvent(evento) : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.all(16),
@@ -354,28 +388,45 @@ class _EventoListScreenState extends State<EventoListScreen> {
                               break;
                           }
                         },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'edit',
-                            child: Row(
-                              children: [
-                                Icon(Icons.edit, color: Colors.blue),
-                                SizedBox(width: 8),
-                                Text('Editar'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Excluir', style: TextStyle(color: Colors.red)),
-                              ],
-                            ),
-                          ),
-                        ],
+                        itemBuilder: (context) {
+                          // Verificação síncrona usando dados do modelo e contexto
+                          final podeExcluir = _podeExcluirEventoSincrono(evento);
+                          final podeEditar = _podeEditarEventoSincrono(evento);
+                          
+                          // Log para debug
+                          developer.log('🔍 Menu do evento "${evento.nome}":', name: 'EventoListScreen');
+                          developer.log('   - podeEditar: $podeEditar', name: 'EventoListScreen');
+                          developer.log('   - podeExcluir: $podeExcluir', name: 'EventoListScreen');
+                          developer.log('   - evento.createdBy: ${evento.createdBy}', name: 'EventoListScreen');
+                          developer.log('   - _currentUserId: $_currentUserId', name: 'EventoListScreen');
+                          developer.log('   - evento.ministerioId: ${evento.ministerioId}', name: 'EventoListScreen');
+                          developer.log('   - evento.isGlobal: ${evento.isGlobal}', name: 'EventoListScreen');
+                          
+                          return [
+                            if (podeEditar)
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, color: Colors.blue),
+                                    SizedBox(width: 8),
+                                    Text('Editar'),
+                                  ],
+                                ),
+                              ),
+                            if (podeExcluir)
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Excluir', style: TextStyle(color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                          ];
+                        },
                         child: Padding(
                           padding: const EdgeInsets.all(4),
                           child: Icon(
@@ -431,11 +482,11 @@ class _EventoListScreenState extends State<EventoListScreen> {
         }
         
         // Buscar o evento original para obter os dados completos
-        final eventoOriginal = controller.todos.firstWhere(
+        final eventoOriginalOuFallback = controller.todos.firstWhere(
           (evento) => evento.id == recurrence.eventId,
           orElse: () => EventoModel(
             id: recurrence.eventId,
-            nome: 'Evento não encontrado',
+            nome: recurrence.eventName ?? 'Evento',
             dataHora: recurrence.instanceDate,
             ministerioId: '',
             isOrdinary: false,
@@ -444,18 +495,25 @@ class _EventoListScreenState extends State<EventoListScreen> {
           ),
         );
         
+        // Usar eventName da recorrência se disponível, caso contrário usar do evento original
+        final nomeFinal = recurrence.eventName?.isNotEmpty == true 
+            ? recurrence.eventName! 
+            : eventoOriginalOuFallback.nome;
+        
         // Converter EventInstanceModel para EventoModel para exibição
         final eventoRecorrente = EventoModel(
           id: '${recurrence.eventId}_${recurrence.instanceDate.millisecondsSinceEpoch}',
-          nome: eventoOriginal.nome,
+          nome: nomeFinal,
           dataHora: recurrence.instanceDate,
-          ministerioId: eventoOriginal.ministerioId,
-          isOrdinary: eventoOriginal.isOrdinary,
+          ministerioId: eventoOriginalOuFallback.ministerioId,
+          isOrdinary: eventoOriginalOuFallback.isOrdinary,
           recorrente: true,
-          tipoRecorrencia: eventoOriginal.tipoRecorrencia,
-          diaSemana: eventoOriginal.diaSemana,
-          semanaDoMes: eventoOriginal.semanaDoMes,
-          observacoes: eventoOriginal.observacoes,
+          tipoRecorrencia: eventoOriginalOuFallback.tipoRecorrencia,
+          diaSemana: eventoOriginalOuFallback.diaSemana,
+          semanaDoMes: eventoOriginalOuFallback.semanaDoMes,
+          observacoes: eventoOriginalOuFallback.observacoes,
+          createdBy: eventoOriginalOuFallback.createdBy,
+          isGlobal: eventoOriginalOuFallback.isGlobal,
         );
         eventosDoDia.add(eventoRecorrente);
         developer.log('✅ [_getEventsForDay] Evento recorrente adicionado: ${eventoRecorrente.nome}', name: 'EventoListScreen');
@@ -522,6 +580,120 @@ class _EventoListScreenState extends State<EventoListScreen> {
         // Log do erro mas não quebra a UI
         print('Erro ao carregar recorrências: $e');
       }
+    }
+  }
+
+  // Verifica se o líder pode editar o evento (versão síncrona)
+  // Líder pode editar se:
+  // 1. O evento não é global (isGlobal == false)
+  // 2. E (o evento foi criado por ele OU pertence ao ministério dele)
+  bool _podeEditarEventoSincrono(EventoModel evento) {
+    // Se é evento global, líder não pode editar
+    if (evento.isGlobal) {
+      developer.log('🚫 Evento global - não pode editar', name: 'EventoListScreen');
+      return false;
+    }
+
+    try {
+      final authState = Provider.of<AuthState>(context, listen: false);
+      final usuario = authState.usuario;
+      
+      // Normalizar IDs para comparação (remover espaços e converter para lowercase)
+      String? normalizeId(String? id) {
+        if (id == null) return null;
+        return id.trim().toLowerCase();
+      }
+      
+      final normalizedUserId = normalizeId(_currentUserId);
+      final normalizedCreatedBy = normalizeId(evento.createdBy);
+      
+      // Verificar se o evento foi criado pelo líder atual
+      if (normalizedUserId != null && 
+          normalizedCreatedBy != null && 
+          normalizedUserId == normalizedCreatedBy) {
+        developer.log('✅ Evento criado pelo líder - pode editar', name: 'EventoListScreen');
+        return true;
+      }
+
+      // Verificar se o evento pertence ao ministério do líder
+      if (usuario?.primaryMinistryId != null && 
+          evento.ministerioId.isNotEmpty) {
+        final normalizedMinistryId = normalizeId(evento.ministerioId);
+        final normalizedPrimaryMinistryId = normalizeId(usuario!.primaryMinistryId);
+        
+        if (normalizedMinistryId == normalizedPrimaryMinistryId) {
+          developer.log('✅ Evento pertence ao ministério do líder - pode editar', name: 'EventoListScreen');
+          // Evento pertence ao ministério do líder - pode editar
+          // O backend vai validar se foi criado por ele ou por outro líder do mesmo ministério
+          return true;
+        }
+      }
+
+      // Se não pertence ao ministério e não foi criado por ele, não pode editar
+      developer.log('🚫 Evento não pode ser editado pelo líder', name: 'EventoListScreen');
+      return false;
+    } catch (e) {
+      developer.log('❌ Erro ao verificar permissão de edição: $e', name: 'EventoListScreen');
+      return false;
+    }
+  }
+
+  // Verifica se o líder pode excluir o evento (versão síncrona)
+  // Líder pode excluir se:
+  // 1. O evento não é global (isGlobal == false)
+  // 2. E (o evento foi criado por ele OU pertence ao ministério dele)
+  bool _podeExcluirEventoSincrono(EventoModel evento) {
+    // Se é evento global, líder não pode excluir
+    if (evento.isGlobal) {
+      developer.log('🚫 Evento global - não pode excluir', name: 'EventoListScreen');
+      return false;
+    }
+
+    try {
+      final authState = Provider.of<AuthState>(context, listen: false);
+      final usuario = authState.usuario;
+      
+      // Normalizar IDs para comparação (remover espaços e converter para lowercase)
+      String? normalizeId(String? id) {
+        if (id == null) return null;
+        return id.trim().toLowerCase();
+      }
+      
+      final normalizedUserId = normalizeId(_currentUserId);
+      final normalizedCreatedBy = normalizeId(evento.createdBy);
+      
+      // Verificar se o evento foi criado pelo líder atual
+      if (normalizedUserId != null && 
+          normalizedCreatedBy != null && 
+          normalizedUserId == normalizedCreatedBy) {
+        developer.log('✅ Evento criado pelo líder - pode excluir', name: 'EventoListScreen');
+        return true;
+      }
+
+      // Verificar se o evento pertence ao ministério do líder
+      if (usuario?.primaryMinistryId != null && 
+          evento.ministerioId.isNotEmpty) {
+        final normalizedMinistryId = normalizeId(evento.ministerioId);
+        final normalizedPrimaryMinistryId = normalizeId(usuario!.primaryMinistryId);
+        
+        if (normalizedMinistryId == normalizedPrimaryMinistryId) {
+          developer.log('✅ Evento pertence ao ministério do líder - pode excluir', name: 'EventoListScreen');
+          // Evento pertence ao ministério do líder - pode excluir
+          // O backend vai validar se foi criado por ele ou por outro líder do mesmo ministério
+          return true;
+        }
+      }
+
+      // Se não pertence ao ministério e não foi criado por ele, não pode excluir
+      developer.log('🚫 Evento não pode ser excluído pelo líder', name: 'EventoListScreen');
+      developer.log('   - userId: $_currentUserId (normalized: $normalizedUserId)', name: 'EventoListScreen');
+      developer.log('   - createdBy: ${evento.createdBy} (normalized: $normalizedCreatedBy)', name: 'EventoListScreen');
+      developer.log('   - ministryId: ${evento.ministerioId}', name: 'EventoListScreen');
+      developer.log('   - primaryMinistryId: ${usuario?.primaryMinistryId}', name: 'EventoListScreen');
+      return false;
+    } catch (e) {
+      developer.log('❌ Erro ao verificar permissão de exclusão: $e', name: 'EventoListScreen');
+      return false;
     }
   }
 
@@ -734,6 +906,14 @@ class _EventoListScreenState extends State<EventoListScreen> {
         ),
       );
       try {
+        // Log de debug antes de excluir
+        developer.log('🗑️ Tentando excluir evento: $realEventId', name: 'EventoListScreen');
+        developer.log('   - Evento nome: ${evento.nome}', name: 'EventoListScreen');
+        developer.log('   - Evento ministryId: ${evento.ministerioId}', name: 'EventoListScreen');
+        developer.log('   - Evento createdBy: ${evento.createdBy}', name: 'EventoListScreen');
+        developer.log('   - Evento isGlobal: ${evento.isGlobal}', name: 'EventoListScreen');
+        developer.log('   - Current userId: $_currentUserId', name: 'EventoListScreen');
+        
         await controller.removerEvento(realEventId);
         // Recarregar recorrências do mês do evento
         try {
@@ -751,11 +931,16 @@ class _EventoListScreenState extends State<EventoListScreen> {
         }
       } catch (e) {
         if (mounted) navigator.pop();
+        developer.log('❌ Erro ao excluir evento: $e', name: 'EventoListScreen');
         if (mounted) {
-        ScaffoldMessenger.of(pageContext).showSnackBar(
+          final errorMessage = e.toString().contains('403') || e.toString().contains('permissão')
+              ? 'Você não tem permissão para excluir este evento. Apenas eventos criados por você ou do seu ministério podem ser excluídos.'
+              : 'Erro ao excluir evento: ${e.toString()}';
+          ScaffoldMessenger.of(pageContext).showSnackBar(
             SnackBar(
-              content: Text('Erro ao excluir evento: ${e.toString()}'),
+              content: Text(errorMessage),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
             ),
           );
         }

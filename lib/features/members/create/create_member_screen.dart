@@ -171,7 +171,6 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
     try {
       final membersResponse = await MembersService.getMembers(
         filter: MemberFilter(search: _emailController.text.trim()),
-        context: context,
       );
       // Verificar se algum membro tem o email exato
       final emailExists = membersResponse.members.any(
@@ -1227,7 +1226,6 @@ class _CreateMemberScreenState extends State<CreateMemberScreen> {
                   ministryId: membership.ministryId!,
                   functionId: functionId,
                   status: shouldAutoApprove ? 'aprovado' : null, // Aprovar automaticamente se for tenant ou leader
-                  context: context,
                 );
                 successCount++;
                 debugPrint('✅ MemberFunction criado com sucesso${shouldAutoApprove ? ' (aprovado automaticamente)' : ''}');

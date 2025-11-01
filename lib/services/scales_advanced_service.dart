@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/core/constants/env.dart';
 
 class ScalesAdvancedService {
-  static const String _baseUrl = 'http://localhost:3000';
+  static const String _baseUrl = Env.baseUrl;
 
   // ========================================
   // 📅 DISPONIBILIDADE DE VOLUNTÁRIOS

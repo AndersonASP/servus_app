@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:servus_app/features/ministries/models/ministry_dto.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
-import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 
 class MinistryService {
   final Dio dio;
+  final NotificationService _errorService = NotificationService();
 
   MinistryService() : dio = DioClient.instance;
 
@@ -15,7 +16,6 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     ListMinistryDto? filters,
-    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
@@ -52,15 +52,11 @@ class MinistryService {
       if (response.statusCode == 200) {
         return MinistryListResponse.fromJson(response.data);
       } else {
-        if (context != null) {
-          showLoadError(context, 'ministérios');
-        }
+        _errorService.handleGenericError('Erro ao carregar ministérios');
         throw Exception('Erro ao listar ministérios: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      if (context != null) {
-        showLoadError(context, 'ministérios');
-      }
+      _errorService.handleDioError(e, customMessage: 'Erro ao carregar ministérios');
       throw Exception(_handleDioError(e));
     }
   }
@@ -70,7 +66,6 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     required String ministryId,
-    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
@@ -106,15 +101,11 @@ class MinistryService {
       if (response.statusCode == 200) {
         return MinistryResponse.fromJson(response.data);
       } else {
-        if (context != null) {
-          showLoadError(context, 'ministério');
-        }
+        _errorService.handleGenericError('Erro ao carregar ministério');
         throw Exception('Erro ao obter ministério: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      if (context != null) {
-        showLoadError(context, 'ministério');
-      }
+      _errorService.handleDioError(e, customMessage: 'Erro ao carregar ministério');
       throw Exception(_handleDioError(e));
     }
   }
@@ -124,7 +115,6 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     required CreateMinistryDto ministryData,
-    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
@@ -161,21 +151,15 @@ class MinistryService {
 
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        if (context != null) {
-          showCreateSuccess(context, 'Ministério');
-        }
+        _errorService.showSuccess('Ministério criado com sucesso!');
         return MinistryResponse.fromJson(response.data);
       } else {
-        if (context != null) {
-          showCreateError(context, 'ministério');
-        }
+        _errorService.handleGenericError('Erro ao criar ministério');
         throw Exception('Erro ao criar ministério: ${response.statusCode}');
       }
     } on DioException catch (e) {
       
-      if (context != null) {
-        showCreateError(context, 'ministério');
-      }
+      _errorService.handleDioError(e, customMessage: 'Erro ao criar ministério');
       throw Exception(_handleDioError(e));
     }
   }
@@ -186,7 +170,6 @@ class MinistryService {
     required String branchId,
     required String ministryId,
     required UpdateMinistryDto ministryData,
-    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
@@ -223,24 +206,20 @@ class MinistryService {
 
 
       if (response.statusCode == 200) {
-        if (context != null) {
-          showUpdateSuccess(context, 'Ministério');
-        }
+        _errorService.showSuccess('Ministério atualizado com sucesso!');
         return MinistryResponse.fromJson(response.data);
       } else {
-        if (context != null) {
-          showUpdateError(context, 'ministério');
-        }
+        _errorService.handleGenericError('Erro ao atualizar ministério');
         throw Exception('Erro ao atualizar ministério: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      if (context != null) {
-        showUpdateError(context, 'ministério');
-      }
+      _errorService.handleDioError(e, customMessage: 'Erro ao atualizar ministério');
       throw Exception(_handleDioError(e));
     } catch (e) {
-      if (context != null) {
-        showUpdateError(context, 'ministério');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao atualizar ministério');
+      } else {
+        _errorService.handleGenericError(e);
       }
       rethrow;
     }
@@ -251,7 +230,6 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     required String ministryId,
-    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
@@ -285,20 +263,14 @@ class MinistryService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        if (context != null) {
-          showDeleteSuccess(context, 'Ministério');
-        }
+        _errorService.showSuccess('Ministério removido com sucesso!');
         return true;
       } else {
-        if (context != null) {
-          showDeleteError(context, 'ministério');
-        }
+        _errorService.handleGenericError('Erro ao remover ministério');
         return false;
       }
     } on DioException catch (e) {
-      if (context != null) {
-        showDeleteError(context, 'ministério');
-      }
+      _errorService.handleDioError(e, customMessage: 'Erro ao remover ministério');
       throw Exception(_handleDioError(e));
     }
   }
@@ -307,7 +279,6 @@ class MinistryService {
   Future<MinistryResponse?> getLeaderMinistry({
     required String tenantId,
     required String branchId,
-    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
@@ -346,9 +317,7 @@ class MinistryService {
         // Líder não tem ministério
         return null;
       } else {
-        if (context != null) {
-          showLoadError(context, 'ministério do líder');
-        }
+        _errorService.handleGenericError('Erro ao carregar ministério do líder');
         throw Exception('Erro ao obter ministério do líder: ${response.statusCode}');
       }
     } on DioException catch (e) {
@@ -356,9 +325,7 @@ class MinistryService {
         // Líder não tem ministério
         return null;
       }
-      if (context != null) {
-        showLoadError(context, 'ministério do líder');
-      }
+        _errorService.handleGenericError('Erro ao carregar ministério do líder');
       throw Exception(_handleDioError(e));
     }
   }
@@ -367,7 +334,6 @@ class MinistryService {
   Future<MinistryResponse?> getLeaderMinistryV2({
     required String tenantId,
     required String branchId,
-    BuildContext? context,
   }) async {
     try {
       debugPrint('🔍 [MinistryService] getLeaderMinistryV2 iniciado');
@@ -444,18 +410,14 @@ class MinistryService {
       } else if (response.statusCode == 404) {
         return null;
       } else {
-        if (context != null) {
-          showLoadError(context, 'ministério do líder');
-        }
+        _errorService.handleGenericError('Erro ao carregar ministério do líder');
         throw Exception('Erro ao obter ministério do líder: ${response.statusCode}');
       }
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
         return null;
       } else {
-        if (context != null) {
-          showLoadError(context, 'ministério do líder');
-        }
+        _errorService.handleGenericError('Erro ao carregar ministério do líder');
         throw Exception(_handleDioError(e));
       }
     }
@@ -466,7 +428,6 @@ class MinistryService {
     required String tenantId,
     required String branchId,
     required String ministryId,
-    BuildContext? context,
   }) async {
     try {
       final deviceId = await TokenService.getDeviceId();
@@ -502,15 +463,11 @@ class MinistryService {
       if (response.statusCode == 200) {
         return response.data;
       } else {
-        if (context != null) {
-          showLoadError(context, 'configuração de bloqueio');
-        }
+        _errorService.handleGenericError('Erro ao carregar configuração de bloqueio');
         throw Exception('Erro ao obter configuração de bloqueio: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      if (context != null) {
-        showLoadError(context, 'configuração de bloqueio');
-      }
+      _errorService.handleDioError(e, customMessage: 'Erro ao carregar configuração de bloqueio');
       throw Exception(_handleDioError(e));
     }
   }
@@ -521,14 +478,12 @@ class MinistryService {
     required String branchId,
     required String ministryId,
     required bool isActive,
-    BuildContext? context,
   }) async {
     return await updateMinistry(
       tenantId: tenantId,
       branchId: branchId,
       ministryId: ministryId,
       ministryData: UpdateMinistryDto(isActive: isActive),
-      context: context,
     );
   }
 

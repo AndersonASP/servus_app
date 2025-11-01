@@ -166,7 +166,6 @@ class MinisterioController extends ChangeNotifier {
       final leaderMinistry = await _ministryService.getLeaderMinistryV2(
         tenantId: _tenantId!,
         branchId: _branchId ?? '',
-        context: null,
       );
 
       if (leaderMinistry != null) {
@@ -402,7 +401,6 @@ class MinisterioController extends ChangeNotifier {
             tenantId: _tenantId!,
             branchId: branchIdParaAPI ?? '', // Passa string vazia se for matriz
             ministryData: createData,
-            context: context,
           );
         }
         

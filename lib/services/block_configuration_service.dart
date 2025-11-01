@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:servus_app/core/models/block_configuration.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
+import 'package:servus_app/core/constants/env.dart';
 
 /// Serviço responsável por gerenciar configurações de bloqueio
 class BlockConfigurationService {
-  static const String _baseUrl = 'http://localhost:3000';
+  static const String _baseUrl = Env.baseUrl;
 
   /// Obtém as configurações de bloqueio para um ministério
   static Future<BlockConfiguration?> getConfiguration({

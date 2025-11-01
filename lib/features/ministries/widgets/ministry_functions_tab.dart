@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:servus_app/core/theme/context_extension.dart';
 import 'package:servus_app/features/ministries/controllers/ministry_functions_controller.dart';
 import 'package:servus_app/features/ministries/models/ministry_function.dart';
-import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 
 class MinistryFunctionsTab extends StatefulWidget {
   final String ministryId;
@@ -181,7 +181,7 @@ class _MinistryFunctionsTabState extends State<MinistryFunctionsTab> {
                 size: 20,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             
             // Informações da função
             Expanded(
@@ -194,6 +194,8 @@ class _MinistryFunctionsTabState extends State<MinistryFunctionsTab> {
                       fontWeight: FontWeight.w600,
                       color: context.colors.onSurface,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                   if (function.description != null && function.description!.isNotEmpty) ...[
                     const SizedBox(height: 4),
@@ -232,6 +234,8 @@ class _MinistryFunctionsTabState extends State<MinistryFunctionsTab> {
               ),
             ),
             
+            const SizedBox(width: 8),
+            
             // Switch para ativar/desativar função
             Switch(
               value: _functionStates[function.functionId] ?? function.isActive,
@@ -255,13 +259,14 @@ class _MinistryFunctionsTabState extends State<MinistryFunctionsTab> {
                   
                   // Mostrar erro se necessário
                   if (mounted) {
-                    showUpdateError(context, 'função');
+                    NotificationService().showError('Erro ao atualizar função');
                   }
                 }
               },
               activeThumbColor: Colors.green,
               inactiveThumbColor: Colors.red,
               inactiveTrackColor: Colors.red.withOpacity(0.3),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ],
         ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:servus_app/core/auth/services/token_service.dart';
 import 'package:servus_app/core/error/error_handler_service.dart';
 
@@ -71,18 +72,6 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    debugPrint('❌ [AuthInterceptor] Erro na requisição:');
-    debugPrint('   - Status: ${err.response?.statusCode}');
-    debugPrint('   - URL: ${err.requestOptions.uri}');
-    
-    // Capturar apenas a mensagem de validação do servidor
-    String? serverMessage;
-    if (err.response?.data is Map) {
-      final data = err.response!.data as Map;
-      serverMessage = data['message']?.toString();
-    }
-    debugPrint('   - Mensagem do servidor: $serverMessage');
-    
     final isUnauthorized = err.response?.statusCode == 401;
     final isRefreshEndpoint = err.requestOptions.path.contains('/auth/refresh');
 
@@ -210,6 +199,7 @@ class AuthInterceptor extends Interceptor {
       return false;
     }
   }
+
 
   Future<void> _logout() async {
     await TokenService.clearAll();

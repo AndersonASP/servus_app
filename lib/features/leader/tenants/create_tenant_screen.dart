@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/context_extension.dart';
-import '../../../shared/widgets/servus_snackbar.dart';
+import '../../../core/error/notification_service.dart';
 
 class CreateTenantScreen extends StatefulWidget {
   const CreateTenantScreen({super.key});
@@ -469,7 +469,9 @@ class _CreateTenantScreenState extends State<CreateTenantScreen>
 
       if (mounted) {
         // Mostrar sucesso com o novo padrão
-        showTenantCreateSuccess(context, _tenantNameController.text);
+        NotificationService().showSuccess(
+          'Igreja "${_tenantNameController.text}" criada com sucesso!',
+        );
         
         // Navegar de volta primeiro para evitar problemas de contexto
         Navigator.of(context).pop(true);
@@ -481,21 +483,10 @@ class _CreateTenantScreenState extends State<CreateTenantScreen>
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Erro ao criar igreja';
-        
         if (e is DioException) {
-          if (e.response?.statusCode == 409) {
-            errorMessage = 'Já existe uma igreja com este nome ou e-mail';
-          } else if (e.response?.statusCode == 400) {
-            errorMessage = 'Dados inválidos. Verifique as informações fornecidas.';
-          } else if (e.response?.data != null && e.response!.data['message'] != null) {
-            errorMessage = e.response!.data['message'];
-          }
-        }
-        
-        // Verificar se o contexto ainda está válido antes de mostrar erro
-        if (mounted && context.mounted) {
-          showTenantCreateError(context, _tenantNameController.text, errorMessage);
+          NotificationService().handleDioError(e, customMessage: 'Erro ao criar igreja');
+        } else {
+          NotificationService().handleGenericError(e);
         }
       }
     } finally {

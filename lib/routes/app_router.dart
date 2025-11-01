@@ -8,13 +8,14 @@ import 'package:servus_app/routes/shells/leader_shell.dart';
 import 'package:servus_app/routes/shells/volunteer_shell.dart';
 import 'package:servus_app/routes/web_routes.dart';
 
-final GoRouter router = GoRouter(
-  initialLocation: WebRoutes.getInitialRoute(), // Detecta rota automaticamente na web
+// Router principal para a aplicação completa
+final GoRouter mainRouter = GoRouter(
+  initialLocation: WebRoutes.getInitialRoute(),
   routes: [
     ...authRoutes,
     ...qrRoutes,
     ...inviteRoutes,
-    ...WebRoutes.routes, // Rotas específicas para web
+    ...WebRoutes.routes,
     volunteerShellRoute,
     leaderShellRoute,
     GoRoute(
@@ -27,3 +28,14 @@ final GoRouter router = GoRouter(
     ),
   ],
 );
+
+// Router simplificado para formulários públicos
+final GoRouter publicFormRouter = GoRouter(
+  initialLocation: '/',
+  routes: [
+    ...WebRoutes.routes,
+  ],
+);
+
+// Manter compatibilidade com código existente
+final GoRouter router = mainRouter;

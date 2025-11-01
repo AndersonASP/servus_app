@@ -3,10 +3,12 @@ import 'package:servus_app/core/models/custom_form.dart';
 import 'package:servus_app/core/models/form_submission.dart';
 import 'package:servus_app/services/auth_context_service.dart';
 import 'package:servus_app/core/network/dio_client.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 
 class CustomFormService {
   final Dio _dio = DioClient.instance;
   final AuthContextService _authContext = AuthContextService.instance;
+  final NotificationService _errorService = NotificationService();
 
   CustomFormService() {
     
@@ -96,10 +98,11 @@ class CustomFormService {
       
       return result;
     } catch (e) {
-      
       if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao listar formulários');
+      } else {
+        _errorService.handleGenericError(e);
       }
-      
       rethrow;
     }
   }
@@ -120,6 +123,11 @@ class CustomFormService {
       
       return CustomForm.fromMap(response.data['data']);
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -133,6 +141,11 @@ class CustomFormService {
       
       return CustomForm.fromMap(response.data['data']);
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -154,6 +167,11 @@ class CustomFormService {
       
       return CustomForm.fromMap(response.data['data']);
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -175,6 +193,11 @@ class CustomFormService {
       
       return CustomForm.fromMap(response.data['data']);
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -188,6 +211,11 @@ class CustomFormService {
       
       return FormSubmission.fromMap(response.data['data']);
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -228,6 +256,11 @@ class CustomFormService {
         'pagination': response.data['pagination'] ?? {},
       };
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -256,6 +289,11 @@ class CustomFormService {
       
       return FormSubmission.fromMap(response.data['data']);
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -285,6 +323,11 @@ class CustomFormService {
       
       return response.data['data'];
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -306,6 +349,11 @@ class CustomFormService {
       
       return response.data['data'];
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }
@@ -325,6 +373,11 @@ class CustomFormService {
       );
       
     } catch (e) {
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar formulário');
+      } else {
+        _errorService.handleGenericError(e);
+      }
       rethrow;
     }
   }

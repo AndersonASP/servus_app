@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:servus_app/features/ministries/models/ministry_function.dart';
 import 'package:servus_app/core/network/dio_client.dart';
 import 'package:servus_app/core/constants/env.dart';
-import 'package:servus_app/shared/widgets/servus_snackbar.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 
 class MinistryFunctionsService {
   final Dio _dio;
+  final NotificationService _errorService = NotificationService();
   static const String baseUrl = Env.baseUrl;
   MinistryFunctionsService() : _dio = DioClient.instance;
 
@@ -17,7 +17,6 @@ class MinistryFunctionsService {
     List<String> names, {
     String? category,
     List<String>? tags,
-    BuildContext? context,
   }) async {
     try {
       final response = await _dio.post(
@@ -30,21 +29,19 @@ class MinistryFunctionsService {
       );
 
       if (response.statusCode == 200) {
-        if (context != null) {
-          showCreateSuccess(context, 'Funções do ministério');
-        }
+        _errorService.showSuccess('Funções do ministério criadas com sucesso!');
         return BulkUpsertResponse.fromJson(response.data);
       } else {
-        if (context != null) {
-          showCreateError(context, 'funções do ministério');
-        }
+        _errorService.handleGenericError('Erro ao criar funções do ministério');
         throw Exception('Erro ao criar funções: ${response.statusMessage}');
       }
     } catch (e) {
-      if (context != null) {
-        showCreateError(context, 'funções do ministério');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao criar funções do ministério');
+      } else {
+        _errorService.handleGenericError('Erro ao criar funções do ministério');
       }
-      throw Exception('Erro ao criar funções: $e');
+      rethrow;
     }
   }
 
@@ -53,7 +50,6 @@ class MinistryFunctionsService {
   Future<List<MinistryFunction>> getMinistryFunctions(
     String ministryId, {
     bool? active,
-    BuildContext? context,
   }) async {
     try {
       final queryParams = <String, dynamic>{};
@@ -73,18 +69,16 @@ class MinistryFunctionsService {
             .map((item) => MinistryFunction.fromJson(item))
             .toList();
       } else {
-        if (context != null) {
-          showLoadError(context, 'funções do ministério');
-        }
+        _errorService.handleGenericError('Erro ao carregar funções do ministério');
         throw Exception('Erro ao listar funções do ministério: ${response.statusMessage}');
       }
     } catch (e) {
       if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar funções do ministério');
+      } else {
+        _errorService.handleGenericError('Erro ao carregar funções do ministério');
       }
-      if (context != null) {
-        showLoadError(context, 'funções do ministério');
-      }
-      throw Exception('Erro ao listar funções do ministério: $e');
+      rethrow;
     }
   }
 
@@ -93,7 +87,6 @@ class MinistryFunctionsService {
   Future<List<MinistryFunction>> getTenantFunctions({
     String? ministryId,
     String? search,
-    BuildContext? context,
   }) async {
     try {
       final queryParams = <String, dynamic>{
@@ -120,18 +113,16 @@ class MinistryFunctionsService {
             .map((item) => MinistryFunction.fromJson(item))
             .toList();
       } else {
-        if (context != null) {
-          showLoadError(context, 'funções do tenant');
-        }
+        _errorService.handleGenericError('Erro ao carregar funções do tenant');
         throw Exception('Erro ao listar funções do tenant: ${response.statusMessage}');
       }
     } catch (e) {
       if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao carregar funções do tenant');
+      } else {
+        _errorService.handleGenericError('Erro ao carregar funções do tenant');
       }
-      if (context != null) {
-        showLoadError(context, 'funções do tenant');
-      }
-      throw Exception('Erro ao listar funções do tenant: $e');
+      rethrow;
     }
   }
 
@@ -143,7 +134,6 @@ class MinistryFunctionsService {
     bool? isActive,
     int? defaultSlots,
     String? notes,
-    BuildContext? context,
   }) async {
     try {
       final data = <String, dynamic>{};
@@ -157,21 +147,19 @@ class MinistryFunctionsService {
       );
 
       if (response.statusCode == 200) {
-        if (context != null) {
-          showUpdateSuccess(context, 'Função do ministério');
-        }
+        _errorService.showSuccess('Função do ministério atualizada com sucesso!');
         return MinistryFunction.fromJson(response.data);
       } else {
-        if (context != null) {
-          showUpdateError(context, 'função do ministério');
-        }
+        _errorService.handleGenericError('Erro ao atualizar função do ministério');
         throw Exception('Erro ao atualizar função: ${response.statusMessage}');
       }
     } catch (e) {
-      if (context != null) {
-        showUpdateError(context, 'função do ministério');
+      if (e is DioException) {
+        _errorService.handleDioError(e, customMessage: 'Erro ao atualizar função do ministério');
+      } else {
+        _errorService.handleGenericError('Erro ao atualizar função do ministério');
       }
-      throw Exception('Erro ao atualizar função: $e');
+      rethrow;
     }
   }
 }

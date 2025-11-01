@@ -45,7 +45,7 @@ class EscalaModel {
     required this.eventoId,
     this.templateId,
     required this.escalados,
-    this.status = StatusEscala.rascunho,
+    this.status = StatusEscala.publicada,
     DateTime? criadaEm,
   })  : id = id ?? const Uuid().v4(),
         criadaEm = criadaEm ?? DateTime.now();
@@ -89,7 +89,7 @@ class EscalaModel {
       ),
       status: StatusEscala.values.firstWhere(
         (s) => s.name == map['status'],
-        orElse: () => StatusEscala.rascunho,
+        orElse: () => StatusEscala.publicada,
       ),
       criadaEm: DateTime.parse(map['criadaEm']),
     );

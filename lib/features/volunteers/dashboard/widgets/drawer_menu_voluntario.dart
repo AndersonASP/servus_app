@@ -59,106 +59,144 @@ class DrawerMenuVoluntario extends StatelessWidget {
               ),
             ),
 
-            // Menu simplificado
+            // Menu simplificado e organizado
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 physics: const BouncingScrollPhysics(),
                 child: Column(
                   children: [
-                    // 📊 Dashboard detalhado
-                    ListTile(
-                      leading: const Icon(Icons.dashboard_outlined),
-                      title: const Text('Dashboard'),
-                      subtitle: const Text('Visão geral detalhada'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        // TODO: Implementar navegação para dashboard detalhado
-                      },
+                    // 🏠 PRINCIPAL
+                    _buildMenuSection(
+                      context,
+                      title: 'Principal',
+                      icon: Icons.home_outlined,
+                      children: [
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.dashboard_outlined,
+                          title: 'Dashboard',
+                          subtitle: 'Visão geral detalhada',
+                          onTap: () {
+                            Navigator.pop(context);
+                            // TODO: Implementar navegação para dashboard detalhado
+                          },
+                        ),
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.event_outlined,
+                          title: 'Eventos',
+                          subtitle: 'Calendário de eventos',
+                          onTap: () {
+                            Navigator.pop(context);
+                            // TODO: Implementar navegação para eventos
+                          },
+                        ),
+                      ],
                     ),
 
-                    // 🎯 Eventos
-                    ListTile(
-                      leading: const Icon(Icons.event_outlined),
-                      title: const Text('Eventos'),
-                      subtitle: const Text('Calendário de eventos'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        // TODO: Implementar navegação para eventos
-                      },
-                    ),
+                    const SizedBox(height: 8),
 
-                    // 📋 Formulários (condicional)
+                    // 📋 FORMULÁRIOS (condicional)
                     if (modoAtual != 'Voluntário' && 
                         (usuario?.role == UserRole.tenant_admin || 
                          usuario?.role == UserRole.branch_admin))
-                      ListTile(
-                        leading: const Icon(Icons.assignment_outlined),
-                        title: const Text('Formulários'),
-                        subtitle: const Text('Preencher formulários'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          // TODO: Implementar navegação para formulários
-                        },
+                      _buildMenuSection(
+                        context,
+                        title: 'Ferramentas',
+                        icon: Icons.build_outlined,
+                        children: [
+                          _buildMenuItem(
+                            context,
+                            icon: Icons.assignment_outlined,
+                            title: 'Formulários',
+                            subtitle: 'Preencher formulários',
+                            onTap: () {
+                              Navigator.pop(context);
+                              // TODO: Implementar navegação para formulários
+                            },
+                          ),
+                        ],
                       ),
 
-                    // ⚙️ Configurações
-                    ListTile(
-                      leading: const Icon(Icons.settings_outlined),
-                      title: const Text('Configurações'),
-                      subtitle: const Text('Preferências do app'),
+                    // 👥 GESTÃO DE PESSOAS (apenas quando não está como voluntário)
+                    if (modoAtual != 'Voluntário' && 
+                        (usuario?.role == UserRole.tenant_admin || 
+                         usuario?.role == UserRole.branch_admin || 
+                         usuario?.role == UserRole.leader))
+                      _buildMenuSection(
+                        context,
+                        title: 'Pessoas',
+                        icon: Icons.people_outlined,
+                        children: [
+                          _buildMenuItem(
+                            context,
+                            icon: Icons.groups_outlined,
+                            title: 'Ministérios',
+                            subtitle: 'Gerenciar ministérios',
+                            onTap: () {
+                              Navigator.pop(context);
+                              // TODO: Implementar navegação para ministérios
+                            },
+                          ),
+                          _buildMenuItem(
+                            context,
+                            icon: Icons.group_add_outlined,
+                            title: 'Membros',
+                            subtitle: 'Gerenciar membros',
+                            onTap: () {
+                              Navigator.pop(context);
+                              // TODO: Implementar navegação para membros
+                            },
+                          ),
+                          _buildMenuItem(
+                            context,
+                            icon: Icons.people_outlined,
+                            title: 'Voluntários',
+                            subtitle: 'Gerenciar voluntários',
+                            onTap: () {
+                              Navigator.pop(context);
+                              // TODO: Implementar navegação para voluntários
+                            },
+                          ),
+                        ],
+                      ),
+
+                    const SizedBox(height: 8),
+
+                    // 🏢 ADMINISTRAÇÃO (apenas para servus_admin)
+                    if (usuario?.role == UserRole.servus_admin)
+                      _buildMenuSection(
+                        context,
+                        title: 'Administração',
+                        icon: Icons.business_outlined,
+                        children: [
+                          _buildMenuItem(
+                            context,
+                            icon: Icons.business_outlined,
+                            title: 'Nova Igreja',
+                            subtitle: 'Criar nova organização',
+                            onTap: () {
+                              Navigator.pop(context);
+                              // TODO: Implementar navegação para criar tenant
+                            },
+                          ),
+                        ],
+                      ),
+
+                    const SizedBox(height: 8),
+
+                    // ⚙️ CONFIGURAÇÕES
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.settings_outlined,
+                      title: 'Configurações',
+                      subtitle: 'Preferências do app',
                       onTap: () {
                         Navigator.pop(context);
                         // TODO: Implementar navegação para configurações
                       },
                     ),
-
-                    // 🏢 Administração (apenas para servus_admin)
-                    if (usuario?.role == UserRole.servus_admin)
-                      ListTile(
-                        leading: const Icon(Icons.business_outlined),
-                        title: const Text('Nova Igreja'),
-                        subtitle: const Text('Criar nova organização'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          // TODO: Implementar navegação para criar tenant
-                        },
-                      ),
-
-                    // 👥 Gestão de Pessoas (apenas quando não está como voluntário)
-                    if (modoAtual != 'Voluntário' && 
-                        (usuario?.role == UserRole.tenant_admin || 
-                         usuario?.role == UserRole.branch_admin || 
-                         usuario?.role == UserRole.leader)) ...[
-                      const Divider(),
-                      ListTile(
-                        leading: const Icon(Icons.groups_outlined),
-                        title: const Text('Ministérios'),
-                        subtitle: const Text('Gerenciar ministérios'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          // TODO: Implementar navegação para ministérios
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.group_add_outlined),
-                        title: const Text('Membros'),
-                        subtitle: const Text('Gerenciar membros'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          // TODO: Implementar navegação para membros
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.people_outlined),
-                        title: const Text('Voluntários'),
-                        subtitle: const Text('Gerenciar voluntários'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          // TODO: Implementar navegação para voluntários
-                        },
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -190,6 +228,53 @@ class DrawerMenuVoluntario extends StatelessWidget {
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMenuSection(BuildContext context, {
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        dividerColor: Colors.transparent,
+      ),
+      child: ExpansionTile(
+        leading: Icon(icon, color: context.colors.primary),
+        title: Text(
+          title,
+          style: context.textStyles.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: context.colors.primary,
+          ),
+        ),
+        children: children,
+        initiallyExpanded: true,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 8),
+      child: ListTile(
+        leading: Icon(icon, size: 20),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        onTap: onTap,
       ),
     );
   }

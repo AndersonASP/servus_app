@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:servus_app/core/auth/controllers/login_controller.dart';
 import 'package:servus_app/core/theme/app_theme.dart';
+import 'package:servus_app/core/error/notification_service.dart';
 import 'package:servus_app/features/leader/dashboard/cards_details/escala_mensal/escala_mensal_controller.dart';
 import 'package:servus_app/features/leader/escalas/controllers/escala/escala_controller.dart';
 import 'package:servus_app/features/leader/escalas/controllers/evento/evento_controller.dart';
@@ -40,11 +41,15 @@ void main() async {
 
 class ServusApp extends StatelessWidget {
   final AuthState authState;
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-  const ServusApp({super.key, required this.authState});
+  ServusApp({super.key, required this.authState});
 
   @override
   Widget build(BuildContext context) {
+    // Inicializar o NotificationService com a chave do navigator
+    NotificationService.initialize(navigatorKey);
+    
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()),
@@ -58,7 +63,6 @@ class ServusApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => EscalaController()),
         ChangeNotifierProvider(create: (_) => EscalaMensalController()),
         ChangeNotifierProvider(create: (_) => MinisterioController()),
-        ChangeNotifierProvider(create: (_) => MinisterioController()),
         ChangeNotifierProvider(create: (_) => EventoController()),
         ChangeNotifierProvider(create: (_) => SubstitutionController()),
         ChangeNotifierProvider(create: (_) => MinistryFunctionsController(MinistryFunctionsService())),
@@ -71,7 +75,7 @@ class ServusApp extends StatelessWidget {
           theme: ServusTheme.light,
           darkTheme: ServusTheme.dark,
           themeMode: ThemeMode.system,
-          routerConfig: router,
+          routerConfig: mainRouter,
           supportedLocales: const [
             Locale('pt', 'BR'),
           ],
@@ -97,7 +101,7 @@ class PublicFormApp extends StatelessWidget {
       theme: ServusTheme.light,
       darkTheme: ServusTheme.dark,
       themeMode: ThemeMode.system,
-      routerConfig: router,
+      routerConfig: publicFormRouter,
       supportedLocales: const [
         Locale('pt', 'BR'),
       ],
